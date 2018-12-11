@@ -84,7 +84,7 @@ for i in range(N_exp):
     
      cfg_out.write(line_out)
     
-    print('Done %s'%cfg_file_out)
+    print(('Done %s'%cfg_file_out))
         
     cfg_out.close()   
 

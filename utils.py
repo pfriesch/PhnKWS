@@ -30,7 +30,7 @@ def run_command(cmd):
     while True:
         line = p.stdout.readline()
         stdout.append(line)
-        print(line.decode("utf-8"))
+        print((line.decode("utf-8")))
         if line == '' and p.poll() != None:
             break
     return ''.join(stdout)
@@ -613,7 +613,7 @@ def create_chunks(config):
                         
                     output_lst_file=out_folder+'/exp_files/train_'+dataset+'_ep'+format(ep, "03d")+'_ck'+format(ck, "02d")+'_'+fea_names[i]+'.lst'
                     f=open(output_lst_file,'w')
-                    tr_chunks_fea_wr=map(lambda x:x+'\n', tr_chunks_fea_split)
+                    tr_chunks_fea_wr=[x+'\n' for x in tr_chunks_fea_split]
                     f.writelines(tr_chunks_fea_wr)
                     f.close()
     
@@ -709,7 +709,7 @@ def create_chunks(config):
                         
                     output_lst_file=out_folder+'/exp_files/valid_'+dataset+'_ep'+format(ep, "03d")+'_ck'+format(ck, "02d")+'_'+fea_names[i]+'.lst'
                     f=open(output_lst_file,'w')
-                    valid_chunks_fea_wr=map(lambda x:x+'\n', valid_chunks_fea_split)
+                    valid_chunks_fea_wr=[x+'\n' for x in valid_chunks_fea_split]
                     f.writelines(valid_chunks_fea_wr)
                     f.close()
                     
@@ -752,7 +752,7 @@ def create_chunks(config):
                     
                 output_lst_file=out_folder+'/exp_files/forward_'+dataset+'_ep'+format(ep, "03d")+'_ck'+format(ck, "02d")+'_'+fea_names[i]+'.lst'
                 f=open(output_lst_file,'w')
-                forward_chunks_fea_wr=map(lambda x:x+'\n', forward_chunks_fea_split)
+                forward_chunks_fea_wr=[x+'\n' for x in forward_chunks_fea_split]
                 f.writelines(forward_chunks_fea_wr)
                 f.close()  
 
@@ -774,11 +774,11 @@ def write_cfg_chunk(cfg_file,config_chunk_file,cfg_file_proto_chunk,pt_files,lst
     # change seed for randomness
     config_chunk['exp']['seed']=str(int(config_chunk['exp']['seed'])+ep+ck)
     
-    for arch in pt_files.keys():
+    for arch in list(pt_files.keys()):
         config_chunk[arch]['arch_pretrain_file']=pt_files[arch]
     
     # writing the current learning rate
-    for lr_arch in lr.keys():
+    for lr_arch in list(lr.keys()):
         config_chunk[lr_arch ]['arch_lr']=str(lr[lr_arch])
     
     # Data_chunk section
@@ -956,7 +956,7 @@ def parse_model_field(cfg_file):
        
     
     possible_inputs=fea_lst
-    model_arch=list(filter(None, model.replace(' ','').split('\n')))
+    model_arch=list([_f for _f in model.replace(' ','').split('\n') if _f])
     
     # Reading the model field line by line
     for line in model_arch:
@@ -1103,7 +1103,7 @@ def create_block_diagram(cfg_file):
     
     out_diag_file=config['exp']['out_folder']+'/model.diag'
     
-    model_arch=list(filter(None, model.replace(' ','').split('\n')))
+    model_arch=list([_f for _f in model.replace(' ','').split('\n') if _f])
     
     
     diag_lines='blockdiag {\n';
@@ -1389,7 +1389,7 @@ def is_sequential(config,arch_lst): # To cancel
 def is_sequential_dict(config,arch_dict):
     seq_model=False
     
-    for arch in arch_dict.keys():
+    for arch in list(arch_dict.keys()):
         arch_id=arch_dict[arch][0]
         if strtobool(config[arch_id]['arch_seq_model']):
             seq_model=True
@@ -1401,7 +1401,7 @@ def compute_cw_max(fea_dict):
     cw_left_arr=[]
     cw_right_arr=[]
     
-    for fea in fea_dict.keys():
+    for fea in list(fea_dict.keys()):
         cw_left_arr.append(int(fea_dict[fea][3]))
         cw_right_arr.append(int(fea_dict[fea][4]))
     
@@ -1488,7 +1488,7 @@ def optimizer_init(nns,config,arch_dict):
     
     # optimizer init
     optimizers={}
-    for net in nns.keys():
+    for net in list(nns.keys()):
         
         lr=float(config[arch_dict[net][0]]['arch_lr'])
         
@@ -1553,7 +1553,7 @@ def forward_model(fea_dict,lab_dict,arch_dict,model,nns,costs,inp,inp_out_dict,m
     pattern='(.*)=(.*)\((.*),(.*)\)'
     
     # adding input features to out_dict:
-    for fea in fea_dict.keys():
+    for fea in list(fea_dict.keys()):
         if len(inp.shape)==3 and len(fea_dict[fea])>1:
             outs_dict[fea]=inp[:,:,fea_dict[fea][5]:fea_dict[fea][6]]
 
@@ -1688,22 +1688,22 @@ def dump_epoch_results(res_file_path, ep, tr_data_lst, tr_loss_tot, tr_error_tot
     res_file = open(res_file_path, "a")
     res_file.write('ep=%s tr=%s loss=%s err=%s ' %(format(ep, "03d"),tr_data_lst,format(tr_loss_tot/len(tr_data_lst), "0.3f"),format(tr_error_tot/len(tr_data_lst), "0.3f")))
     print(' ')
-    print('----- Summary epoch %s / %s'%(format(ep, "03d"),format(N_ep-1, "03d")))
-    print('Training on %s' %(tr_data_lst))
-    print('Loss = %s | err = %s '%(format(tr_loss_tot/len(tr_data_lst), "0.3f"),format(tr_error_tot/len(tr_data_lst), "0.3f")))
+    print(('----- Summary epoch %s / %s'%(format(ep, "03d"),format(N_ep-1, "03d"))))
+    print(('Training on %s' %(tr_data_lst)))
+    print(('Loss = %s | err = %s '%(format(tr_loss_tot/len(tr_data_lst), "0.3f"),format(tr_error_tot/len(tr_data_lst), "0.3f"))))
     print('-----')
     for valid_data in valid_data_lst:
         res_file.write('valid=%s loss=%s err=%s ' %(valid_data,format(valid_peformance_dict[valid_data][0], "0.3f"),format(valid_peformance_dict[valid_data][1], "0.3f")))
-        print('Validating on %s' %(valid_data))
-        print('Loss = %s | err = %s '%(format(valid_peformance_dict[valid_data][0], "0.3f"),format(valid_peformance_dict[valid_data][1], "0.3f")))
+        print(('Validating on %s' %(valid_data)))
+        print(('Loss = %s | err = %s '%(format(valid_peformance_dict[valid_data][0], "0.3f"),format(valid_peformance_dict[valid_data][1], "0.3f"))))
 
     print('-----')
-    for lr_arch in lr.keys():
+    for lr_arch in list(lr.keys()):
         res_file.write('lr_%s=%f ' %(lr_arch,lr[lr_arch]))
-        print('Learning rate on %s = %f ' %(lr_arch,lr[lr_arch]))
+        print(('Learning rate on %s = %f ' %(lr_arch,lr[lr_arch])))
     print('-----')
     res_file.write('time(s)=%i\n' %(int(tot_time)))
-    print('Elapsed time (s) = %i\n' %(int(tot_time)))
+    print(('Elapsed time (s) = %i\n' %(int(tot_time))))
     print(' ')
     res_file.close()
 

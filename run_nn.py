@@ -113,7 +113,7 @@ optimizers=optimizer_init(nns,config,arch_dict)
        
 
 # pre-training
-for net in nns.keys():
+for net in list(nns.keys()):
   pt_file_arch=config[arch_dict[net][0]]['arch_pretrain_file']
   
   if pt_file_arch!='none':        
@@ -211,7 +211,7 @@ for i in range(N_batches):
 
     if to_do=='train':
         
-        for opt in optimizers.keys():
+        for opt in list(optimizers.keys()):
             optimizers[opt].zero_grad()
             
 
@@ -222,7 +222,7 @@ for i in range(N_batches):
         #    torch.nn.utils.clip_grad_norm_(nns[net].parameters(), 0.1)
         
         
-        for opt in optimizers.keys():
+        for opt in list(optimizers.keys()):
             if not(strtobool(config[arch_dict[opt][0]]['arch_freeze'])):
                 optimizers[opt].step()
                 
@@ -266,7 +266,7 @@ err_tot=err_sum/N_batches
 if to_do=='train':
  
 
-     for net in nns.keys():
+     for net in list(nns.keys()):
          checkpoint={}
          checkpoint['model_par']=nns[net].state_dict()
          checkpoint['optimizer_par']=optimizers[net].state_dict()

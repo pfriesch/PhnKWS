@@ -42,16 +42,16 @@ M_2PI = 6.283185307179586476925286766559005
 
 dim_mat=(2*splice+1)*dim
 timeContext=2*splice+1
-print '['
+print('[')
 for row in range(dim_mat):
     for col in range(dim_mat):
         if col!=row:
-            print '0',
+            print('0', end=' ')
         else:
             i=int(row/dim)
-            print str(0.54 - 0.46*cos((M_2PI * i) / (timeContext-1))),
-    print
+            print(str(0.54 - 0.46*cos((M_2PI * i) / (timeContext-1))), end=' ')
+    print()
 
-print ']'
+print(']')
 
 

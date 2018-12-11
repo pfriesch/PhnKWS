@@ -7,7 +7,7 @@
 ##########################################################
 
 
-from __future__ import print_function
+
 
 import os
 import sys
@@ -128,7 +128,7 @@ for ep in range(N_ep):
                 model_files_past=model_files
                 
             model_files={}
-            for arch in pt_files.keys():
+            for arch in list(pt_files.keys()):
                 model_files[arch]=info_file.replace('.info','_'+arch+'.pkl')
             
             config_chunk_file=out_folder+'/exp_files/train_'+tr_data+'_ep'+format(ep, "03d")+'_ck'+format(ck, "02d")+'.cfg'
@@ -152,12 +152,12 @@ for ep in range(N_ep):
                                   
                       
             # update pt_file (used to initialized the DNN for the next chunk)  
-            for pt_arch in pt_files.keys():
+            for pt_arch in list(pt_files.keys()):
                 pt_files[pt_arch]=out_folder+'/exp_files/train_'+tr_data+'_ep'+format(ep, "03d")+'_ck'+format(ck, "02d")+'_'+pt_arch+'.pkl'
                 
             # remove previous pkl files
-            if len(model_files_past.keys())>0:
-                for pt_arch in pt_files.keys():
+            if len(list(model_files_past.keys()))>0:
+                for pt_arch in list(pt_files.keys()):
                     if os.path.exists(model_files_past[pt_arch]):
                         os.remove(model_files_past[pt_arch]) 
     
@@ -234,7 +234,7 @@ for ep in range(N_ep):
         err_valid_mean=np.mean(np.asarray(list(valid_peformance_dict.values()))[:,1])
         err_valid_mean_prev=np.mean(np.asarray(list(valid_peformance_dict_prev.values()))[:,1])
         
-        for lr_arch in lr.keys():
+        for lr_arch in list(lr.keys()):
             if ((err_valid_mean_prev-err_valid_mean)/err_valid_mean)<improvement_threshold[lr_arch]:
                 lr[lr_arch]=lr[lr_arch]*halving_factor[lr_arch]
     
@@ -296,7 +296,7 @@ for data in forward_data_lst:
             config_dec = configparser.ConfigParser()
             config_dec.add_section('decoding')
             
-            for dec_key in config['decoding'].keys():
+            for dec_key in list(config['decoding'].keys()):
                 config_dec.set('decoding',dec_key,config['decoding'][dec_key])
  
             # add graph_dir, datadir, alidir
