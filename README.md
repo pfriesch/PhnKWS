@@ -112,11 +112,28 @@ In the following, we provide a short tutorial of the PyTorch-Kaldi toolkit based
 
    4. Make sure `bc` is installed. Run `sudo apt-get install bc` otherwise.
 
-   5. Run `run.sh`. Takes a couple of hours if you run the full script. (Only the final DNN training steps take advantage of a GPU. You can run parts of the script by commenting out the specific stages.) This only works with python2 until [#2909](https://github.com/kaldi-asr/kaldi/pull/2909) gets accepted.
+   5. Choose the features you want to use and modify `run.sh` accordingly.
+
+      If you want to change the features, you have to first compute them with the Kaldi toolkit. To compute fbank features, you have to open `$KALDI_ROOT/egs/timit/s5/run.sh` and compute them with the following lines:
+
+      ```bash
+      feadir=fbank
+      
+      for x in train dev test; do
+        steps/make_fbank.sh --cmd "$train_cmd" --nj $feats_nj data/$x exp/make_fbank/$x $feadir
+        steps/compute_cmvn_stats.sh data/$x exp/make_fbank/$x $feadir
+      done
+      ```
+
+      Then, change the before mentioned configuration file with the new feature list.
+      If you already have run the full timit Kaldi recipe, you can directly find the fmllr features in `$KALDI_ROOT/egs/timit/s5/data-fmllr-tri3`.
+      If you feed the neural network with such features you should expect a substantial performance improvement, due to the adoption of the speaker adaptation.
+
+   4. Run `run.sh`. Takes a couple of hours if you run the full script. (Only the final DNN training steps take advantage of a GPU. You can run parts of the script by commenting out the specific stages.) This only works with python2 until [#2909](https://github.com/kaldi-asr/kaldi/pull/2909) gets accepted.
 
       This step is necessary to compute features and labels later used to train the PyTorch neural network. We recommend running the full timit s5 recipe (including the DNN training) in `kaldi/egs/timit/s5`. (comment out the early `exit 0`). This way all the necessary files are created and the user can directly compare the results obtained by Kaldi with that achieved with our toolkit.
 
-4. Compute the alignments (i.e, the phone-state labels) for test and dev data with the following commands (go into `$KALDI_ROOT/egs/timit/s5`).
+5. Compute the alignments (i.e, the phone-state labels) for test and dev data with the following commands (go into `$KALDI_ROOT/egs/timit/s5`).
 
    * If you want to use DNN alignments (as suggested), type:
 
@@ -135,9 +152,9 @@ In the following, we provide a short tutorial of the PyTorch-Kaldi toolkit based
    
    ```
 
-5. We start this tutorial with a very simple MLP network trained on mfcc features.  Before launching the experiment, take a look at the configuration file  `cfg/TIMIT_baselines/TIMIT_MLP_mfcc_basic.cfg`. See the [Description of the configuration files](#description-of-the-configuration-files) for a detailed description of all its fields. 
+6. We start this tutorial with a very simple MLP network trained on mfcc features.  Before launching the experiment, take a look at the configuration file  `cfg/TIMIT_baselines/TIMIT_MLP_mfcc_basic.cfg`. See the [Description of the configuration files](#description-of-the-configuration-files) for a detailed description of all its fields. 
 
-6. Change the config file according to your paths. In particular:
+7. Change the config file according to your paths. In particular:
 
    To avoid errors make sure that all the paths in the cfg file exist. **Please, avoid using paths containing bash variables since paths are read literally and are not automatically expanded** (e.g. no `$KALDI_ROOT`)
 
@@ -145,8 +162,6 @@ In the following, we provide a short tutorial of the PyTorch-Kaldi toolkit based
 - Add your path (e.g., `<kaldi_root_folder>/egs/timit/s5/data/train/utt2spk`) into `--utt2spk=ark:`
 - Add your CMVN transformation e.g.,<kaldi_root_folder>/egs/timit/s5/mfcc/cmvn_train.ark`
 - Add the folder where labels are stored (e.g.,`<kaldi_root_folder>/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali` for training and ,`<kaldi_root_folder>/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev` for dev data).
-
-
 
 7. Run the ASR experiment:
 ```bash
@@ -195,20 +210,6 @@ ep=023 tr=['TIMIT_tr'] loss=0.959 err=0.301 valid=TIMIT_dev loss=1.651 err=0.446
 
 The achieved PER(%) is 18.1%. Note that there could be some variability in the results, due to different initializations on different machines. We believe that averaging the performance obtained with different initialization seeds (i.e., change the field *seed* in the config file) is crucial for TIMIT since the natural performance variability might completely hide the experimental evidence. We noticed a standard deviation of about 0.2% for the TIMIT experiments.
 
-If you want to change the features, you have to first compute them with the Kaldi toolkit. To compute fbank features, you have to open `$KALDI_ROOT/egs/timit/s5/run.sh` and compute them with the following lines:
-```bash
-feadir=fbank
-
-for x in train dev test; do
-  steps/make_fbank.sh --cmd "$train_cmd" --nj $feats_nj data/$x exp/make_fbank/$x $feadir
-  steps/compute_cmvn_stats.sh data/$x exp/make_fbank/$x $feadir
-done
-```
-
-Then, change the before mentioned configuration file with the new feature list.
-If you already have run the full timit Kaldi recipe, you can directly find the fmllr features in `$KALDI_ROOT/egs/timit/s5/data-fmllr-tri3`.
-If you feed the neural network with such features you should expect a substantial performance improvement, due to the adoption of the speaker adaptation.
-
 In the TIMIT_baseline folder, we propose several other examples of possible TIMIT baselines. Similarly to the previous example, you can run them by simply typing:
 ```bash
 python run_exp.py $cfg_file
@@ -231,10 +232,9 @@ The best results are actually obtained with a more complex architecture that com
 You can directly compare your results with ours by going [here](https://bitbucket.org/mravanelli/pytorch-kaldi-exp-timit/src/master/). In this external repository, you can find all the folders containing the generated files.
 
 ### Librispeech tutorial
-The steps to run PyTorch-Kaldi on the Librispeech dataset are similar to that reported above for TIMIT. The following tutorial is based on the *100h sub-set*, but it can be easily extended to the full dataset (960h).
+The steps to run PyTorch-Kaldi on the Librispeech dataset are similar to that reported above for TIMIT. The following tutorial is based on the *train-clean-100 100h sub-set*, but it can be easily extended to the full dataset *(train-clean-100 + train-clean-360 + train-other-500 = 960h)*.
 
-1. Run the Kaldi recipe for timit (at least until # decode using the tri4b model)
-
+1. Run the Kaldi recipe for librispeech (at least until # decode using the tri4b model)
 2. Compute the fmllr features by running:
 
 ```bash
