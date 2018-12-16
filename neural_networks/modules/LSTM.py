@@ -3,7 +3,7 @@ from distutils.util import strtobool
 import torch
 import torch.nn as nn
 
-from neural_networks.utils import LayerNorm, act_fun
+from neural_networks.modules.utils import LayerNorm, act_fun, flip
 
 
 class LSTM(nn.Module):
@@ -13,17 +13,17 @@ class LSTM(nn.Module):
 
         # Reading parameters
         self.input_dim = inp_dim
-        self.lstm_lay = list(map(int, options['lstm_lay'].split(',')))
-        self.lstm_drop = list(map(float, options['lstm_drop'].split(',')))
-        self.lstm_use_batchnorm = list(map(strtobool, options['lstm_use_batchnorm'].split(',')))
-        self.lstm_use_laynorm = list(map(strtobool, options['lstm_use_laynorm'].split(',')))
-        self.lstm_use_laynorm_inp = strtobool(options['lstm_use_laynorm_inp'])
-        self.lstm_use_batchnorm_inp = strtobool(options['lstm_use_batchnorm_inp'])
-        self.lstm_act = options['lstm_act'].split(',')
-        self.lstm_orthinit = strtobool(options['lstm_orthinit'])
+        self.lstm_lay = options['lstm_lay']
+        self.lstm_drop = options['lstm_drop']
+        self.lstm_use_batchnorm = options['lstm_use_batchnorm']
+        self.lstm_use_laynorm = options['lstm_use_laynorm']
+        self.lstm_use_laynorm_inp = options['lstm_use_laynorm_inp']
+        self.lstm_use_batchnorm_inp = options['lstm_use_batchnorm_inp']
+        self.lstm_act = options['lstm_act']
+        self.lstm_orthinit = options['lstm_orthinit']
 
-        self.bidir = strtobool(options['lstm_bidir'])
-        self.use_cuda = strtobool(options['use_cuda'])
+        self.bidir = options['lstm_bidir']
+        self.use_cuda = options['use_cuda']
         self.to_do = options['to_do']
 
         if self.to_do == 'train':

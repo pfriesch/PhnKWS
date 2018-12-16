@@ -3,7 +3,7 @@ from distutils.util import strtobool
 import torch
 import torch.nn as nn
 
-from neural_networks.utils import LayerNorm, act_fun
+from neural_networks.modules.utils import LayerNorm, act_fun, flip
 
 
 class GRU(nn.Module):
@@ -13,16 +13,16 @@ class GRU(nn.Module):
 
         # Reading parameters
         self.input_dim = inp_dim
-        self.gru_lay = list(map(int, options['gru_lay'].split(',')))
-        self.gru_drop = list(map(float, options['gru_drop'].split(',')))
-        self.gru_use_batchnorm = list(map(strtobool, options['gru_use_batchnorm'].split(',')))
-        self.gru_use_laynorm = list(map(strtobool, options['gru_use_laynorm'].split(',')))
-        self.gru_use_laynorm_inp = strtobool(options['gru_use_laynorm_inp'])
-        self.gru_use_batchnorm_inp = strtobool(options['gru_use_batchnorm_inp'])
-        self.gru_orthinit = strtobool(options['gru_orthinit'])
-        self.gru_act = options['gru_act'].split(',')
-        self.bidir = strtobool(options['gru_bidir'])
-        self.use_cuda = strtobool(options['use_cuda'])
+        self.gru_lay = options['gru_lay']
+        self.gru_drop = options['gru_drop']
+        self.gru_use_batchnorm = options['gru_use_batchnorm']
+        self.gru_use_laynorm = options['gru_use_laynorm']
+        self.gru_use_laynorm_inp = options['gru_use_laynorm_inp']
+        self.gru_use_batchnorm_inp = options['gru_use_batchnorm_inp']
+        self.gru_orthinit = options['gru_orthinit']
+        self.gru_act = options['gru_act']
+        self.bidir = options['gru_bidir']
+        self.use_cuda = options['use_cuda']
         self.to_do = options['to_do']
 
         if self.to_do == 'train':

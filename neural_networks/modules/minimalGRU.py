@@ -3,7 +3,7 @@ from distutils.util import strtobool
 import torch
 import torch.nn as nn
 
-from neural_networks.utils import LayerNorm, act_fun
+from neural_networks.modules.utils import LayerNorm, act_fun, flip
 
 
 class minimalGRU(nn.Module):
@@ -13,16 +13,16 @@ class minimalGRU(nn.Module):
 
         # Reading parameters
         self.input_dim = inp_dim
-        self.minimalgru_lay = list(map(int, options['minimalgru_lay'].split(',')))
-        self.minimalgru_drop = list(map(float, options['minimalgru_drop'].split(',')))
-        self.minimalgru_use_batchnorm = list(map(strtobool, options['minimalgru_use_batchnorm'].split(',')))
-        self.minimalgru_use_laynorm = list(map(strtobool, options['minimalgru_use_laynorm'].split(',')))
-        self.minimalgru_use_laynorm_inp = strtobool(options['minimalgru_use_laynorm_inp'])
-        self.minimalgru_use_batchnorm_inp = strtobool(options['minimalgru_use_batchnorm_inp'])
-        self.minimalgru_orthinit = strtobool(options['minimalgru_orthinit'])
-        self.minimalgru_act = options['minimalgru_act'].split(',')
-        self.bidir = strtobool(options['minimalgru_bidir'])
-        self.use_cuda = strtobool(options['use_cuda'])
+        self.minimalgru_lay = options['minimalgru_lay']
+        self.minimalgru_drop = options['minimalgru_drop']
+        self.minimalgru_use_batchnorm = options['minimalgru_use_batchnorm']
+        self.minimalgru_use_laynorm = options['minimalgru_use_laynorm']
+        self.minimalgru_use_laynorm_inp = options['minimalgru_use_laynorm_inp']
+        self.minimalgru_use_batchnorm_inp = options['minimalgru_use_batchnorm_inp']
+        self.minimalgru_orthinit = options['minimalgru_orthinit']
+        self.minimalgru_act = options['minimalgru_act']
+        self.bidir = options['minimalgru_bidir']
+        self.use_cuda = options['use_cuda']
         self.to_do = options['to_do']
 
         if self.to_do == 'train':

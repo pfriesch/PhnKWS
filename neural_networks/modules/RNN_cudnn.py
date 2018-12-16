@@ -10,13 +10,13 @@ class RNN_cudnn(nn.Module):
         super(RNN_cudnn, self).__init__()
 
         self.input_dim = inp_dim
-        self.hidden_size = int(options['hidden_size'])
-        self.num_layers = int(options['num_layers'])
+        self.hidden_size = options['hidden_size']
+        self.num_layers = options['num_layers']
         self.nonlinearity = options['nonlinearity']
-        self.bias = strtobool(options['bias'])
-        self.batch_first = strtobool(options['batch_first'])
-        self.dropout = float(options['dropout'])
-        self.bidirectional = strtobool(options['bidirectional'])
+        self.bias = options['bias']
+        self.batch_first = options['batch_first']
+        self.dropout = options['dropout']
+        self.bidirectional = options['bidirectional']
 
         self.rnn = nn.ModuleList([nn.RNN(self.input_dim, self.hidden_size, self.num_layers,
                                          nonlinearity=self.nonlinearity, bias=self.bias, dropout=self.dropout,

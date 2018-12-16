@@ -1,0 +1,327 @@
+{
+  "cfg_proto": {
+    "cfg_proto": "proto/global.proto",
+    "cfg_proto_chunk": "proto/global_chunk.proto"
+  },
+  "exp": {
+    "cmd": "",
+    "run_nn_script": "run_nn.py",
+    "out_folder": "exp/TIMIT_MLP_mfcc",
+    "seed": 3234,
+    "use_cuda": true,
+    "multi_gpu": false,
+    "save_gpumem": false,
+    "n_epochs_tr": 3
+  },
+  "datasets": {
+    "TIMIT_tr": {
+      "fea": {
+        "mfcc": {
+          "fea_name": "mfcc",
+          "fea_lst": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/feats.scp",
+          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/train/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/mfcc/cmvn_train.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
+          "cw_left": 5,
+          "cw_right": 5
+        }
+      },
+      "lab": {
+        "lab_cd": {
+          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
+          "lab_opts": "ali-to-pdf",
+          "lab_count_file": "auto",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        },
+        "lab_mono": {
+          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
+          "lab_opts": "ali-to-phones --per-frame=true",
+          "lab_count_file": "none",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        }
+      },
+      "n_chunks": 1
+    },
+    "TIMIT_dev": {
+      "fea": {
+        "mfcc": {
+          "fea_name": "",
+          "fea_lst": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/feats.scp",
+          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/mfcc/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
+          "cw_left": 5,
+          "cw_right": 5
+        }
+      },
+      "lab": {
+        "lab_cd": {
+          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
+          "lab_opts": "ali-to-pdf",
+          "lab_count_file": "auto",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        },
+        "lab_mono": {
+          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
+          "lab_opts": "ali-to-phones --per-frame=true",
+          "lab_count_file": "none",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        }
+      },
+      "n_chunks": 1
+    },
+    "TIMIT_test": {
+      "fea": {
+        "mfcc": {
+          "fea_lst": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/feats.scp",
+          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/mfcc/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
+          "cw_left": 5,
+          "cw_right": 5
+        }
+      },
+      "lab": {
+        "lab_cd": {
+          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
+          "lab_opts": "ali-to-pdf",
+          "lab_count_file": "auto",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        },
+        "lab_mono": {
+          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
+          "lab_opts": "ali-to-phones --per-frame=true",
+          "lab_count_file": "none",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        }
+      },
+      "n_chunks": 1
+    }
+  },
+  "data_use": {
+    "train_with": [
+      "TIMIT_tr"
+    ],
+    "valid_with": [
+      "TIMIT_dev"
+    ],
+    "forward_with": [
+      "TIMIT_test"
+    ]
+  },
+  "batches": {
+    "batch_size_train": 128,
+    "max_seq_length_train": 1000,
+    "increase_seq_length_train": false,
+    "start_seq_len_train": 100,
+    "multply_factor_seq_len_train": 2,
+    "batch_size_valid": 128,
+    "max_seq_length_valid": 1000
+  },
+  "architectures": {
+    "MLP_layers1": {
+      "arch_proto": "proto/MLP.proto",
+      "arch_library": "neural_networks",
+      "arch_class": "MLP",
+      "arch_pretrain_file": "none",
+      "arch_freeze": false,
+      "arch_seq_model": false,
+      "dnn_lay": [
+        1024,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      "dnn_drop": [
+        0.15,
+        0.15,
+        0.15,
+        0.15,
+        0.15
+      ],
+      "dnn_use_laynorm_inp": false,
+      "dnn_use_batchnorm_inp": false,
+      "dnn_use_batchnorm": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "dnn_use_laynorm": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "dnn_act": [
+        "relu",
+        "relu",
+        "relu",
+        "relu",
+        "relu"
+      ],
+      "arch_lr": 0.08,
+      "arch_halving_factor": 0.5,
+      "arch_improvement_threshold": 0.001,
+      "arch_opt": "sgd",
+      "opt_momentum": 0.0,
+      "opt_weight_decay": 0.0,
+      "opt_dampening": 0.0,
+      "opt_nesterov": false
+    },
+    "MLP_layers2": {
+      "arch_proto": "proto/MLP.proto",
+      "arch_library": "neural_networks",
+      "arch_class": "MLP",
+      "arch_pretrain_file": "none",
+      "arch_freeze": false,
+      "arch_seq_model": false,
+      //TODO handle multple inputs
+      "dnn_lay": "N_out_lab_cd",
+      "dnn_drop": [
+        0.0
+      ],
+      "dnn_use_laynorm_inp": false,
+      "dnn_use_batchnorm_inp": false,
+      "dnn_use_batchnorm": [
+        false
+      ],
+      "dnn_use_laynorm": [
+        false
+      ],
+      "dnn_act": [
+        "softmax"
+      ],
+      "arch_lr": 0.0004,
+      "arch_halving_factor": 0.5,
+      "arch_improvement_threshold": 0.001,
+      "arch_opt": "rmsprop",
+      "opt_momentum": 0.0,
+      "opt_alpha": 0.95,
+      "opt_eps": 1e-08,
+      "opt_centered": false,
+      "opt_weight_decay": 0.0
+    },
+    "MLP_layers3": {
+      "arch_proto": "proto/MLP.proto",
+      "arch_library": "neural_networks",
+      "arch_class": "MLP",
+      "arch_pretrain_file": "none",
+      "arch_freeze": false,
+      "arch_seq_model": false,
+      "dnn_lay": [
+        48
+      ],
+      "dnn_drop": [
+        0.0
+      ],
+      "dnn_use_laynorm_inp": false,
+      "dnn_use_batchnorm_inp": false,
+      "dnn_use_batchnorm": [
+        false
+      ],
+      "dnn_use_laynorm": [
+        false
+      ],
+      "dnn_act": [
+        "softmax"
+      ],
+      "arch_lr": 0.0004,
+      "arch_halving_factor": 0.5,
+      "arch_improvement_threshold": 0.001,
+      "arch_opt": "rmsprop",
+      "opt_momentum": 0.0,
+      "opt_alpha": 0.95,
+      "opt_eps": 1e-08,
+      "opt_centered": false,
+      "opt_weight_decay": 0.0
+    }
+  },
+  "model": {
+    "model_proto": "proto/model.proto",
+    "model": [
+      {
+        "out_name": "out_dnn1",
+        "operation": "compute",
+        "inp1": "MLP_layers1",
+        "inp2": "mfcc"
+      },
+      {
+        "out_name": "out_dnn2",
+        "operation": "compute",
+        "inp1": "MLP_layers2",
+        "inp2": "out_dnn1"
+      },
+      {
+        "out_name": "out_dnn3",
+        "operation": "compute",
+        "inp1": "MLP_layers3",
+        "inp2": "out_dnn1"
+      },
+      {
+        "out_name": "loss_mono",
+        "operation": "cost_nll",
+        "inp1": "out_dnn3",
+        "inp2": "lab_mono"
+      },
+      {
+        "out_name": "loss_mono_w",
+        "operation": "mult_constant",
+        "inp1": "loss_mono",
+        "inp2": "1.0"
+      },
+      {
+        "out_name": "loss_cd",
+        "operation": "cost_nll",
+        "inp1": "out_dnn2",
+        "inp2": "lab_cd"
+      },
+      {
+        "out_name": "loss_final",
+        "operation": "sum",
+        "inp1": "loss_cd",
+        "inp2": "loss_mono_w"
+      },
+      {
+        "out_name": "err_final",
+        "operation": "cost_err",
+        "inp1": "out_dnn2",
+        "inp2": "lab_cd"
+      }
+    ]
+  },
+  "forward": {
+    "forward_out": [
+      "out_dnn2"
+    ],
+    "normalize_posteriors": [
+      true
+    ],
+    "normalize_with_counts_from": [
+      "lab_cd"
+    ],
+    "save_out_file": true,
+    "require_decoding": [
+      true
+    ]
+  },
+  "decoding": {
+    "decoding_script_folder": "kaldi_decoding_scripts",
+    "decoding_script": "decode_dnn.sh",
+    "decoding_proto": "proto/decoding.proto",
+    "min_active": 200,
+    "max_active": 7000,
+    "max_mem": 50000000,
+    "beam": 13.0,
+    "latbeam": 8.0,
+    "acwt": 0.2,
+    "max_arcs": -1.0,
+    "skip_scoring": "false",
+    "scoring_script": "local/score.sh",
+    "scoring_opts": "\"--min-lmwt 1 --max-lmwt 10\"",
+    "norm_vars": false
+  }
+}

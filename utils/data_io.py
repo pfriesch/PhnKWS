@@ -7,18 +7,25 @@
 
 import sys
 
-import kaldi_io
 import numpy as np
+
+import kaldi_io
 
 
 def load_dataset(fea_scp, fea_opts, lab_folder, lab_opts, left, right, max_sequence_length):
     fea = {k: m for k, m in kaldi_io.read_mat_ark('ark:copy-feats scp:' + fea_scp + ' ark:- |' + fea_opts)}
+    assert len(fea) > 0
 
     lab = {k: v for k, v in kaldi_io.read_vec_int_ark(
         'gunzip -c ' + lab_folder + '/ali*.gz | ' + lab_opts + ' ' + lab_folder + '/final.mdl ark:- ark:-|') if
            k in fea}  # Note that I'm copying only the aligments of the loaded fea
     fea = {k: v for k, v in list(fea.items()) if
            k in lab}  # This way I remove all the features without an aligment (see log file in alidir "Did not Succeded")
+
+    # check length of lab and feat matching
+
+    for filename in fea:
+        assert fea[filename].shape[0] == len(lab[filename])
 
     end_snt = 0
     end_index = []
@@ -59,6 +66,9 @@ def load_dataset(fea_scp, fea_opts, lab_folder, lab_opts, left, right, max_seque
             snt_name.append(k)
 
         tmp += 1
+
+    assert len(fea_conc) > 0
+    assert len(lab_conc) > 0
 
     fea_zipped = list(zip(fea_conc, lab_conc))
     fea_sorted = sorted(fea_zipped, key=lambda x: x[0].shape[0])
@@ -142,19 +152,19 @@ def read_lab_fea(fea_dict, lab_dict, cw_left_max, cw_right_max, max_seq_length):
     fea_index = 0
     cnt_fea = 0
 
-    for fea in list(fea_dict.keys()):
+    for fea in fea_dict:
 
         # reading the features
-        fea_scp = fea_dict[fea][1]
-        fea_opts = fea_dict[fea][2]
-        cw_left = int(fea_dict[fea][3])
-        cw_right = int(fea_dict[fea][4])
+        fea_scp = fea_dict[fea]['fea_lst']
+        fea_opts = fea_dict[fea]['fea_opts']
+        cw_left = fea_dict[fea]['cw_left']
+        cw_right = fea_dict[fea]['cw_right']
 
         cnt_lab = 0
-        for lab in list(lab_dict.keys()):
+        for lab in lab_dict:
 
-            lab_folder = lab_dict[lab][1]
-            lab_opts = lab_dict[lab][2]
+            lab_folder = lab_dict[lab]['lab_folder']
+            lab_opts = lab_dict[lab]['lab_opts']
 
             [data_name_fea, data_set_fea, data_end_index_fea] = load_chunk(fea_scp, fea_opts, lab_folder, lab_opts,
                                                                            cw_left, cw_right, max_seq_length)
@@ -172,10 +182,9 @@ def read_lab_fea(fea_dict, lab_dict, cw_left_max, cw_right_max, max_seq_length):
                 data_end_index = data_end_index_fea
                 data_name = data_name_fea
 
-                fea_dict[fea].append(fea_index)
-                fea_index = fea_index + data_set_fea.shape[1]
-                fea_dict[fea].append(fea_index)
-                fea_dict[fea].append(fea_dict[fea][6] - fea_dict[fea][5])
+                fea_dict[fea]['fea_index_start'] = fea_index
+                fea_dict[fea]['fea_index_end'] = fea_index + data_set_fea.shape[1]
+                fea_dict[fea]['fea_index_length'] = fea_dict[fea]['fea_index_end'] - fea_dict[fea]['fea_index_start']
 
 
             else:
@@ -205,10 +214,15 @@ def read_lab_fea(fea_dict, lab_dict, cw_left_max, cw_right_max, max_seq_length):
         cnt_fea = cnt_fea + 1
 
     cnt_lab = 0
-    for lab in list(lab_dict.keys()):
-        lab_dict[lab].append(data_set.shape[1] + cnt_lab)
+    for lab in lab_dict:
+        lab_dict[lab]['lab_index'] = data_set.shape[1] + cnt_lab
         cnt_lab = cnt_lab + 1
 
     data_set = np.column_stack((data_set, labs))
 
+    """
+    data_name : filenames
+    data_set: shape (227335, 430) where (:, 429) i the lables
+    data_end_index: increasing indeces 
+    """
     return [data_name, data_set, data_end_index]

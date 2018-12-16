@@ -3,7 +3,7 @@ from distutils.util import strtobool
 import torch
 import torch.nn as nn
 
-from neural_networks.utils import LayerNorm, act_fun
+from neural_networks.modules.utils import LayerNorm, act_fun, flip
 
 
 class liGRU(nn.Module):
@@ -13,16 +13,16 @@ class liGRU(nn.Module):
 
         # Reading parameters
         self.input_dim = inp_dim
-        self.ligru_lay = list(map(int, options['ligru_lay'].split(',')))
-        self.ligru_drop = list(map(float, options['ligru_drop'].split(',')))
-        self.ligru_use_batchnorm = list(map(strtobool, options['ligru_use_batchnorm'].split(',')))
-        self.ligru_use_laynorm = list(map(strtobool, options['ligru_use_laynorm'].split(',')))
-        self.ligru_use_laynorm_inp = strtobool(options['ligru_use_laynorm_inp'])
-        self.ligru_use_batchnorm_inp = strtobool(options['ligru_use_batchnorm_inp'])
-        self.ligru_orthinit = strtobool(options['ligru_orthinit'])
-        self.ligru_act = options['ligru_act'].split(',')
-        self.bidir = strtobool(options['ligru_bidir'])
-        self.use_cuda = strtobool(options['use_cuda'])
+        self.ligru_lay = options['ligru_lay']
+        self.ligru_drop = options['ligru_drop']
+        self.ligru_use_batchnorm = options['ligru_use_batchnorm']
+        self.ligru_use_laynorm = options['ligru_use_laynorm']
+        self.ligru_use_laynorm_inp = options['ligru_use_laynorm_inp']
+        self.ligru_use_batchnorm_inp = options['ligru_use_batchnorm_inp']
+        self.ligru_orthinit = options['ligru_orthinit']
+        self.ligru_act = options['ligru_act']
+        self.bidir = options['ligru_bidir']
+        self.use_cuda = options['use_cuda']
         self.to_do = options['to_do']
 
         if self.to_do == 'train':

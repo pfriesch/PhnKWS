@@ -3,7 +3,7 @@ from distutils.util import strtobool
 import torch
 import torch.nn as nn
 
-from neural_networks.utils import LayerNorm, act_fun
+from neural_networks.modules.utils import LayerNorm, act_fun, flip
 
 
 class RNN(nn.Module):
@@ -13,16 +13,16 @@ class RNN(nn.Module):
 
         # Reading parameters
         self.input_dim = inp_dim
-        self.rnn_lay = list(map(int, options['rnn_lay'].split(',')))
-        self.rnn_drop = list(map(float, options['rnn_drop'].split(',')))
-        self.rnn_use_batchnorm = list(map(strtobool, options['rnn_use_batchnorm'].split(',')))
-        self.rnn_use_laynorm = list(map(strtobool, options['rnn_use_laynorm'].split(',')))
-        self.rnn_use_laynorm_inp = strtobool(options['rnn_use_laynorm_inp'])
-        self.rnn_use_batchnorm_inp = strtobool(options['rnn_use_batchnorm_inp'])
-        self.rnn_orthinit = strtobool(options['rnn_orthinit'])
-        self.rnn_act = options['rnn_act'].split(',')
-        self.bidir = strtobool(options['rnn_bidir'])
-        self.use_cuda = strtobool(options['use_cuda'])
+        self.rnn_lay =  options['rnn_lay']
+        self.rnn_drop =  options['rnn_drop']
+        self.rnn_use_batchnorm =  options['rnn_use_batchnorm']
+        self.rnn_use_laynorm =  options['rnn_use_laynorm']
+        self.rnn_use_laynorm_inp = options['rnn_use_laynorm_inp']
+        self.rnn_use_batchnorm_inp = options['rnn_use_batchnorm_inp']
+        self.rnn_orthinit = options['rnn_orthinit']
+        self.rnn_act = options['rnn_act']
+        self.bidir = options['rnn_bidir']
+        self.use_cuda = options['use_cuda']
         self.to_do = options['to_do']
 
         if self.to_do == 'train':

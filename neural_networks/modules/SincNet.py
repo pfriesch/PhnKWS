@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import numpy as np
 
-from neural_networks.utils import act_fun, LayerNorm
+from neural_networks.modules.utils import act_fun, LayerNorm
 
 
 class SincNet(nn.Module):
@@ -16,24 +16,24 @@ class SincNet(nn.Module):
 
         # Reading parameters
         self.input_dim = inp_dim
-        self.sinc_N_filt = list(map(int, options['sinc_N_filt'].split(',')))
+        self.sinc_N_filt = options['sinc_N_filt']
 
-        self.sinc_len_filt = list(map(int, options['sinc_len_filt'].split(',')))
-        self.sinc_max_pool_len = list(map(int, options['sinc_max_pool_len'].split(',')))
+        self.sinc_len_filt = options['sinc_len_filt']
+        self.sinc_max_pool_len = options['sinc_max_pool_len']
 
-        self.sinc_act = options['sinc_act'].split(',')
-        self.sinc_drop = list(map(float, options['sinc_drop'].split(',')))
+        self.sinc_act = options['sinc_act']
+        self.sinc_drop = options['sinc_drop']
 
-        self.sinc_use_laynorm = list(map(strtobool, options['sinc_use_laynorm'].split(',')))
-        self.sinc_use_batchnorm = list(map(strtobool, options['sinc_use_batchnorm'].split(',')))
-        self.sinc_use_laynorm_inp = strtobool(options['sinc_use_laynorm_inp'])
-        self.sinc_use_batchnorm_inp = strtobool(options['sinc_use_batchnorm_inp'])
+        self.sinc_use_laynorm = options['sinc_use_laynorm']
+        self.sinc_use_batchnorm = options['sinc_use_batchnorm']
+        self.sinc_use_laynorm_inp = options['sinc_use_laynorm_inp']
+        self.sinc_use_batchnorm_inp = options['sinc_use_batchnorm_inp']
 
         self.N_sinc_lay = len(self.sinc_N_filt)
 
-        self.sinc_sample_rate = int(options['sinc_sample_rate'])
-        self.sinc_min_low_hz = int(options['sinc_min_low_hz'])
-        self.sinc_min_band_hz = int(options['sinc_min_band_hz'])
+        self.sinc_sample_rate = options['sinc_sample_rate']
+        self.sinc_min_low_hz = options['sinc_min_low_hz']
+        self.sinc_min_band_hz = options['sinc_min_band_hz']
 
         self.conv = nn.ModuleList([])
         self.bn = nn.ModuleList([])

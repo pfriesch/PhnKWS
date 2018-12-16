@@ -3,7 +3,7 @@ from distutils.util import strtobool
 import torch.nn.functional as F
 import torch.nn as nn
 
-from neural_networks.utils import act_fun, LayerNorm
+from neural_networks.modules.utils import act_fun, LayerNorm
 
 
 class CNN(nn.Module):
@@ -13,18 +13,18 @@ class CNN(nn.Module):
 
         # Reading parameters
         self.input_dim = inp_dim
-        self.cnn_N_filt = list(map(int, options['cnn_N_filt'].split(',')))
+        self.cnn_N_filt = options['cnn_N_filt']
 
-        self.cnn_len_filt = list(map(int, options['cnn_len_filt'].split(',')))
-        self.cnn_max_pool_len = list(map(int, options['cnn_max_pool_len'].split(',')))
+        self.cnn_len_filt = options['cnn_len_filt']
+        self.cnn_max_pool_len = options['cnn_max_pool_len']
 
-        self.cnn_act = options['cnn_act'].split(',')
-        self.cnn_drop = list(map(float, options['cnn_drop'].split(',')))
+        self.cnn_act = options['cnn_act']
+        self.cnn_drop = options['cnn_drop']
 
-        self.cnn_use_laynorm = list(map(strtobool, options['cnn_use_laynorm'].split(',')))
-        self.cnn_use_batchnorm = list(map(strtobool, options['cnn_use_batchnorm'].split(',')))
-        self.cnn_use_laynorm_inp = strtobool(options['cnn_use_laynorm_inp'])
-        self.cnn_use_batchnorm_inp = strtobool(options['cnn_use_batchnorm_inp'])
+        self.cnn_use_laynorm = options['cnn_use_laynorm']
+        self.cnn_use_batchnorm = options['cnn_use_batchnorm']
+        self.cnn_use_laynorm_inp = options['cnn_use_laynorm_inp']
+        self.cnn_use_batchnorm_inp = options['cnn_use_batchnorm_inp']
 
         self.N_cnn_lay = len(self.cnn_N_filt)
         self.conv = nn.ModuleList([])

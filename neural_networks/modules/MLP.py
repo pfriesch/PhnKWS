@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from neural_networks.utils import act_fun, LayerNorm
+from neural_networks.modules.utils import act_fun, LayerNorm
 
 
 class MLP(nn.Module):
@@ -12,13 +12,21 @@ class MLP(nn.Module):
         super(MLP, self).__init__()
 
         self.input_dim = inp_dim
-        self.dnn_lay = list(map(int, options['dnn_lay'].split(',')))
-        self.dnn_drop = list(map(float, options['dnn_drop'].split(',')))
-        self.dnn_use_batchnorm = list(map(strtobool, options['dnn_use_batchnorm'].split(',')))
-        self.dnn_use_laynorm = list(map(strtobool, options['dnn_use_laynorm'].split(',')))
-        self.dnn_use_laynorm_inp = strtobool(options['dnn_use_laynorm_inp'])
-        self.dnn_use_batchnorm_inp = strtobool(options['dnn_use_batchnorm_inp'])
-        self.dnn_act = options['dnn_act'].split(',')
+        self.dnn_lay = options['dnn_lay']
+        self.dnn_drop = options['dnn_drop']
+        self.dnn_use_batchnorm = options['dnn_use_batchnorm']
+        self.dnn_use_laynorm = options['dnn_use_laynorm']
+        self.dnn_use_laynorm_inp = options['dnn_use_laynorm_inp']
+        self.dnn_use_batchnorm_inp = options['dnn_use_batchnorm_inp']
+        self.dnn_act = options['dnn_act']
+
+        assert [isinstance(elem, int) for elem in self.dnn_lay]
+        assert [isinstance(elem, float) for elem in self.dnn_drop]
+        assert [isinstance(elem, bool) for elem in self.dnn_use_batchnorm]
+        assert [isinstance(elem, bool) for elem in self.dnn_use_laynorm]
+        assert isinstance(self.dnn_use_laynorm_inp, bool)
+        assert isinstance(self.dnn_use_batchnorm_inp, bool)
+        assert [isinstance(elem, str) for elem in self.dnn_act]
 
         self.wx = nn.ModuleList([])
         self.bn = nn.ModuleList([])

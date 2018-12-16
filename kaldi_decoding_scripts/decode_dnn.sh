@@ -19,7 +19,7 @@ out_folder=$2
 # Reading the options in the cfg file
 source <(grep = $cfg_file | sed 's/ *= */=/g')
 
-cd $decoding_script_folder
+cd $(dirname "$BASH_SOURCE")
 
 ./path.sh
 ./cmd.sh

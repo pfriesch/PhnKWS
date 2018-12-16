@@ -4,31 +4,25 @@
 # Mila, University of Montreal
 # October 2018
 ##########################################################
-
-
-import os
-import sys
-import glob
 import configparser
+import json
+import os
+import glob
 import re
-from distutils.util import strtobool
 
 import numpy as np
 
 from run_nn import train_on_chunk
-from utils.utils import check_cfg, create_chunks, write_cfg_chunk, compute_avg_performance, \
-    read_args_command_line, run_shell, compute_n_chunks, get_all_archs, cfg_item2sec, \
-    dump_epoch_results, create_curves, check_environment
+from utils.utils import create_chunks, write_cfg_chunk, compute_avg_performance, \
+    compute_n_chunks, \
+    dump_epoch_results, create_curves, check_environment, read_json, config2dict, \
+    check_and_maybe_replace_output_layer_size_based_on_data, run_shell
 
 check_environment()
 
 
 def main(cfg_file):
-    if not (os.path.exists(cfg_file)):
-        raise ValueError('ERROR: The config file %s does not exist!\n' % (cfg_file))
-    else:
-        config = configparser.ConfigParser()
-        config.read(cfg_file)
+    config = read_json(cfg_file)
 
     # Output folder creation
     out_folder = config['exp']['out_folder']
@@ -37,20 +31,31 @@ def main(cfg_file):
 
     # Import paths of kaldi libraries
     log_file = config['exp']['out_folder'] + '/log.log'
-    run_shell('./path.sh', log_file)
 
     # Reading and parsing optional arguments from command line (e.g.,--optimization,lr=0.002)
-    [section_args, field_args, value_args] = read_args_command_line(sys.argv, config)
+    # [section_args, field_args, value_args] = read_args_command_line(sys.argv, config)
 
     # Read, parse, and check the config file
     cfg_file_proto = config['cfg_proto']['cfg_proto']
-    [config, name_data, name_arch] = check_cfg(cfg_file, config, cfg_file_proto)
+
+    # name_arch #<class 'list'>: ['MLP_layers1', 'MLP_layers2', 'MLP_layers3']
+    # name_data #<class 'list'>: ['TIMIT_tr', 'TIMIT_dev', 'TIMIT_test']
+
+    # Create the output folder
+    if not os.path.exists(out_folder) or not (os.path.exists(out_folder + '/exp_files')):
+        os.makedirs(out_folder + '/exp_files')
+
+    config = check_and_maybe_replace_output_layer_size_based_on_data(config)
+
+    name_data = config["datasets"].keys()
+    name_arch = config["architectures"].keys()
     print("- Reading config file......OK!")
 
     # Copy the global cfg file into the output folder
-    cfg_file = out_folder + '/conf.cfg'
+
+    cfg_file = out_folder + '/conf.json'
     with open(cfg_file, 'w') as configfile:
-        config.write(configfile)
+        json.dump(config, configfile)
 
     # Splitting data into chunks (see out_folder/additional_files)
     create_chunks(config)
@@ -66,27 +71,27 @@ def main(cfg_file):
     cfg_file_proto_chunk = config['cfg_proto']['cfg_proto_chunk']
     # run_nn_script = config['exp']['run_nn_script']
     cmd = config['exp']['cmd']
-    N_ep = int(config['exp']['N_epochs_tr'])
-    tr_data_lst = config['data_use']['train_with'].split(',')
-    valid_data_lst = config['data_use']['valid_with'].split(',')
-    forward_data_lst = config['data_use']['forward_with'].split(',')
+    N_ep = int(config['exp']['n_epochs_tr'])
+    tr_data_lst = config['data_use']['train_with']
+    valid_data_lst = config['data_use']['valid_with']
+    forward_data_lst = config['data_use']['forward_with']
     max_seq_length_train = int(config['batches']['max_seq_length_train'])
-    forward_save_files = list(map(strtobool, config['forward']['save_out_file'].split(',')))
+    forward_save_files = config['forward']['save_out_file']
+    assert isinstance(forward_save_files, bool)
 
     # Learning rates and architecture-specific optimization parameters
-    arch_lst = get_all_archs(config)
     lr = {}
     improvement_threshold = {}
     halving_factor = {}
     pt_files = {}
 
-    for arch in arch_lst:
-        lr[arch] = float(config[arch]['arch_lr'])
-        improvement_threshold[arch] = float(config[arch]['arch_improvement_threshold'])
-        halving_factor[arch] = float(config[arch]['arch_halving_factor'])
-        pt_files[arch] = config[arch]['arch_pretrain_file']
+    for arch in config["architectures"]:
+        lr[arch] = config["architectures"][arch]['arch_lr']
+        improvement_threshold[arch] = config["architectures"][arch]['arch_improvement_threshold']
+        halving_factor[arch] = config["architectures"][arch]['arch_halving_factor']
+        pt_files[arch] = config["architectures"][arch]['arch_pretrain_file']
 
-    if strtobool(config['batches']['increase_seq_length_train']):
+    if config['batches']['increase_seq_length_train']:
         max_seq_length_train_curr = int(config['batches']['start_seq_len_train'])
     else:
         max_seq_length_train_curr = max_seq_length_train
@@ -98,10 +103,31 @@ def main(cfg_file):
         tr_error_tot = 0
         tr_time_tot = 0
 
-        print('------------------------------ Epoch %s / %s ------------------------------' % (
-            format(ep, "03d"), format(N_ep - 1, "03d")))
+        print("----------------------------- Epoch {:03d} / {:03d} -----------------------------".format(ep, N_ep - 1))
 
         for tr_data in tr_data_lst:
+            # #### PREPERATION ####
+            # 1. info file
+            # loss=6.0169883
+            # err=0.83695066
+            # elapsed_time_read=13.312386 (reading dataset)
+            # elapsed_time_load=11.523646 (loading data on pytorch/gpu)
+            # elapsed_time_chunk=51.931287 (processing chunk)
+            # elapsed_time=76.767319
+
+            # 2 data list scp per chunk
+
+            # model backup after each chunk
+
+            # 3 save config to run only that chunk
+
+            # run training
+
+            # save chunk model state
+
+            # remove previous state
+
+            # compute avg train acc and loss
 
             # Compute the total number of chunks for each training epoch
             N_ck_tr = compute_n_chunks(out_folder, tr_data, ep, 'train')
@@ -114,8 +140,9 @@ def main(cfg_file):
                                                                                                                    "02d") + '_*.lst'
 
                 # paths of the output files (info,model,chunk_specific cfg file)
-                info_file = out_folder + '/exp_files/train_' + tr_data + '_ep' + format(ep, "03d") + '_ck' + format(ck,
-                                                                                                                    "02d") + '.info'
+                info_file_name = out_folder + '/exp_files/train_' + tr_data + '_ep' + format(ep,
+                                                                                             "03d") + '_ck' + format(ck,
+                                                                                                                     "02d") + '.info'
 
                 if ep + ck == 0:
                     model_files_past = {}
@@ -124,19 +151,23 @@ def main(cfg_file):
 
                 model_files = {}
                 for arch in list(pt_files.keys()):
-                    model_files[arch] = info_file.replace('.info', '_' + arch + '.pkl')
+                    model_files[arch] = info_file_name.replace('.info', '_' + arch + '.pkl')
 
-                config_chunk_file = out_folder + '/exp_files/train_' + tr_data + '_ep' + format(ep,
-                                                                                                "03d") + '_ck' + format(
-                    ck, "02d") + '.cfg'
+                config_chunk_file = "{}/exp_files/train_{}_ep{:03d}_ck{:02d}.json" \
+                    .format(out_folder, tr_data, ep, ck)
+
+                # TODO run the experiement with json config, but keep ini config around to make sure it is equal or to helt wtf is going on
+                # TODO run with custom arch, optimizer, lrscheduler, loss
 
                 # Write chunk-specific cfg file
-                write_cfg_chunk(cfg_file, config_chunk_file, cfg_file_proto_chunk, pt_files, lst_file, info_file,
+                write_cfg_chunk(cfg_file, config_chunk_file,
+                                pt_files, lst_file,
+                                info_file_name,
                                 'train',
                                 tr_data, lr, max_seq_length_train_curr, name_data, ep, ck)
 
                 # if this chunk has not already been processed, do training...
-                if not (os.path.exists(info_file)):
+                if not (os.path.exists(info_file_name)):
                     print('Training %s chunk = %i / %i' % (tr_data, ck + 1, N_ck_tr))
 
                     # Doing training
@@ -153,7 +184,7 @@ def main(cfg_file):
                         if os.path.exists(model_files_past[pt_arch]):
                             os.remove(model_files_past[pt_arch])
 
-                            # Training Loss and Error
+            # Training Loss and Error
             tr_info_lst = sorted(
                 glob.glob(out_folder + '/exp_files/train_' + tr_data + '_ep' + format(ep, "03d") + '*.info'))
             [tr_loss, tr_error, tr_time] = compute_avg_performance(tr_info_lst)
@@ -183,23 +214,27 @@ def main(cfg_file):
                     "02d") + '_*.lst'
 
                 # paths of the output files
-                info_file = out_folder + '/exp_files/valid_' + valid_data + '_ep' + format(ep, "03d") + '_ck' + format(
+                info_file_name = out_folder + '/exp_files/valid_' + valid_data + '_ep' + format(ep,
+                                                                                                "03d") + '_ck' + format(
                     ck,
                     "02d") + '.info'
-                config_chunk_file = out_folder + '/exp_files/valid_' + valid_data + '_ep' + format(ep,
-                                                                                                   "03d") + '_ck' + format(
-                    ck, "02d") + '.cfg'
+                config_chunk_file_name = out_folder + '/exp_files/valid_' + valid_data + '_ep' + format(ep,
+                                                                                                        "03d") + '_ck' + format(
+                    ck, "02d") + '.json'
 
                 # Write chunk-specific cfg file
-                write_cfg_chunk(cfg_file, config_chunk_file, cfg_file_proto_chunk, model_files, lst_file, info_file,
-                                'valid', valid_data, lr, max_seq_length_train_curr, name_data, ep, ck)
+                write_cfg_chunk(cfg_file, config_chunk_file_name,
+                                model_files, lst_file,
+                                info_file_name,
+                                'valid',
+                                valid_data, lr, max_seq_length_train_curr, name_data, ep, ck)
 
                 # Do validation if the chunk was not already processed
-                if not (os.path.exists(info_file)):
+                if not (os.path.exists(info_file_name)):
                     print('Validating %s chunk = %i / %i' % (valid_data, ck + 1, N_ck_valid))
 
                     # Doing eval
-                    train_on_chunk(config_chunk_file)
+                    train_on_chunk(config_chunk_file_name)
 
             # Compute validation performance
             valid_info_lst = sorted(
@@ -213,7 +248,7 @@ def main(cfg_file):
                            valid_peformance_dict, lr, N_ep)
 
         #  if needed, update sentence_length
-        if strtobool(config['batches']['increase_seq_length_train']):
+        if config['batches']['increase_seq_length_train']:
             max_seq_length_train_curr = max_seq_length_train_curr * int(
                 config['batches']['multply_factor_seq_len_train'])
             if max_seq_length_train_curr > max_seq_length_train:
@@ -245,29 +280,33 @@ def main(cfg_file):
                 "02d") + '_*.lst'
 
             # output file
-            info_file = out_folder + '/exp_files/forward_' + forward_data + '_ep' + format(ep, "03d") + '_ck' + format(
+            info_file_name = out_folder + '/exp_files/forward_' + forward_data + '_ep' + format(ep,
+                                                                                                "03d") + '_ck' + format(
                 ck,
                 "02d") + '.info'
-            config_chunk_file = out_folder + '/exp_files/forward_' + forward_data + '_ep' + format(ep,
-                                                                                                   "03d") + '_ck' + format(
-                ck, "02d") + '.cfg'
+            config_chunk_file_name = out_folder + '/exp_files/forward_' + forward_data + '_ep' + format(ep,
+                                                                                                        "03d") + '_ck' + format(
+                ck, "02d") + '.json'
 
             # Write chunk-specific cfg file
-            write_cfg_chunk(cfg_file, config_chunk_file, cfg_file_proto_chunk, model_files, lst_file, info_file,
+            write_cfg_chunk(cfg_file, config_chunk_file_name,
+                            model_files, lst_file,
+                            info_file_name,
                             'forward',
                             forward_data, lr, max_seq_length_train_curr, name_data, ep, ck)
 
             # Do forward if the chunk was not already processed
-            if not (os.path.exists(info_file)):
+            if not (os.path.exists(info_file_name)):
                 # Doing forward
-                train_on_chunk(config_chunk_file)
+                train_on_chunk(config_chunk_file_name)
 
     # --------DECODING--------#
     dec_lst = glob.glob(out_folder + '/exp_files/*_to_decode.ark')
+    assert len(dec_lst) > 0
 
-    forward_data_lst = config['data_use']['forward_with'].split(',')
-    forward_outs = config['forward']['forward_out'].split(',')
-    forward_dec_outs = list(map(strtobool, config['forward']['require_decoding'].split(',')))
+    forward_data_lst = config['data_use']['forward_with']
+    forward_outs = config['forward']['forward_out']
+    forward_dec_outs = config['forward']['require_decoding']
 
     for data in forward_data_lst:
         for k in range(len(forward_outs)):
@@ -275,7 +314,7 @@ def main(cfg_file):
 
                 print('Decoding %s output %s' % (data, forward_outs[k]))
 
-                info_file = out_folder + '/exp_files/decoding_' + data + '_' + forward_outs[k] + '.info'
+                info_file_name = out_folder + '/exp_files/decoding_' + data + '_' + forward_outs[k] + '.info'
 
                 # create decode config file
                 config_dec_file = out_folder + '/decoding_' + data + '_' + forward_outs[k] + '.conf'
@@ -283,19 +322,15 @@ def main(cfg_file):
                 config_dec.add_section('decoding')
 
                 for dec_key in list(config['decoding'].keys()):
-                    config_dec.set('decoding', dec_key, config['decoding'][dec_key])
+                    config_dec.set('decoding', dec_key, str(config['decoding'][dec_key]))
 
-                # add graph_dir, datadir, alidir
-                lab_field = config[cfg_item2sec(config, 'data_name', data)]['lab']
-                pattern = 'lab_folder=(.*)\nlab_opts=(.*)\nlab_count_file=(.*)\nlab_data_folder=(.*)\nlab_graph=(.*)'
-                alidir = re.findall(pattern, lab_field)[0][0]
-                config_dec.set('decoding', 'alidir', os.path.abspath(alidir))
-
-                datadir = re.findall(pattern, lab_field)[0][3]
-                config_dec.set('decoding', 'data', os.path.abspath(datadir))
-
-                graphdir = re.findall(pattern, lab_field)[0][4]
-                config_dec.set('decoding', 'graphdir', os.path.abspath(graphdir))
+                lab_to_use = 'lab_cd'  # TODO just choosing one here since they should be the same, smells!
+                config_dec.set('decoding', 'alidir',
+                               os.path.abspath(config['datasets'][data]['lab'][lab_to_use]['lab_folder']))
+                config_dec.set('decoding', 'data',
+                               os.path.abspath(config['datasets'][data]['lab'][lab_to_use]['lab_data_folder']))
+                config_dec.set('decoding', 'graphdir',
+                               os.path.abspath(config['datasets'][data]['lab'][lab_to_use]['lab_graph']))
 
                 with open(config_dec_file, 'w') as configfile:
                     config_dec.write(configfile)
@@ -304,22 +339,23 @@ def main(cfg_file):
                 files_dec = out_folder + '/exp_files/forward_' + data + '_ep*_ck*_' + forward_outs[k] + '_to_decode.ark'
                 out_dec_folder = out_folder + '/decode_' + data + '_' + forward_outs[k]
 
-                if not (os.path.exists(info_file)):
+                if not (os.path.exists(info_file_name)):
 
                     # Run the decoder
                     cmd_decode = cmd + config['decoding']['decoding_script_folder'] + '/' + config['decoding'][
                         'decoding_script'] + ' ' + os.path.abspath(
                         config_dec_file) + ' ' + out_dec_folder + ' \"' + files_dec + '\"'
+                    print("cwd:", os.getcwd())
                     run_shell(cmd_decode, log_file)
 
                     # remove ark files if needed
-                    if forward_save_files:
+                    if not forward_save_files:
                         list_rem = glob.glob(files_dec)
                         for rem_ark in list_rem:
                             os.remove(rem_ark)
 
                 # Print WER results and write info file
-                cmd_res = './check_res_dec.sh ' + out_dec_folder
+                cmd_res = './scripts/check_res_dec.sh ' + out_dec_folder
                 wers = run_shell(cmd_res, log_file).decode('utf-8')
                 res_file = open(res_file_path, "a")
                 res_file.write('%s\n' % wers)
@@ -330,5 +366,4 @@ def main(cfg_file):
 
 
 if __name__ == '__main__':
-    main("/mnt/data/pytorch-kaldi_orig/cfg/TIMIT_baselines/TIMIT_MLP_mfcc.cfg")
-    # main("/mnt/data/pytorch-kaldi_orig/cfg/TIMIT_baselines/TIMIT_MLP_mfcc.cfg")
+    main("cfg/TIMIT_baselines/TIMIT_MLP_mfcc.json")

@@ -5,11 +5,7 @@
 # October 2018
 ##########################################################
 
-import sys
-import configparser
-import os
 import random
-from distutils.util import strtobool
 import time
 
 import numpy as np
@@ -17,27 +13,22 @@ import torch
 from scipy.ndimage.interpolation import shift
 
 import kaldi_io
-from utils.utils import read_args_command_line, dict_fea_lab_arch, is_sequential_dict, compute_cw_max, model_init, \
-    optimizer_init, forward_model, progress
+from utils.utils import compute_cw_max, model_init, \
+    optimizer_init, forward_model, progress, read_json
 from utils.data_io import load_counts, read_lab_fea
 
 
 def train_on_chunk(cfg_file):
-    if not (os.path.exists(cfg_file)):
-        sys.stderr.write('ERROR: The config file %s does not exist!\n' % (cfg_file))
-        sys.exit(0)
-    else:
-        config = configparser.ConfigParser()
-        config.read(cfg_file)
-
-    # Reading and parsing optional arguments from command line (e.g.,--optimization,lr=0.002)
-    [section_args, field_args, value_args] = read_args_command_line(sys.argv, config)
+    config = read_json(cfg_file)
 
     # list all the features, labels, and architecture actually used in the model section
-    [fea_dict, lab_dict, arch_dict] = dict_fea_lab_arch(config)
+    # [fea_dict, lab_dict, arch_dict] = dict_fea_lab_arch(config)
+    fea_dict = config['data_chunk']['fea']
+    lab_dict = config['data_chunk']['lab']
+    arch_dict = config['architectures']
 
     # check automatically if the model is sequential
-    seq_model = is_sequential_dict(config, arch_dict)
+    seq_model = any([config['architectures'][arch]['arch_seq_model'] for arch in config['architectures']])
 
     # Setting torch seed
     seed = int(config['exp']['seed'])
@@ -46,30 +37,28 @@ def train_on_chunk(cfg_file):
     np.random.seed(seed)
 
     # Reading config parameters
-    use_cuda = strtobool(config['exp']['use_cuda'])
-    save_gpumem = strtobool(config['exp']['save_gpumem'])
-    multi_gpu = strtobool(config['exp']['multi_gpu'])
+    use_cuda = config['exp']['use_cuda']
+    save_gpumem = config['exp']['save_gpumem']
+    multi_gpu = config['exp']['multi_gpu']
 
     to_do = config['exp']['to_do']
     info_file = config['exp']['out_info']
 
-    model = config['model']['model'].split('\n')
-
-    forward_outs = config['forward']['forward_out'].split(',')
-    forward_normalize_post = list(map(strtobool, config['forward']['normalize_posteriors'].split(',')))
-    forward_count_files = config['forward']['normalize_with_counts_from'].split(',')
-    require_decodings = list(map(strtobool, config['forward']['require_decoding'].split(',')))
+    forward_outs = config['forward']['forward_out']
+    forward_normalize_post = config['forward']['normalize_posteriors']
+    forward_count_files = config['forward']['normalize_with_counts_from']
+    require_decodings = config['forward']['require_decoding']
 
     batch_size = None
     max_seq_length = None
     if to_do == 'train':
-        max_seq_length = int(
-            config['batches']['max_seq_length_train'])  # *(int(info_file[-13:-10])+1) # increasing over the epochs
-        batch_size = int(config['batches']['batch_size_train'])
+        max_seq_length = config['batches']['max_seq_length_train']
+        # *(int(info_file[-13:-10])+1) # increasing over the epochs
+        batch_size = config['batches']['batch_size_train']
 
     if to_do == 'valid':
-        max_seq_length = int(config['batches']['max_seq_length_valid'])
-        batch_size = int(config['batches']['batch_size_valid'])
+        max_seq_length = config['batches']['max_seq_length_valid']
+        batch_size = config['batches']['batch_size_valid']
 
     if to_do == 'forward':
         max_seq_length = -1  # do to break forward sentences
@@ -78,12 +67,14 @@ def train_on_chunk(cfg_file):
     start_time = time.time()
 
     # Compute the maximum context window in the feature dict
-    [cw_left_max, cw_right_max] = compute_cw_max(fea_dict)
+    cw_left_max = max([fea_dict[fea_elem]['cw_left'] for fea_elem in fea_dict])
+    cw_right_max = max([fea_dict[fea_elem]['cw_right'] for fea_elem in fea_dict])
 
     # Reading all the features and labels
     [data_name, data_set, data_end_index] = read_lab_fea(fea_dict, lab_dict, cw_left_max, cw_right_max, max_seq_length)
 
     # Randomize if the model is not sequential
+    # TODO figure out sequential model
     if not (seq_model) and to_do != 'forward':
         np.random.shuffle(data_set)
 
@@ -91,7 +82,8 @@ def train_on_chunk(cfg_file):
 
     # converting numpy tensors into pytorch tensors and put them on GPUs if specified
     start_time = time.time()
-    if not (save_gpumem) and use_cuda: #TODO rename save_gpumem to gpu_prefetch maybe?? check first what else save_gpumem does
+    if not (save_gpumem) and use_cuda:
+        # TODO rename save_gpumem to gpu_prefetch maybe?? check first what else save_gpumem does
         data_set = torch.from_numpy(data_set).float().cuda()
     else:
         data_set = torch.from_numpy(data_set).float()
@@ -101,24 +93,25 @@ def train_on_chunk(cfg_file):
     # Reading model and initialize networks
     inp_out_dict = fea_dict
 
-    #TODO modify model
-    [nns, costs] = model_init(inp_out_dict, model, config, arch_dict, use_cuda, multi_gpu, to_do)
+    model = config['model']['model']
+    # TODO modify model
+    nns, costs = model_init(inp_out_dict, model, config, arch_dict, use_cuda, multi_gpu, to_do)
 
-    #TODO modify optimizer
+    # TODO modify optimizer
     # optimizers initialization
     optimizers = optimizer_init(nns, config, arch_dict)
 
     # pre-training
     for net in list(nns.keys()):
-        #TODO Does not actually do pretraining, but provieds an option to load pretrained weights
-        pt_file_arch = config[arch_dict[net][0]]['arch_pretrain_file']
+        # TODO Does not actually do pretraining, but provieds an option to load pretrained weights
+        pt_file_arch = arch_dict[net]['arch_pretrain_file']
 
         if pt_file_arch != 'none':
             checkpoint_load = torch.load(pt_file_arch)
             nns[net].load_state_dict(checkpoint_load['model_par'])
             optimizers[net].load_state_dict(checkpoint_load['optimizer_par'])
-            optimizers[net].param_groups[0]['lr'] = float(
-                config[arch_dict[net][0]]['arch_lr'])  # loading lr of the cfg file for pt
+            # loading lr of the cfg file for pt
+            optimizers[net].param_groups[0]['lr'] = arch_dict[net]['arch_lr']
 
     if to_do == 'forward':
 
@@ -204,12 +197,12 @@ def train_on_chunk(cfg_file):
 
             outs_dict['loss_final'].backward()
 
-            # Gradient Clipping (th 0.1)
+            # Gradient Clipping (th 0.1) #TODO
             # for net in nns.keys():
             #    torch.nn.utils.clip_grad_norm_(nns[net].parameters(), 0.1)
 
             for opt in list(optimizers.keys()):
-                if not (strtobool(config[arch_dict[opt][0]]['arch_freeze'])):
+                if not arch_dict[opt]['arch_freeze']:
                     optimizers[opt].step()
 
         if to_do == 'forward':
@@ -255,7 +248,7 @@ def train_on_chunk(cfg_file):
             checkpoint['model_par'] = nns[net].state_dict()
             checkpoint['optimizer_par'] = optimizers[net].state_dict()
 
-            out_file = info_file.replace('.info', '_' + arch_dict[net][0] + '.pkl')
+            out_file = info_file.replace('.info', '_' + net + '.pkl')
             torch.save(checkpoint, out_file)
 
     if to_do == 'forward':
