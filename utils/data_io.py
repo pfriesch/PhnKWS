@@ -7,8 +7,9 @@
 
 import sys
 
-import kaldi_io
 import numpy as np
+
+import kaldi_io
 
 
 def load_dataset(fea_scp, fea_opts, lab_folder, lab_opts, left, right, max_sequence_length):
@@ -19,6 +20,11 @@ def load_dataset(fea_scp, fea_opts, lab_folder, lab_opts, left, right, max_seque
            k in fea}  # Note that I'm copying only the aligments of the loaded fea
     fea = {k: v for k, v in list(fea.items()) if
            k in lab}  # This way I remove all the features without an aligment (see log file in alidir "Did not Succeded")
+
+    # check length of lab and feat matching
+
+    for filename in fea:
+        assert fea[filename].shape[0] == len(lab[filename])
 
     end_snt = 0
     end_index = []
@@ -59,6 +65,9 @@ def load_dataset(fea_scp, fea_opts, lab_folder, lab_opts, left, right, max_seque
             snt_name.append(k)
 
         tmp += 1
+
+    assert len(fea_conc) > 0
+    assert len(lab_conc) > 0
 
     fea_zipped = list(zip(fea_conc, lab_conc))
     fea_sorted = sorted(fea_zipped, key=lambda x: x[0].shape[0])
@@ -211,4 +220,9 @@ def read_lab_fea(fea_dict, lab_dict, cw_left_max, cw_right_max, max_seq_length):
 
     data_set = np.column_stack((data_set, labs))
 
+    """
+    data_name : filenames
+    data_set: shape (227335, 430) where (:, 429) i the lables
+    data_end_index: increasing indeces 
+    """
     return [data_name, data_set, data_end_index]

@@ -18,7 +18,7 @@ import numpy as np
 from run_nn import train_on_chunk
 from utils.utils import check_cfg, create_chunks, write_cfg_chunk, compute_avg_performance, \
     read_args_command_line, run_shell, compute_n_chunks, get_all_archs, cfg_item2sec, \
-    dump_epoch_results, create_curves, check_environment
+    dump_epoch_results, create_curves, check_environment, config2dict
 
 check_environment()
 
@@ -37,6 +37,7 @@ def main(cfg_file):
 
     # Import paths of kaldi libraries
     log_file = config['exp']['out_folder'] + '/log.log'
+    assert os.path.exists('./path.sh')
     run_shell('./path.sh', log_file)
 
     # Reading and parsing optional arguments from command line (e.g.,--optimization,lr=0.002)
@@ -44,9 +45,10 @@ def main(cfg_file):
 
     # Read, parse, and check the config file
     cfg_file_proto = config['cfg_proto']['cfg_proto']
-    [config, name_data, name_arch] = check_cfg(cfg_file, config, cfg_file_proto)
+    [config_after, name_data, name_arch] = check_cfg(cfg_file, config, cfg_file_proto)
     print("- Reading config file......OK!")
 
+    config = config_after
     # Copy the global cfg file into the output folder
     cfg_file = out_folder + '/conf.cfg'
     with open(cfg_file, 'w') as configfile:
@@ -71,7 +73,7 @@ def main(cfg_file):
     valid_data_lst = config['data_use']['valid_with'].split(',')
     forward_data_lst = config['data_use']['forward_with'].split(',')
     max_seq_length_train = int(config['batches']['max_seq_length_train'])
-    forward_save_files = list(map(strtobool, config['forward']['save_out_file'].split(',')))
+    forward_save_files = list(map(strtobool, config['forward']['save_out_file'].split(',')))[0]
 
     # Learning rates and architecture-specific optimization parameters
     arch_lst = get_all_archs(config)
@@ -313,13 +315,13 @@ def main(cfg_file):
                     run_shell(cmd_decode, log_file)
 
                     # remove ark files if needed
-                    if forward_save_files:
+                    if not forward_save_files:
                         list_rem = glob.glob(files_dec)
                         for rem_ark in list_rem:
                             os.remove(rem_ark)
 
                 # Print WER results and write info file
-                cmd_res = './check_res_dec.sh ' + out_dec_folder
+                cmd_res = './scripts/check_res_dec.sh ' + out_dec_folder
                 wers = run_shell(cmd_res, log_file).decode('utf-8')
                 res_file = open(res_file_path, "a")
                 res_file.write('%s\n' % wers)
@@ -330,5 +332,4 @@ def main(cfg_file):
 
 
 if __name__ == '__main__':
-    main("/mnt/data/pytorch-kaldi_orig/cfg/TIMIT_baselines/TIMIT_MLP_mfcc.cfg")
-    # main("/mnt/data/pytorch-kaldi_orig/cfg/TIMIT_baselines/TIMIT_MLP_mfcc.cfg")
+    main("cfg/TIMIT_baselines/TIMIT_MLP_mfcc.cfg")

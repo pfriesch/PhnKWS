@@ -18,7 +18,7 @@ from scipy.ndimage.interpolation import shift
 
 import kaldi_io
 from utils.utils import read_args_command_line, dict_fea_lab_arch, is_sequential_dict, compute_cw_max, model_init, \
-    optimizer_init, forward_model, progress
+    optimizer_init, forward_model, progress, config2dict
 from utils.data_io import load_counts, read_lab_fea
 
 
@@ -156,7 +156,7 @@ def train_on_chunk(cfg_file):
 
     inp_dim = data_set.shape[1]
 
-    for i in range(N_batches):
+    for _idx in range(N_batches):
 
         max_len = 0
 
@@ -204,7 +204,7 @@ def train_on_chunk(cfg_file):
 
             outs_dict['loss_final'].backward()
 
-            # Gradient Clipping (th 0.1)
+            # Gradient Clipping (th 0.1) #TODO
             # for net in nns.keys():
             #    torch.nn.utils.clip_grad_norm_(nns[net].parameters(), 0.1)
 
@@ -223,7 +223,7 @@ def train_on_chunk(cfg_file):
                     out_save = out_save - np.log(counts / np.sum(counts))
 
                     # save the output
-                kaldi_io.write_mat(post_file[forward_outs[out_id]], out_save, data_name[i])
+                kaldi_io.write_mat(post_file[forward_outs[out_id]], out_save, data_name[_idx])
         else:
             loss_sum = loss_sum + outs_dict['loss_final'].detach()
             err_sum = err_sum + outs_dict['err_final'].detach()
@@ -234,13 +234,13 @@ def train_on_chunk(cfg_file):
 
         # Progress bar
         if to_do == 'train':
-            status_string = "Training | (Batch " + str(i + 1) + "/" + str(N_batches) + ")"
+            status_string = "Training | (Batch " + str(_idx + 1) + "/" + str(N_batches) + ")"
         if to_do == 'valid':
-            status_string = "Validating | (Batch " + str(i + 1) + "/" + str(N_batches) + ")"
+            status_string = "Validating | (Batch " + str(_idx + 1) + "/" + str(N_batches) + ")"
         if to_do == 'forward':
-            status_string = "Forwarding | (Batch " + str(i + 1) + "/" + str(N_batches) + ")"
+            status_string = "Forwarding | (Batch " + str(_idx + 1) + "/" + str(N_batches) + ")"
 
-        progress(i, N_batches, status=status_string)
+        progress(_idx, N_batches, status=status_string)
 
     elapsed_time_chunk = time.time() - start_time
 

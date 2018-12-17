@@ -19,9 +19,17 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import matplotlib
+
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 import neural_networks.MLP
+import neural_networks.CNN
+
+
+def config2dict(config):
+    return {s: dict(config.items(s)) for s in config.sections()}
 
 
 def which(program):
@@ -55,6 +63,10 @@ def check_environment():
 
 
 def run_command(cmd):
+    if cmd.split(" ")[0].endswith(".sh"):
+        if not (os.path.isfile(cmd.split(" ")[0]) and os.access(cmd.split(" ")[0], os.X_OK)):
+            print("WARNING: {} does not exist or is not runnable!".format(cmd.split(" ")[0]))
+
     """from http://blog.kagesenshi.org/2008/02/teeing-python-subprocesspopen-output.html
     """
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -69,6 +81,10 @@ def run_command(cmd):
 
 
 def run_shell_display(cmd):
+    if cmd.split(" ")[0].endswith(".sh"):
+        if not (os.path.isfile(cmd.split(" ")[0]) and os.access(cmd.split(" ")[0], os.X_OK)):
+            print("WARNING: {} does not exist or is not runnable!".format(cmd.split(" ")[0]))
+
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     while True:
         out = p.stdout.read(1).decode('utf-8')
@@ -81,15 +97,19 @@ def run_shell_display(cmd):
 
 
 def run_shell(cmd, log_file):
+    if cmd.split(" ")[0].endswith(".sh"):
+        if not (os.path.isfile(cmd.split(" ")[0]) and os.access(cmd.split(" ")[0], os.X_OK)):
+            print("WARNING: {} does not exist or is not runnable!".format(cmd.split(" ")[0]))
+
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 
     (output, err) = p.communicate()
     p.wait()
+    print("OUTPUT: ", output.decode("utf-8"))
+    print("ERROR:  ", err.decode("utf-8"), file=sys.stderr)
     with open(log_file, 'a+') as logfile:
         logfile.write(output.decode("utf-8") + '\n')
         logfile.write(err.decode("utf-8") + '\n')
-
-    print(output.decode("utf-8"))
     return output
 
 
@@ -468,7 +488,7 @@ def check_cfg(cfg_file, config, cfg_file_proto):
 
         cnt = cnt + 1
 
-    # Create the output folder 
+    # Create the output folder
     out_folder = config['exp']['out_folder']
 
     if not os.path.exists(out_folder) or not (os.path.exists(out_folder + '/exp_files')):
@@ -1446,6 +1466,8 @@ def model_init(inp_out_dict, model, config, arch_dict, use_cuda, multi_gpu, to_d
             if config[arch_dict[inp1][0]]['arch_class'] == "MLP":
                 nn_class = neural_networks.MLP.MLP
                 # nn_class = getattr(module, config[arch_dict[inp1][0]]['arch_class'])
+            elif config[arch_dict[inp1][0]]['arch_class'] == "CNN":
+                nn_class = neural_networks.CNN.CNN
 
             else:
                 raise ValueError
