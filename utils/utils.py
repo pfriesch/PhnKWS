@@ -6,6 +6,7 @@
 ##########################################################
 
 import configparser
+import copy
 import sys
 import os.path
 import random
@@ -22,12 +23,25 @@ import torch.nn as nn
 import torch.optim as optim
 import matplotlib
 
+from neural_networks.TIMIT_LSTM import TIMIT_LSTM
+from neural_networks.losses.mtl_mono_cd_loss import MtlMonoCDLoss
+
+from neural_networks.metrics.metrics import LabCDAccuracy, LabMonoAccuracy
+from utils import logger
+
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from jsmin import jsmin
 
 from neural_networks.modules.MLP import MLP
 from neural_networks.modules.CNN import CNN
+
+
+def set_seed(seed):
+    assert isinstance(seed, int)
+    torch.manual_seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
 
 
 def config2dict(config):
@@ -115,21 +129,22 @@ def check_environment():
 #     return
 
 
-def run_shell(cmd, log_file):
-    print("RUN: ", cmd)
+def run_shell(cmd, logger):
+    logger.info("RUN: {}".format(cmd))
     if cmd.split(" ")[0].endswith(".sh"):
         if not (os.path.isfile(cmd.split(" ")[0]) and os.access(cmd.split(" ")[0], os.X_OK)):
-            print("WARNING: {} does not exist or is not runnable!".format(cmd.split(" ")[0]))
+            logger.warn("{} does not exist or is not runnable!".format(cmd.split(" ")[0]))
 
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 
     (output, err) = p.communicate()
-    p.wait()
-    print("OUTPUT: ", output.decode("utf-8"))
-    print("ERROR:  ", err.decode("utf-8"), file=sys.stderr)
-    with open(log_file, 'a+') as logfile:
-        logfile.write(output.decode("utf-8") + '\n')
-        logfile.write(err.decode("utf-8") + '\n')
+    return_code = p.wait()
+    if return_code > 0:
+        logger.error("Call: {} had nonzero return code: {}, stderr: {}".format(cmd, return_code, err))
+        raise RuntimeError("Call: {} had nonzero return code: {}, stderr: {}".format(cmd, return_code, err))
+    # logger.warn("ERROR: {}".format(err.decode("utf-8")))
+
+    logger.info("OUTPUT: {}".format(output.decode("utf-8")))
     return output
 
 
@@ -183,85 +198,38 @@ def compute_avg_performance(info_lst):
     return [loss, error, time]
 
 
-def check_and_maybe_replace_output_layer_size_based_on_data(config):
-    out_folder = config['exp']['out_folder']
-
+def get_posterior_norm_data(config, logger):
     # Parsing forward field
-    model = config['model']['model']
-    possible_outs = [layer['out_name'] for layer in model]
-    forward_out_lst = config['forward']['forward_out']
-    forward_norm_lst = config['forward']['normalize_with_counts_from']
-    forward_norm_bool_lst = config['forward']['normalize_posteriors']
+    # forward_out_lst = config['forward']['forward_out']
+    # forward_norm_lst = config['forward']['normalize_with_counts_from']
+    # forward_norm_bool_lst = config['forward']['normalize_posteriors']
 
     train_dataset_lab = config['datasets'][config['data_use']['train_with'][0]]['lab']
-    lab_lst = list(train_dataset_lab.keys())
-    N_out_lab = {k: 'none' for k in lab_lst}
+    # lab_lst = list(train_dataset_lab.keys())
+    N_out_lab = {}
 
-    for i in range(len(forward_out_lst)):
-        if forward_out_lst[i] not in possible_outs:
-            raise ValueError(
-                """ERROR: the output "{}" in the section "forwad_out" is not defined in section model)\n"""
-                    .format(forward_out_lst[i]))
-
-        if forward_norm_bool_lst[i]:
-
-            if forward_norm_lst[i] not in lab_lst:
-                if not os.path.exists(forward_norm_lst[i]):
-                    raise ValueError(
-                        """ERROR: the count_file "{}" in the section "forwad_out" is does not exist)\n"""
-                            .format(forward_norm_lst[i]))
-
-                else:
-                    # Check if the specified file is in the right format
-                    f = open(forward_norm_lst[i], "r")
-                    cnts = f.read()
-                    if not (bool(re.match("(.*)\[(.*)\]", cnts))):
-                        raise ValueError(
-                            """ERROR: the count_file "{}" in the section "forwad_out" is not in the right format)\n"""
-                                .format(forward_norm_lst[i]))
-
-
-            else:
-                # Try to automatically retrieve the config file
-                if "ali-to-pdf" in train_dataset_lab[forward_norm_lst[i]]['lab_opts']:
-                    log_file = config['exp']['out_folder'] + '/log.log'
-                    folder_lab_count = train_dataset_lab[forward_norm_lst[i]]['lab_folder']
-                    cmd = "hmm-info " + folder_lab_count + "/final.mdl | awk '/pdfs/{print $4}'"
-                    output = run_shell(cmd, log_file)
-                    N_out = int(output.decode().rstrip())
-                    N_out_lab[forward_norm_lst[i]] = N_out
-                    count_file_path = out_folder + '/exp_files/forward_' + forward_out_lst[i] + '_' + forward_norm_lst[
-                        i] + '.count'
-                    cmd = "analyze-counts --print-args=False --verbose=0 --binary=false --counts-dim=" + str(
-                        N_out) + " \"ark:ali-to-pdf " + folder_lab_count + "/final.mdl \\\"ark:gunzip -c " + folder_lab_count + "/ali.*.gz |\\\" ark:- |\" " + count_file_path
-                    run_shell(cmd, log_file)
-                    forward_norm_lst[i] = count_file_path
-
-                else:
-                    raise ValueError(
-                        """ERROR: Not able to automatically retrieve count file for the label""" +
-                        """ "{}". Please add a valid count file path in "normalize_with_counts_from" or set normalize_posteriors=False \n"""
-                        .format(forward_norm_lst[i]))
+    for forward_out in config['forward']:
+        normalize_with_counts_from = config['forward'][forward_out]['normalize_with_counts_from']
+        if config['forward'][forward_out]['normalize_posteriors']:
+            # Try to automatically retrieve the config file
+            assert "ali-to-pdf" in train_dataset_lab[normalize_with_counts_from]['lab_opts']
+            folder_lab_count = train_dataset_lab[normalize_with_counts_from]['lab_folder']
+            cmd = "hmm-info " + folder_lab_count + "/final.mdl | awk '/pdfs/{print $4}'"
+            output = run_shell(cmd, logger)
+            N_out = int(output.decode().rstrip())
+            N_out_lab[normalize_with_counts_from] = N_out
+            count_file_path = os.path.join(config['exp']['save_dir'], config['exp']['name'],
+                                           'exp_files/forward_' + forward_out + '_' + \
+                                           normalize_with_counts_from + '.count')
+            cmd = "analyze-counts --print-args=False --verbose=0 --binary=false --counts-dim=" + str(
+                N_out) + " \"ark:ali-to-pdf " + folder_lab_count + "/final.mdl \\\"ark:gunzip -c " + folder_lab_count + "/ali.*.gz |\\\" ark:- |\" " + count_file_path
+            run_shell(cmd, logger)
+            config['forward'][forward_out]['normalize_with_counts_from'] = count_file_path
 
     # Update the config file with the count_file paths
-    config['forward']['normalize_with_counts_from'] = forward_norm_lst
+    # config['forward']['normalize_with_counts_from'] = forward_norm_lst
 
-    # When possible replace the pattern "N_out_lab*" with the detected number of output
-
-    for arch in config['architectures']:
-        for opt_key, opt_val in config['architectures'][arch].items():
-            for _lst in lab_lst:
-                pattern = 'N_out_' + _lst
-                if isinstance(opt_val, str) and pattern in opt_val:
-                    if N_out_lab[_lst] != 'none':
-                        # TODO handle multiple inputs
-                        config['architectures'][arch][opt_key] = [N_out_lab[_lst]]
-                    else:
-                        raise ValueError(
-                            'ERROR: Cannot automatically retrieve the number of output in %s. Plese, add manually the number of outputs \n' % (
-                                pattern))
-
-    return config
+    return config, N_out_lab
 
 
 # TODO check config
@@ -274,28 +242,27 @@ def split_chunks(seq, size):
     return newseq
 
 
-def create_chunks(json_config):
+def create_chunks(config, debug_mode=False):
     # splitting data into chunks (see out_folder/additional_files)
-    out_folder = json_config['exp']['out_folder']
-    seed = int(json_config['exp']['seed'])
-    N_ep = int(json_config['exp']['n_epochs_tr'])
+    seed = int(config['exp']['seed'])
+    N_ep = int(config['exp']['n_epochs_tr'])
 
     # Setting the random seed
     random.seed(seed)
 
     # training chunk lists creation
-    tr_data_name = json_config['data_use']['train_with']
+    tr_data_name = config['data_use']['train_with']
 
     # Reading validation feature lists
     for dataset in tr_data_name:
-        fea_names = list(json_config['datasets'][dataset]['fea'].keys())
-        list_fea = [json_config['datasets'][dataset]['fea'][feats]['fea_lst'] for feats in
-                    json_config['datasets'][dataset]['fea']]
+        fea_names = list(config['datasets'][dataset]['fea'].keys())
+        list_fea = [config['datasets'][dataset]['fea'][feats]['fea_lst'] for feats in
+                    config['datasets'][dataset]['fea']]
 
         # assert [fea_names, list_fea, fea_opts, cws_left, cws_right] == parse_fea_field(
         #     config[cfg_item2sec(config, 'data_name', dataset)]['fea'])
 
-        N_chunks = int(json_config['datasets'][dataset]['n_chunks'])
+        N_chunks = int(config['datasets'][dataset]['n_chunks'])
 
         full_list = []
 
@@ -307,6 +274,9 @@ def create_chunks(json_config):
         full_list_fea_conc = full_list[0]
         for i in range(1, len(full_list)):
             full_list_fea_conc = list(map(str.__add__, full_list_fea_conc, full_list[i]))
+
+        if debug_mode:
+            full_list_fea_conc = full_list_fea_conc[:32]
 
         for ep in range(N_ep):
             #  randomize the list
@@ -322,24 +292,25 @@ def create_chunks(json_config):
                         # print(snt.split(',')[i])
                         tr_chunks_fea_split.append(snt.split(',')[i])
 
-                    output_lst_file = out_folder + '/exp_files/train_' + dataset + '_ep' + format(ep,
-                                                                                                  "03d") + '_ck' + format(
-                        ck, "02d") + '_' + fea_names[i] + '.lst'
+                    output_lst_file = os.path.join(config['exp']['save_dir'], config['exp']['name'],
+                                                   'exp_files',
+                                                   'train_{}_ep{:03d}_ck{:02d}_{}.lst'
+                                                   .format(dataset, ep, ck, fea_names[i]))
                     f = open(output_lst_file, 'w')
                     tr_chunks_fea_wr = [x + '\n' for x in tr_chunks_fea_split]
                     f.writelines(tr_chunks_fea_wr)
                     f.close()
 
     # Validation chunk lists creation
-    valid_data_name = json_config['data_use']['valid_with']
+    valid_data_name = config['data_use']['valid_with']
 
     # Reading validation feature lists
     for dataset in valid_data_name:
-        fea_names = list(json_config['datasets'][dataset]['fea'].keys())
-        list_fea = [json_config['datasets'][dataset]['fea'][feats]['fea_lst'] for feats in
-                    json_config['datasets'][dataset]['fea']]
+        fea_names = list(config['datasets'][dataset]['fea'].keys())
+        list_fea = [config['datasets'][dataset]['fea'][feats]['fea_lst'] for feats in
+                    config['datasets'][dataset]['fea']]
 
-        N_chunks = int(json_config['datasets'][dataset]['n_chunks'])
+        N_chunks = int(config['datasets'][dataset]['n_chunks'])
 
         full_list = []
 
@@ -351,6 +322,9 @@ def create_chunks(json_config):
         full_list_fea_conc = full_list[0]
         for i in range(1, len(full_list)):
             full_list_fea_conc = list(map(str.__add__, full_list_fea_conc, full_list[i]))
+
+        if debug_mode:
+            full_list_fea_conc = full_list_fea_conc[:32]
 
         # randomize the list
         random.shuffle(full_list_fea_conc)
@@ -364,25 +338,26 @@ def create_chunks(json_config):
                     for snt in valid_chunks_fea[ck]:
                         # print(snt.split(',')[i])
                         valid_chunks_fea_split.append(snt.split(',')[i])
+                    output_lst_file = os.path.join(config['exp']['save_dir'], config['exp']['name'],
+                                                   'exp_files',
+                                                   'valid_{}_ep{:03d}_ck{:02d}_{}.lst'
+                                                   .format(dataset, ep, ck, fea_names[i]))
 
-                    output_lst_file = out_folder + '/exp_files/valid_' + dataset + '_ep' + format(ep,
-                                                                                                  "03d") + '_ck' + format(
-                        ck, "02d") + '_' + fea_names[i] + '.lst'
                     f = open(output_lst_file, 'w')
                     valid_chunks_fea_wr = [x + '\n' for x in valid_chunks_fea_split]
                     f.writelines(valid_chunks_fea_wr)
                     f.close()
 
     # forward chunk lists creation
-    forward_data_name = json_config['data_use']['forward_with']
+    forward_data_name = config['data_use']['forward_with']
 
     # Reading validation feature lists
     for dataset in forward_data_name:
-        fea_names = list(json_config['datasets'][dataset]['fea'].keys())
-        list_fea = [json_config['datasets'][dataset]['fea'][feats]['fea_lst'] for feats in
-                    json_config['datasets'][dataset]['fea']]
+        fea_names = list(config['datasets'][dataset]['fea'].keys())
+        list_fea = [config['datasets'][dataset]['fea'][feats]['fea_lst'] for feats in
+                    config['datasets'][dataset]['fea']]
 
-        N_chunks = int(json_config['datasets'][dataset]['n_chunks'])
+        N_chunks = int(config['datasets'][dataset]['n_chunks'])
 
         full_list = []
 
@@ -395,6 +370,9 @@ def create_chunks(json_config):
         for i in range(1, len(full_list)):
             full_list_fea_conc = list(map(str.__add__, full_list_fea_conc, full_list[i]))
 
+        if debug_mode:
+            full_list_fea_conc = full_list_fea_conc[:32]
+
         # randomize the list
         random.shuffle(full_list_fea_conc)
         forward_chunks_fea = list(split_chunks(full_list_fea_conc, N_chunks))
@@ -406,39 +384,38 @@ def create_chunks(json_config):
                 for snt in forward_chunks_fea[ck]:
                     # print(snt.split(',')[i])
                     forward_chunks_fea_split.append(snt.split(',')[i])
-
-                output_lst_file = out_folder + '/exp_files/forward_' + dataset + '_ep' + format(ep,
-                                                                                                "03d") + '_ck' + format(
-                    ck, "02d") + '_' + fea_names[i] + '.lst'
+                    output_lst_file = os.path.join(config['exp']['save_dir'], config['exp']['name'],
+                                                   'exp_files',
+                                                   'forward_{}_ep{:03d}_ck{:02d}_{}.lst'
+                                                   .format(dataset, ep, ck, fea_names[i]))
                 f = open(output_lst_file, 'w')
                 forward_chunks_fea_wr = [x + '\n' for x in forward_chunks_fea_split]
                 f.writelines(forward_chunks_fea_wr)
                 f.close()
 
 
-def write_cfg_chunk(json_cfg_file, json_config_chunk_file, pt_file,
-                    lst_file, info_file, to_do,
-                    data_set_name, lr, max_seq_length_train_curr, name_data, ep, ck):
+def get_chunk_config(config,
+                     lst_file, info_file, to_do,
+                     data_set_name, max_seq_length_train_curr, ep, ck):
     # writing the chunk-specific cfg file
-    config = read_json(json_cfg_file)
-    config_chunk = read_json(json_cfg_file)
+    config_chunk = copy.deepcopy(config)
 
     # Exp section
     config_chunk['exp']['to_do'] = to_do
     config_chunk['exp']['out_info'] = info_file
 
     # change seed for randomness
-    config_chunk['exp']['seed'] = str(int(config_chunk['exp']['seed']) + ep + ck)
+    config_chunk['exp']['seed'] = config_chunk['exp']['seed'] + ep + ck
 
-    for arch in pt_file:
-        config_chunk["architectures"][arch]['arch_pretrain_file'] = pt_file[arch]
+    # for arch in pt_file:
+    #     config_chunk["arch_dict"][arch]['arch_pretrain_file'] = pt_file[arch]
 
     # writing the current learning rate
-    for arch in lr:
-        config_chunk["architectures"][arch]['arch_lr'] = lr[arch]
+    # for arch in lr:
+    #     config_chunk["arch_dict"][arch]['arch_lr'] = lr[arch]
 
     # Data_chunk section
-    config_chunk['data_chunk'] = config['datasets'][data_set_name]
+    config_chunk['data_chunk'] = copy.deepcopy(config['datasets'][data_set_name])
 
     # TODO make feat type independend, still shake debug with more than one feature list
     lst_files = sorted(glob.glob(lst_file))
@@ -457,14 +434,12 @@ def write_cfg_chunk(json_cfg_file, json_config_chunk_file, pt_file,
 
     config_chunk['batches']['max_seq_length_train'] = max_seq_length_train_curr
 
-    write_json(config_chunk, json_config_chunk_file)
+    return config_chunk
 
 
-def compute_n_chunks(out_folder, data_list, ep, step):
-    list_ck = sorted(
-        glob.glob(out_folder + '/exp_files/' + step + '_' + data_list + '_ep' + format(ep, "03d") + '*.lst'))
-    last_ck = list_ck[-1]
-    N_ck = int(re.findall('_ck(.+)_', last_ck)[-1].split('_')[0]) + 1
+def compute_n_chunks(out_folder, data_list, epoch, step):
+    list_ck = glob.glob('{}/exp_files/{}_{}_ep{:03d}*.lst'.format(out_folder, step, data_list, epoch))
+    N_ck = len(list_ck)
     return N_ck
 
 
@@ -481,7 +456,7 @@ def parse_model_field(cfg_file):
     # readiing the model string
     model = config['model']['model']
 
-    # Reading fea,lab arch architectures from the cfg file   
+    # Reading fea,lab arch arch_dict from the cfg file
     fea_lst = list(re.findall('fea_name=(.*)\n', config['dataset1']['fea'].replace(' ', '')))
     lab_lst = list(re.findall('lab_name=(.*)\n', config['dataset1']['lab'].replace(' ', '')))
     arch_lst = list(re.findall('arch_name=(.*)\n', open(cfg_file, 'r').read().replace(' ', '')))
@@ -514,7 +489,7 @@ def parse_model_field(cfg_file):
                         if possible_operations[i][k] == 'architecture':
                             if inps[k - 1] not in arch_lst:
                                 raise ValueError(
-                                    'ERROR: the architecture \"%s\" is not in the architecture lists of the config file (possible architectures are %s)\n' % (
+                                    'ERROR: the architecture \"%s\" is not in the architecture lists of the config file (possible arch_dict are %s)\n' % (
                                         inps[k - 1], arch_lst))
 
                         if possible_operations[i][k] == 'label':
@@ -622,7 +597,7 @@ def create_block_diagram(cfg_file):
     # readiing the model string
     model = config['model']['model']
 
-    # Reading fea,lab arch architectures from the cfg file   
+    # Reading fea,lab arch arch_dict from the cfg file
     pattern = '(.*)=(.*)\((.*),(.*)\)'
 
     fea_lst = list(re.findall('fea_name=(.*)\n', config['dataset1']['fea'].replace(' ', '')))
@@ -742,7 +717,49 @@ def compute_cw_max(fea_dict):
     return [cw_left_max, cw_right_max]
 
 
-def model_init(inp_out_dict, model, config, arch_dict, use_cuda, multi_gpu, to_do):
+def model_init(arch_name, fea_index_length, lab_cd_num, use_cuda=False, multi_gpu=False):
+    if arch_name == "TIMIT_LSTM":
+        net = TIMIT_LSTM(inp_dim=fea_index_length, lab_cd_num=lab_cd_num)
+
+    # model = [
+    #     {
+    #         "out_name": "loss_mono",
+    #         "operation": "cost_nll",
+    #         "inp1": "out_dnn3",
+    #         "inp2": "lab_mono"
+    #     },
+    #     {
+    #         "out_name": "loss_mono_w",
+    #         "operation": "mult_constant",
+    #         "inp1": "loss_mono",
+    #         "inp2": "1.0"
+    #     },
+    #     {
+    #         "out_name": "loss_cd",
+    #         "operation": "cost_nll",
+    #         "inp1": "out_dnn2",
+    #         "inp2": "lab_cd"
+    #     },
+    #     {
+    #         "out_name": "loss_final",
+    #         "operation": "sum",
+    #         "inp1": "loss_cd",
+    #         "inp2": "loss_mono_w"
+    #     },
+    #     {
+    #         "out_name": "err_final",
+    #         "operation": "cost_err",
+    #         "inp1": "out_dnn2",
+    #         "inp2": "lab_cd"
+    #     }
+    # ]
+    else:
+        raise ValueError
+
+    return net
+
+
+def model_init_old(inp_out_dict, model, config, arch_dict, use_cuda, multi_gpu, to_do):
     nns = {}
     costs = {}
 
@@ -817,39 +834,42 @@ def model_init(inp_out_dict, model, config, arch_dict, use_cuda, multi_gpu, to_d
     return [nns, costs]
 
 
-def optimizer_init(nns, config, arch_dict):
-    # optimizer init
-    optimizers = {}
-    for net in nns.keys():
+def optimizer_init(config, trainable_params):
+    if config['optimizer']['type'] == 'adam':
+        optimizer = optim.Adam(trainable_params, **config['optimizer']["args"])
+    else:
+        raise ValueError
 
-        lr = arch_dict[net]['arch_lr']
+    return optimizer
 
-        if arch_dict[net]['arch_opt'] == 'sgd':
-            optimizers[net] = (optim.SGD(nns[net].parameters(),
-                                         lr=lr,
-                                         momentum=arch_dict[net]['opt_momentum'],
-                                         weight_decay=arch_dict[net]['opt_weight_decay'],
-                                         dampening=arch_dict[net]['opt_dampening'],
-                                         nesterov=arch_dict[net]['opt_nesterov']))
 
-        if arch_dict[net]['arch_opt'] == 'adam':
-            optimizers[net] = (optim.Adam(nns[net].parameters(),
-                                          lr=lr,
-                                          betas=arch_dict[net]['opt_betas'],
-                                          eps=arch_dict[net]['opt_eps'],
-                                          weight_decay=arch_dict[net]['opt_weight_decay'],
-                                          amsgrad=arch_dict[net]['opt_amsgrad']))
+def loss_init(config):
+    if config['arch']['loss']['name'] == 'mtl_mono_cd':
+        return MtlMonoCDLoss(config['arch']['loss']['args']['weight_mono'])
+    else:
+        raise ValueError
 
-        if arch_dict[net]['arch_opt'] == 'rmsprop':
-            optimizers[net] = (optim.RMSprop(nns[net].parameters(),
-                                             lr=lr,
-                                             momentum=arch_dict[net]['opt_momentum'],
-                                             alpha=arch_dict[net]['opt_alpha'],
-                                             eps=arch_dict[net]['opt_eps'],
-                                             centered=arch_dict[net]['opt_centered'],
-                                             weight_decay=arch_dict[net]['opt_weight_decay']))
 
-    return optimizers
+def metrics_init(config):
+    metrics = {}
+    for metric in config['arch']['metrics']:
+        if metric == 'acc_lab_cd':
+            metrics[metric] = LabCDAccuracy()
+        elif metric == 'acc_lab_mono':
+            metrics[metric] = LabMonoAccuracy()
+        else:
+            raise ValueError("Can't find the metric {}".format(metric))
+    return metrics
+
+
+def lr_scheduler_init(config, optimizer):
+    optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                         mode='min',
+                                         factor=config['lr_scheduler']['arch_halving_factor'],
+                                         patience=1,
+                                         verbose=True,
+                                         threshold=config['lr_scheduler']['arch_improvement_threshold'],
+                                         threshold_mode='rel')
 
 
 def forward_model(fea_dict, lab_dict, arch_dict, model, nns, costs, inp, inp_out_dict, max_len, batch_size, to_do,

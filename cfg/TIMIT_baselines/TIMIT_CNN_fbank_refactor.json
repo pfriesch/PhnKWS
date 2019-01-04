@@ -96,7 +96,7 @@
     "batch_size_valid": 128,
     "max_seq_length_valid": 1000
   },
-  "architectures": {
+  "arch_dict": {
     "CNN_layers": {
       "arch_proto": "proto/CNN.proto",
       "arch_library": "neural_networks",

@@ -8,7 +8,7 @@
     "run_nn_script": "run_nn.py",
     "out_folder": "exp/TIMIT_MLP_mfcc",
     "seed": 3234,
-    "use_cuda": true,
+    "use_cuda": false,
     "multi_gpu": false,
     "save_gpumem": false,
     "n_epochs_tr": 3
@@ -68,29 +68,18 @@
       },
       "n_chunks": 1
     },
-    "TIMIT_test": {
+    "google_speech_commands_test": {
       "fea": {
         "mfcc": {
-          "fea_lst": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/feats.scp",
-          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/mfcc/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
+          "fea_lst": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/feats.scp",
+          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/mfcc_kws/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
           "cw_left": 5,
           "cw_right": 5
         }
       },
       "lab": {
-        "lab_cd": {
-          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
-          "lab_opts": "ali-to-pdf",
-          "lab_count_file": "auto",
-          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
-          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
-        },
-        "lab_mono": {
-          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
-          "lab_opts": "ali-to-phones --per-frame=true",
-          "lab_count_file": "none",
-          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
-          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        "lab_text": {
+          "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
         }
       },
       "n_chunks": 1
@@ -104,7 +93,7 @@
       "TIMIT_dev"
     ],
     "forward_with": [
-      "TIMIT_test"
+      "google_speech_commands_test"
     ]
   },
   "batches": {
@@ -116,7 +105,7 @@
     "batch_size_valid": 128,
     "max_seq_length_valid": 1000
   },
-  "architectures": {
+  "arch_dict": {
     "MLP_layers1": {
       "arch_proto": "proto/MLP.proto",
       "arch_library": "neural_networks",

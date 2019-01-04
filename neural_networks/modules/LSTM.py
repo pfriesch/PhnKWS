@@ -1,5 +1,3 @@
-from distutils.util import strtobool
-
 import torch
 import torch.nn as nn
 
@@ -22,11 +20,18 @@ class LSTM(nn.Module):
         self.lstm_act = options['lstm_act']
         self.lstm_orthinit = options['lstm_orthinit']
 
-        self.bidir = options['lstm_bidir']
-        self.use_cuda = options['use_cuda']
-        self.to_do = options['to_do']
+        assert all([isinstance(elem, int) for elem in self.lstm_lay])
+        assert all([isinstance(elem, float) for elem in self.lstm_drop])
+        assert all([isinstance(elem, bool) for elem in self.lstm_use_batchnorm])
+        assert all([isinstance(elem, bool) for elem in self.lstm_use_laynorm])
+        assert isinstance(self.lstm_use_laynorm_inp, bool)
+        assert isinstance(self.lstm_use_batchnorm_inp, bool)
+        assert all([isinstance(elem, str) for elem in self.lstm_act])
+        assert isinstance(self.lstm_orthinit, bool)
 
-        if self.to_do == 'train':
+        self.bidir = options['lstm_bidir']
+
+        if self.training:
             self.test_flag = False
         else:
             self.test_flag = True
@@ -134,9 +139,8 @@ class LSTM(nn.Module):
             else:
                 drop_mask = torch.FloatTensor([1 - self.lstm_drop[i]])
 
-            if self.use_cuda:
-                h_init = h_init.cuda()
-                drop_mask = drop_mask.cuda()
+            h_init = h_init.to(x.device)
+            drop_mask = drop_mask.to(x.device)
 
             # Feed-forward affine transformations (all steps in parallel)
             wfx_out = self.wfx[i](x)

@@ -35,14 +35,14 @@ The toolkit is released under a **Creative Commons Attribution 4.0 International
 
 
 ## Introduction
-The PyTorch-Kaldi project aims to bridge the gap between the Kaldi and the PyTorch toolkits, trying to inherit the efficiency of Kaldi and the flexibility of PyTorch. PyTorch-Kaldi is not only a simple interface between these software, but it embeds several useful features for developing modern speech recognizers. For instance, the code is specifically designed to naturally plug-in user-defined acoustic models. As an alternative, users can exploit several pre-implemented neural networks that can be customized using intuitive configuration files. PyTorch-Kaldi supports multiple feature and label streams as well as combinations of neural networks, enabling the use of complex neural architectures. The toolkit is publicly-released along with a rich documentation and is designed to properly work locally or on HPC clusters.
+The PyTorch-Kaldi project aims to bridge the gap between the Kaldi and the PyTorch toolkits, trying to inherit the efficiency of Kaldi and the flexibility of PyTorch. PyTorch-Kaldi is not only a simple interface between these software, but it embeds several useful features for developing modern speech recognizers. For instance, the code is specifically designed to naturally plug-in user-defined acoustic models. As an alternative, users can exploit several pre-implemented neural networks that can be customized using intuitive configuration files. PyTorch-Kaldi supports multiple feature and label streams as well as combinations of neural networks, enabling the use of complex neural arch_dict. The toolkit is publicly-released along with a rich documentation and is designed to properly work locally or on HPC clusters.
 
 Some features of the new version of the PyTorch-Kaldi toolkit:
 
 - Easy interface with Kaldi.
 - Easy plug-in of user-defined models.
 - Several pre-implemented models (MLP, CNN, RNN, LSTM, GRU, Li-GRU, SincNet).
-- Natural implementation of complex models based on multiple features, labels, and neural architectures.
+- Natural implementation of complex models based on multiple features, labels, and neural arch_dict.
 - Easy and flexible configuration files.
 - Automatic recovery from the last processed chunk.
 - Automatic chunking and context expansions of the input features.
@@ -217,7 +217,7 @@ In the TIMIT_baseline folder, we propose several other examples of possible TIMI
 ```bash
 python run_exp.py $cfg_file
 ```
-There are some examples with recurrent (`TIMIT_RNN`,`TIMIT_LSTM`,`TIMIT_GRU`,`TIMIT_LiGRU`) and CNN architectures (`TIMIT_CNN`). We also propose a more advanced model (`TIMIT_DNN_liGRU_DNN_mfcc+fbank+fmllr.cfg`) where we used a combination of feed-forward and recurrent neural networks fed by a concatenation of mfcc, fbank, and fmllr features. Note that the latter configuration files correspond to the best architecture described in the reference paper. As you might see from the above-mentioned configuration files, we improve the ASR performance by including some tricks such as the monophone regularization (i.e., we jointly estimate both context-dependent and context-independent targets). The following table reports the results obtained by running the latter systems (average PER\%):
+There are some examples with recurrent (`TIMIT_RNN`,`TIMIT_LSTM`,`TIMIT_GRU`,`TIMIT_LiGRU`) and CNN arch_dict (`TIMIT_CNN`). We also propose a more advanced model (`TIMIT_DNN_liGRU_DNN_mfcc+fbank+fmllr.cfg`) where we used a combination of feed-forward and recurrent neural networks fed by a concatenation of mfcc, fbank, and fmllr features. Note that the latter configuration files correspond to the best architecture described in the reference paper. As you might see from the above-mentioned configuration files, we improve the ASR performance by including some tricks such as the monophone regularization (i.e., we jointly estimate both context-dependent and context-independent targets). The following table reports the results obtained by running the latter systems (average PER\%):
 
 | Model  | mfcc | fbank | fMLLR |
 | ------ | -----| ------| ------|
@@ -457,7 +457,7 @@ opt_dampening = 0.0
 opt_nesterov = False
 ```
 
-The sections `[architecture\*]` are used to specify the architectures of the neural networks involved in the ASR experiments. The field `arch_name` specifies the name of the architecture. Since different neural networks can depend on a different set of hyperparameters, the user has to add the path of a proto file that contains the list of hyperparameters into the field `proto`.  For example,  the prototype file for a standard MLP model contains the following fields:
+The sections `[architecture\*]` are used to specify the arch_dict of the neural networks involved in the ASR experiments. The field `arch_name` specifies the name of the architecture. Since different neural networks can depend on a different set of hyperparameters, the user has to add the path of a proto file that contains the list of hyperparameters into the field `proto`.  For example,  the prototype file for a standard MLP model contains the following fields:
 
 ```ini
 [proto]
@@ -475,11 +475,11 @@ dnn_act=str_list
 Similarly to the other prototype files, each line defines a hyperparameter with the related value type. All the hyperparameters defined in the proto file must appear into the global configuration file under the corresponding `[architecture\*]` section.
 The field `arch_library` specifies where the model is coded (e.g. `neural_nets.py`), while `arch_class` indicates the name of the class where the architecture is implemented (e.g. if we set `class=MLP` we will do `from neural_nets.py import MLP`).
 
-The field `arch_pretrain_file` can be used to pre-train the neural network with a previously-trained architecture, while `arch_freeze` can be set to `False` if you want to train the parameters of the architecture during training and should be set to `True` do keep the parameters fixed (i.e., frozen) during training. The section `arch_seq_model` indicates if the architecture is sequential (e.g. RNNs) or non-sequential (e.g., a  feed-forward MLP or CNN). The way PyTorch-Kaldi processes the input batches is different in the two cases. For recurrent neural networks (`arch_seq_model=True`) the sequence of features is not randomized (to preserve the elements of the sequences), while for feedforward models  (`arch_seq_model=False`) we randomize the features (this usually helps to improve the performance). In the case of multiple architectures, sequential processing is used if at least one of the employed architectures is marked as sequential  (`arch_seq_model=True`).
+The field `arch_pretrain_file` can be used to pre-train the neural network with a previously-trained architecture, while `arch_freeze` can be set to `False` if you want to train the parameters of the architecture during training and should be set to `True` do keep the parameters fixed (i.e., frozen) during training. The section `arch_seq_model` indicates if the architecture is sequential (e.g. RNNs) or non-sequential (e.g., a  feed-forward MLP or CNN). The way PyTorch-Kaldi processes the input batches is different in the two cases. For recurrent neural networks (`arch_seq_model=True`) the sequence of features is not randomized (to preserve the elements of the sequences), while for feedforward models  (`arch_seq_model=False`) we randomize the features (this usually helps to improve the performance). In the case of multiple arch_dict, sequential processing is used if at least one of the employed arch_dict is marked as sequential  (`arch_seq_model=True`).
 
 The other hyperparameters are specific of the considered architecture (they depend on how the class MLP is actually implemented by the user) and can define number and typology of hidden layers, batch and layer normalizations, and other parameters.
 Other important parameters are related to the optimization of the considered architecture. For instance, `arch_lr` is the learning rate, while `arch_halving_factor` is used to implement learning rate annealing. In particular, when the relative performance improvement on the dev-set between two consecutive epochs is smaller than that specified in the `arch_improvement_threshold` (e.g, arch_improvement_threshold) we multiply the learning rate by the `arch_halving_factor` (e.g.,`arch_halving_factor=0.5`). The field arch_opt specifies the type of optimization algorithm. We currently support SGD, Adam, and Rmsprop. The other parameters are specific to the considered optimization algorithm (see the PyTorch documentation for an exact meaning of all the optimization-specific hyperparameters).
-Note that the different architectures defined in `[archictecture\*]` can have different optimization hyperparameters and they can even use a different optimization algorithm.
+Note that the different arch_dict defined in `[archictecture\*]` can have different optimization hyperparameters and they can even use a different optimization algorithm.
 
 ```ini
 [model]
@@ -489,8 +489,8 @@ model = out_dnn1=compute(MLP_layers1,mfcc)
     err_final=cost_err(out_dnn1,lab_cd)
 ```
 
-The way all the various features and architectures are combined is specified in this section with a very simple and intuitive meta-language.
-The field `model:` describes how features and architectures are connected to generate as output a set of posterior probabilities. The line `out_dnn1=compute(MLP_layers,mfcc)` means "`feed the architecture called MLP_layers1 with the features called mfcc and store the output into the variable out_dnn1`”.
+The way all the various features and arch_dict are combined is specified in this section with a very simple and intuitive meta-language.
+The field `model:` describes how features and arch_dict are connected to generate as output a set of posterior probabilities. The line `out_dnn1=compute(MLP_layers,mfcc)` means "`feed the architecture called MLP_layers1 with the features called mfcc and store the output into the variable out_dnn1`”.
 From the neural network output `out_dnn1` the error and the loss functions are computed using the labels called `lab_cd`, that have to be previously defined into the `[datasets\*]` sections. The `err_final` and `loss_final` fields are mandatory subfields that define the final output of the model.
 
 A much more complex example (discussed here just to highlight the potentiality of the toolkit) is reported in `cfg/TIMIT_baselines/TIMIT_mfcc_fbank_fmllr_liGRU_best.cfg`:
@@ -514,7 +514,7 @@ model:conc1=concatenate(mfcc,fbank)
 
 In this case we first concatenate mfcc, fbank, and fmllr features and we then feed a MLP. The output of the MLP is fed into the a recurrent neural network (specifically a Li-GRU model). We then have another MLP layer (`MLP_layers_second`) followed by two softmax classifiers (i.e., `MLP_layers_last`, `MLP_layers_last2`). The first one estimates standard context-dependent states, while the second estimates monophone targets. The final cost function is a weighted sum between these two predictions. In this way we implement the monophone regularization, that turned out to be useful to improve the ASR performance.
 
-The full model can be considered as a single big computational graph, where all the basic architectures used in the [model] section are jointly trained. For each mini-batch, the input features are propagated through the full model and the cost_final is computed using the specified labels. The gradient of the cost function with respect to all the learnable parameters of the architecture is then computed. All the parameters of the employed architectures are then updated together with the algorithm specified in the `[architecture\*]` sections.
+The full model can be considered as a single big computational graph, where all the basic arch_dict used in the [model] section are jointly trained. For each mini-batch, the input features are propagated through the full model and the cost_final is computed using the specified labels. The gradient of the cost function with respect to all the learnable parameters of the architecture is then computed. All the parameters of the employed arch_dict are then updated together with the algorithm specified in the `[architecture\*]` sections.
 
 ```ini  
 [forward]
@@ -654,11 +654,11 @@ python run_nn.py TIMIT_MLP_mfcc_baseline/exp_files/train_TIMIT_tr_ep000_ck00.cfg
 When implementing a new model, an important debug test consists of doing an overfitting experiment (to make sure that the model is able to overfit a tiny dataset). If the model is not able to overfit, it means that there is a major bug to solve.
 
 8. Hyperparameter tuning.
-In deep learning, it is often important to play with the hyperparameters to find the proper setting for your model. This activity is usually very computational and time-consuming but is often necessary when introducing new architectures. To help hyperparameter tuning, we developed a utility that implements a random search of the hyperparameters (see next section for more details).
+In deep learning, it is often important to play with the hyperparameters to find the proper setting for your model. This activity is usually very computational and time-consuming but is often necessary when introducing new arch_dict. To help hyperparameter tuning, we developed a utility that implements a random search of the hyperparameters (see next section for more details).
 
 
 ### How can I tune the hyperparameters
-A hyperparameter tuning is often needed in deep learning to search for proper neural architectures. To help tuning the hyperparameters within PyTorch-Kaldi, we have implemented a simple utility that implements a random search. In particular, the script  `tune_hyperparameters.py` generates a set of random configuration files and can be run in this way:
+A hyperparameter tuning is often needed in deep learning to search for proper neural arch_dict. To help tuning the hyperparameters within PyTorch-Kaldi, we have implemented a simple utility that implements a random search. In particular, the script  `tune_hyperparameters.py` generates a set of random configuration files and can be run in this way:
 ```bash
 python tune_hyperparameters.py cfg/TIMIT_MLP_mfcc.cfg exp/TIMIT_MLP_mfcc_tuning 10 arch_lr=randfloat(0.001,0.01) batch_size_train=randint(32,256) dnn_act=choose_str{relu,relu,relu,relu,softmax|tanh,tanh,tanh,tanh,softmax}
 ```
@@ -681,7 +681,7 @@ The current version of PyTorch-Kaldi supports input features stored with the Kal
 Moreover, you can take a look into our utility called save_raw_fea.py. This script generates Kaldi ark files containing raw features, that are later used to train neural networks fed by the raw waveform directly (see the section about processing audio with SincNet).
 
 ### How can I contribute to the project
-The project is still in its initial phase and we invite all potential contributors to participate. We hope to build a community of developers larger enough to progressively maintain, improve, and expand the functionalities of our current toolkit.  For instance, it could be helpful to report any bug or any suggestion to improve the current version of the code. People can also contribute by adding additional neural models, that can eventually make the set of currently-implemented architectures richer.
+The project is still in its initial phase and we invite all potential contributors to participate. We hope to build a community of developers larger enough to progressively maintain, improve, and expand the functionalities of our current toolkit.  For instance, it could be helpful to report any bug or any suggestion to improve the current version of the code. People can also contribute by adding additional neural models, that can eventually make the set of currently-implemented arch_dict richer.
 
 ## EXTRA
 ### Speech recognition from the raw waveform with SincNet
