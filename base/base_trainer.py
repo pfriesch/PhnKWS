@@ -1,14 +1,10 @@
 import os
 import math
 import json
-import logging
-import datetime
-import time
-import numpy as np
 
 import torch
-from utils.util import ensure_dir
-from utils.utils import get_posterior_norm_data
+
+from utils.util import ensure_dir, folder_to_checkpoint
 from utils.visualization import WriterTensorboardX
 
 
@@ -17,7 +13,7 @@ class BaseTrainer:
     Base class for all trainers
     """
 
-    def __init__(self, model, loss, metrics, optimizer, resume, config, logger=None):
+    def __init__(self, model, loss, metrics, optimizer, lr_scheduler, resume_path, config, logger=None):
         self.config = config
         self.logger = logger
 
@@ -30,6 +26,7 @@ class BaseTrainer:
         self.loss = loss
         self.metrics = metrics
         self.optimizer = optimizer
+        self.lr_scheduler = lr_scheduler
 
         self.epochs = config['exp']['n_epochs_tr']
         self.save_period = config['exp']['save_period']
@@ -49,9 +46,7 @@ class BaseTrainer:
         self.start_epoch = 0
 
         # setup directory for checkpoint saving
-        start_time = datetime.datetime.now().strftime('%m%d_%H%M%S')
-        # self.checkpoint_dir = os.path.join(config['exp']['save_dir'], config['exp']['name'], start_time) #TODO switch to make folder by time
-        self.checkpoint_dir = os.path.join(config['exp']['save_dir'], config['exp']['name'])
+        self.checkpoint_dir = os.path.join(config['exp']['save_dir'], config['exp']['name'], 'checkpoints')
         # setup visualization writer instance
         writer_dir = os.path.join(self.checkpoint_dir, "logs")
         self.writer = WriterTensorboardX(writer_dir, enable=True)
@@ -62,8 +57,8 @@ class BaseTrainer:
         with open(config_save_path, 'w') as handle:
             json.dump(config, handle, indent=4, sort_keys=False)
 
-        if resume:
-            self._resume_checkpoint(resume)
+        if resume_path:
+            self._resume_checkpoint(resume_path)
 
     def _prepare_device(self, n_gpu_use):
         """
@@ -90,9 +85,11 @@ class BaseTrainer:
 
         epoch = self.start_epoch
         for epoch in range(self.start_epoch, self.epochs):
-            print('--------------------- Epoch %s / %s ---------------------' % (
-                format(epoch, "03d"), format(self.epochs, "03d")))
+            self.logger.info('----- Epoch {} / {} -----'.format(format(epoch, "03d"), format(self.epochs, "03d")))
             result = self._train_epoch(epoch)
+
+            if self.lr_scheduler is not None:
+                self.lr_scheduler.step(result['valid_loss'], epoch=epoch)
 
             # save logged informations into log dict
             log = {'epoch': epoch}
@@ -101,7 +98,7 @@ class BaseTrainer:
             # print logged informations to the screen
             if self.logger is not None:
                 for key, value in log.items():
-                    self.logger.info('    {:15s}: {}'.format(str(key), value))
+                    self.logger.info('    {:10s}: {}'.format(str(key), value))
 
             # evaluate model performance according to configured metric, save best checkpoint as model_best
             best = False
@@ -134,7 +131,7 @@ class BaseTrainer:
                 self._save_checkpoint(epoch, save_best=best)
 
         result_eval = self._eval_epoch(epoch)
-        print(result_eval)
+        self.logger.info(result_eval)
 
     def _train_epoch(self, epoch):
         """
@@ -155,48 +152,43 @@ class BaseTrainer:
         :param log: logging information of the epoch
         :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
         """
-        arch = type(self.model).__name__
         state = {
-            'arch': arch,
             'epoch': epoch,
-            'logger': self.logger,
             'state_dict': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
+            'lr_scheduler': self.lr_scheduler.state_dict(),
             'monitor_best': self.mnt_best,
             'config': self.config
         }
         filename = os.path.join(self.checkpoint_dir, 'checkpoint-epoch{}.pth'.format(epoch))
         torch.save(state, filename)
         self.logger.info("Saving checkpoint: {} ...".format(filename))
+
+        if epoch > 0:
+            filename_prev = os.path.join(self.checkpoint_dir, 'checkpoint-epoch{}.pth'.format(epoch - 1))
+            if os.path.exists(filename_prev):
+                os.remove(filename_prev)
+                self.logger.info("Removing old checkpoint: {} ...".format(filename_prev))
+
         if save_best:
             best_path = os.path.join(self.checkpoint_dir, 'model_best.pth')
             torch.save(state, best_path)
             self.logger.info("Saving current best: {} ...".format('model_best.pth'))
 
-    def _resume_checkpoint(self, resume_path):
-        """
-        Resume from saved checkpoints
+    def _resume_checkpoint(self, resume_folder_path):
+        resume_path = folder_to_checkpoint(resume_folder_path)
 
-        :param resume_path: Checkpoint path to be resumed
-        """
         self.logger.info("Loading checkpoint: {} ...".format(resume_path))
         checkpoint = torch.load(resume_path)
         self.start_epoch = checkpoint['epoch'] + 1
-        self.mnt_best = checkpoint['monitor_best']
-
-        # load architecture params from checkpoint.
-        if checkpoint['config']['arch'] != self.config['arch']:
-            self.logger.warning(
-                'Warning: Architecture configuration given in config file is different from that of checkpoint. ' + \
-                'This may yield an exception while state_dict is being loaded.')
         self.model.load_state_dict(checkpoint['state_dict'])
 
-        # load optimizer state from checkpoint only when optimizer type is not changed. 
+        # load optimizer state from checkpoint only when optimizer type is not changed.
         if checkpoint['config']['optimizer']['type'] != self.config['optimizer']['type']:
             self.logger.warning('Warning: Optimizer type given in config file is different from that of checkpoint. ' + \
                                 'Optimizer parameters not being resumed.')
         else:
             self.optimizer.load_state_dict(checkpoint['optimizer'])
+            self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
 
-        self.logger = checkpoint['logger']
         self.logger.info("Checkpoint '{}' (epoch {}) loaded".format(resume_path, self.start_epoch))

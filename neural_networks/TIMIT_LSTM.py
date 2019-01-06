@@ -1,5 +1,4 @@
 import torch.nn as nn
-from torch.nn.functional import nll_loss
 from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence
 
 from neural_networks.modules.LSTM_cudnn import LSTM
@@ -53,10 +52,14 @@ class TIMIT_LSTM(nn.Module):
             ],
         }, inp_dim=self.lstm.out_dim)
 
+        self.context_left = 0
+        self.context_right = 0
+
     def forward(self, x):
         x = x['mfcc']
         out_dnn = self.lstm(x)
         if isinstance(out_dnn, PackedSequence):
+            # Padd with zeros
             out_dnn, sequence_lengths = pad_packed_sequence(out_dnn)
         out_cd = self.mlp_lab_cd(out_dnn)
         out_mono = self.mlp_lab_mono(out_dnn)

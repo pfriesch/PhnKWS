@@ -32,17 +32,21 @@ def collate_fn(sample_list):
 
 class KaldiDataLoader(DataLoader):
 
-    def __init__(self, fea_dict, lab_dict, batch_size, shuffle, use_gpu, prefetch_to_gpu, device, num_workers):
-        self.dataset = KaldiDataset(fea_dict, lab_dict)
+    def __init__(self, dataset, batch_size, shuffle, use_gpu, prefetch_to_gpu,
+                 device, num_workers):
+        self.dataset = dataset
         self.n_samples = len(self.dataset)
         if prefetch_to_gpu:
             # start_time = time.time() #TODO benchmark everything
             self.dataset.move_to(device)
             # elapsed_time_load = time.time() - start_time
 
+        assert (prefetch_to_gpu and num_workers == 0) or not prefetch_to_gpu
+
         super(KaldiDataLoader, self).__init__(self.dataset,
                                               batch_size,
                                               shuffle,
                                               collate_fn=collate_fn,
                                               pin_memory=use_gpu and not prefetch_to_gpu,
+                                              num_workers=num_workers,
                                               drop_last=False)

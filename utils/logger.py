@@ -1,4 +1,3 @@
-import json
 import logging
 import logging.config
 
@@ -23,8 +22,6 @@ def configure_logger(name, log_path):
                 'class': 'logging.handlers.RotatingFileHandler',
                 'formatter': 'default',
                 'filename': log_path,
-                'maxBytes': 1024,
-                'backupCount': 3
             }
         },
         # matplotlib logs to the root logger too, in debug mode
@@ -42,7 +39,6 @@ def configure_logger(name, log_path):
         'disable_existing_loggers': False
     })
     return logging.getLogger(name)
-
 
 #
 #

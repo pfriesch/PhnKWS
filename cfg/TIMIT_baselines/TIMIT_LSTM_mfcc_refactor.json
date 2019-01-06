@@ -5,10 +5,16 @@
     "name": "TIMIT_LSTM_mfcc",
     "seed": 2234,
     "n_gpu": 1,
-    "prefetch_to_gpu": true,
-    "n_epochs_tr": 2,
+    "prefetch_to_gpu": false,
+    "n_epochs_tr": 10,
     "save_period": 1,
     "log_level": "INFO"
+  },
+  "data_use": {
+    //todo allow multiple inputs
+    "train_with": "TIMIT_tr",
+    "valid_with": "TIMIT_dev",
+    "test_with": "TIMIT_test"
   },
   "datasets": {
     "TIMIT_tr": {
@@ -36,7 +42,7 @@
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
       },
-      "n_chunks": 1
+      "n_chunks": 3
     },
     "TIMIT_dev": {
       "fea": {
@@ -110,25 +116,25 @@
   //      "n_chunks": 1
   //    }
   //  },
-  "data_use": {
-    "train_with": [
-      "TIMIT_tr"
-    ],
-    "valid_with": [
-      "TIMIT_dev"
-    ],
-    "forward_with": [
-      "TIMIT_test"
-    ]
-  },
-  "batches": {
+  "training": {
     "batch_size_train": 8,
     "max_seq_length_train": 1000,
     "increase_seq_length_train": true,
     "start_seq_len_train": 100,
     "multply_factor_seq_len_train": 2,
     "batch_size_valid": 8,
-    "max_seq_length_valid": 1000
+    "max_seq_length_valid": 1000,
+    "clip_grad_norm": -1,
+    "optimizer": {
+      "type": "adam",
+      "args": {
+        "lr": 0.001
+      }
+    },
+    "lr_scheduler": {
+      "arch_halving_factor": 0.5,
+      "arch_improvement_threshold": 0.001
+    }
   },
   "arch": {
     "name": "TIMIT_LSTM",
@@ -146,17 +152,7 @@
       "acc_lab_mono"
     ]
   },
-  "optimizer": {
-    "type": "adam",
-    "args": {
-      "lr": 0.0016
-    }
-  },
-  "lr_scheduler": {
-    "arch_halving_factor": 0.5,
-    "arch_improvement_threshold": 0.001
-  },
-  "forward": {
+  "test": {
     "out_cd": {
       "normalize_posteriors": true,
       "normalize_with_counts_from": "lab_cd",

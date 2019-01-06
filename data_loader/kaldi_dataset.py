@@ -1,9 +1,7 @@
-import time
-
 import numpy as np
 import torch
 
-import kaldi_io
+from utils import kaldi_io
 
 
 def load_counts(class_counts_file):
@@ -52,6 +50,13 @@ def read_lab_fea(fea_dict, lab_dict):
     return fea_loaded, lab_loaded
 
 
+def apply_context(lab_dict, context_left, context_right):
+    for lab in lab_dict:
+        for filename in lab_dict[lab]:
+            lab_dict[lab][filename] = lab_dict[lab][filename][context_left:len(lab_dict[lab][filename]) - context_right]
+    return lab_dict
+
+
 def make_big_chunk(feat_dict, lab_dict, normalize_feat=True, normalize_lab=True):
     sample_name = {k: {'fea': {}, 'lab': {}} for k in feat_dict[list(feat_dict.keys())[0]].keys()}
     feat_chunks = {}
@@ -84,19 +89,19 @@ def make_big_chunk(feat_dict, lab_dict, normalize_feat=True, normalize_lab=True)
     for fea in feat_dict:
         feat_chunks[fea] = np.concatenate(feat_chunks[fea])
 
-        # make sure the concat worked
-        for filename in feat_dict[fea]:
-            assert np.array_equal(feat_chunks[fea][sample_name[filename]['fea'][fea]['start_idx']:
-                                                   sample_name[filename]['fea'][fea]['end_idx']],
-                                  feat_dict[fea][filename])
+        # # make sure the concat worked
+        # for filename in feat_dict[fea]:
+        #     assert np.array_equal(feat_chunks[fea][sample_name[filename]['fea'][fea]['start_idx']:
+        #                                            sample_name[filename]['fea'][fea]['end_idx']],
+        #                           feat_dict[fea][filename])
 
     for lab in lab_dict:
         lab_chunks[lab] = np.concatenate(lab_chunks[lab])
-        # make sure the concat worked
-        for filename in lab_dict[lab]:
-            assert np.array_equal(lab_chunks[lab][sample_name[filename]['lab'][lab]['start_idx']:
-                                                  sample_name[filename]['lab'][lab]['end_idx']],
-                                  lab_dict[lab][filename])
+        # # make sure the concat worked
+        # for filename in lab_dict[lab]:
+        #     assert np.array_equal(lab_chunks[lab][sample_name[filename]['lab'][lab]['start_idx']:
+        #                                           sample_name[filename]['lab'][lab]['end_idx']],
+        #                           lab_dict[lab][filename])
 
     if normalize_lab:
         for lab in lab_dict:
@@ -111,12 +116,19 @@ def make_big_chunk(feat_dict, lab_dict, normalize_feat=True, normalize_lab=True)
 
 class KaldiDataset(object):
 
-    def __init__(self, fea_dict, lab_dict):
+    def __init__(self, fea_dict, lab_dict, context_left, context_right, debug=False):
         feat_dict, lab_dict = read_lab_fea(fea_dict, lab_dict)
 
-        # TODO split files that are too long
-        # TODO handle context
+        if debug:
+            for lab in lab_dict:
+                lab_dict[lab] = dict(list(lab_dict[lab].items())[:30])
+            for fea in feat_dict:
+                feat_dict[fea] = dict(list(feat_dict[fea].items())[:30])
 
+        # TODO split files that are too long
+        lab_dict = apply_context(lab_dict, context_left, context_right)
+
+        # TODO make multiple chunks if too big
         sample_name, feat_chunks, lab_chunks = make_big_chunk(feat_dict, lab_dict)
         self.feat_chunks = {fea: torch.from_numpy(feat_chunks[fea]).float()
                             for fea, v in feat_chunks.items()}
