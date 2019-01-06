@@ -6,7 +6,7 @@ import os
 import jsondiff
 import torch
 
-from utils import configure_logger, folder_to_checkpoint
+from utils import configure_logger, folder_to_checkpoint, kaldi_io
 from utils.utils import model_init, \
     optimizer_init, lr_scheduler_init, loss_init, set_seed, get_posterior_norm_data, metrics_init
 from trainer import Trainer
@@ -62,6 +62,7 @@ def main(config_path, resume_path, debug):
         os.makedirs(out_folder + '/exp_files')
 
     default_logger = configure_logger('default', os.path.join(out_folder, 'log.log'))
+    kaldi_io.logger = default_logger
 
     model, loss, metrics, optimizer, config, lr_scheduler = setup_run(config, default_logger)
 

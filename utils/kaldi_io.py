@@ -20,6 +20,8 @@ os.environ['PATH'] = os.popen(
     'echo $KALDI_ROOT/src/bin:$KALDI_ROOT/tools/openfst/bin:$KALDI_ROOT/src/fstbin/:$KALDI_ROOT/src/gmmbin/:$KALDI_ROOT/src/featbin/:$KALDI_ROOT/src/lm/:$KALDI_ROOT/src/sgmmbin/:$KALDI_ROOT/src/sgmm2bin/:$KALDI_ROOT/src/fgmmbin/:$KALDI_ROOT/src/latbin/:$KALDI_ROOT/src/nnetbin:$KALDI_ROOT/src/nnet2bin:$KALDI_ROOT/src/nnet3bin:$KALDI_ROOT/src/online2bin/:$KALDI_ROOT/src/ivectorbin/:$KALDI_ROOT/src/lmbin/').readline().strip() + ':' + \
                      os.environ['PATH']
 
+logger = None
+
 
 #################################################
 # Define all custom exceptions,
@@ -87,26 +89,30 @@ def popen(cmd, mode="rb"):
     # cleanup function for subprocesses,
     def cleanup(proc, cmd):
         ret = proc.wait()
+        if logger is not None:
+            logger.debug(proc.stderr.read().decode("utf-8"))
+        else:
+            print(proc.stderr.read().decode("utf-8"))
         if ret > 0:
             raise SubprocessFailed('cmd %s returned %d !' % (cmd, ret))
         return
 
     # text-mode,
     if mode == "r":
-        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         threading.Thread(target=cleanup, args=(proc, cmd)).start()  # clean-up thread,
         return io.TextIOWrapper(proc.stdout)
     elif mode == "w":
-        proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE)
+        proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         threading.Thread(target=cleanup, args=(proc, cmd)).start()  # clean-up thread,
         return io.TextIOWrapper(proc.stdin)
     # binary,
     elif mode == "rb":
-        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         threading.Thread(target=cleanup, args=(proc, cmd)).start()  # clean-up thread,
         return proc.stdout
     elif mode == "wb":
-        proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE)
+        proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         threading.Thread(target=cleanup, args=(proc, cmd)).start()  # clean-up thread,
         return proc.stdin
     # sanity,
