@@ -1,6 +1,8 @@
 import os
 import re
 
+import subprocess
+
 
 def ensure_dir(path):
     if not os.path.exists(path):
@@ -14,3 +16,9 @@ def folder_to_checkpoint(folder):
 
     resume_path = max(checkpoints, key=_[0])[1]
     return os.path.join(checkpoint_folder_path, resume_path)
+
+
+def check_code_versioning():
+    diff = subprocess.check_output(['git', 'diff'])
+    assert len(diff) == 0
+    return subprocess.check_output(['git', 'rev-parse', 'HEAD'])
