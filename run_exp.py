@@ -6,7 +6,8 @@ import os
 import jsondiff
 import torch
 
-from utils import configure_logger, folder_to_checkpoint, kaldi_io, check_code_versioning
+from data_loader import kaldi_io
+from utils import configure_logger, folder_to_checkpoint, code_versioning
 from utils.utils import model_init, \
     optimizer_init, lr_scheduler_init, loss_init, set_seed, get_posterior_norm_data, metrics_init
 from trainer import Trainer
@@ -40,7 +41,9 @@ def setup_run(config, logger):
 def main(config_path, resume_path, debug):
     config = read_json(config_path)
     if not debug:
-        git_commit = check_code_versioning()
+        git_commit = code_versioning()
+        if 'versioning' not in config:
+            config['versioning'] = {}
         config['versioning']['git_commit'] = git_commit
 
     if resume_path:

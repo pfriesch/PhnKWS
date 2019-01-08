@@ -7,9 +7,9 @@ import torch
 from tqdm import tqdm
 
 from base.base_trainer import BaseTrainer
+from data_loader import kaldi_io
 from data_loader.kaldi_data_loader import KaldiDataLoader
 from data_loader.kaldi_dataset import load_counts, KaldiDataset
-from utils import kaldi_io
 from utils.utils import check_environment, run_shell
 
 check_environment()

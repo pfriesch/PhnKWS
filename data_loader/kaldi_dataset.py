@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from utils import kaldi_io
+from data_loader import kaldi_io
 
 
 def load_counts(class_counts_file):

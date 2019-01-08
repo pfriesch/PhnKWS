@@ -13,11 +13,11 @@
 import math
 import os
 
-import kaldi_io
 import scipy.io.wavfile
 import numpy as np
 
 # Run it for all the data chunks (e.g., train, dev, test) => uncomment
+from data_loader import kaldi_io
 
 lab_folder = 'quick_test/dnn4_pretrain-dbn_dnn_ali'
 lab_opts = 'ali-to-pdf'

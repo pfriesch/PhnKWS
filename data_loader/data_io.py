@@ -9,7 +9,7 @@ import sys
 
 import numpy as np
 
-import kaldi_io
+from data_loader import kaldi_io
 
 
 def load_dataset(fea_scp, fea_opts, lab_folder, lab_opts, left, right, max_sequence_length):

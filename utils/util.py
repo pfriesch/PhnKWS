@@ -18,7 +18,13 @@ def folder_to_checkpoint(folder):
     return os.path.join(checkpoint_folder_path, resume_path)
 
 
-def check_code_versioning():
-    diff = subprocess.check_output(['git', 'diff'])
-    assert len(diff) == 0
-    return subprocess.check_output(['git', 'rev-parse', 'HEAD'])
+def code_versioning():
+    #todo make sure exp folder is in gitignore
+    branches = subprocess.check_output(['git', 'branch']).decode("utf-8").split("\n")
+    current_branch = [b for b in branches if b.startswith("*")][0].split(" ")[1]
+    assert current_branch == 'runs_log'
+
+    subprocess.check_output(['git', 'add', '--all'])
+    subprocess.check_output(['git', 'commit', '-am', 'update'])
+
+    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode("utf-8").strip()
