@@ -1,6 +1,7 @@
 import os
 import math
 import json
+import time
 
 import torch
 
@@ -86,13 +87,21 @@ class BaseTrainer:
         epoch = self.start_epoch
         for epoch in range(self.start_epoch, self.epochs):
             self.logger.info('----- Epoch {} / {} -----'.format(format(epoch, "03d"), format(self.epochs, "03d")))
+
+            start_time = time.time()
+
             result = self._train_epoch(epoch)
+
+            elapsed_time_epoch = time.time() - start_time
+
+            self.tensorboard_logger.add_scalar("elapsed_time_epoch", elapsed_time_epoch)
 
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step(result['valid_loss'], epoch=epoch)
 
             # save logged informations into log dict
             log = {'epoch': epoch}
+            log.update({'epoch_elapsed_time': elapsed_time_epoch})
             log.update(result)
 
             # print logged informations to the screen
@@ -164,8 +173,8 @@ class BaseTrainer:
         torch.save(state, filename)
         self.logger.info("Saving checkpoint: {} ...".format(filename))
 
-        if epoch > 0:
-            filename_prev = os.path.join(self.checkpoint_dir, 'checkpoint-epoch{}.pth'.format(epoch - 1))
+        if epoch > 3:
+            filename_prev = os.path.join(self.checkpoint_dir, 'checkpoint-epoch{}.pth'.format(epoch - 3))
             if os.path.exists(filename_prev):
                 os.remove(filename_prev)
                 self.logger.info("Removing old checkpoint: {} ...".format(filename_prev))

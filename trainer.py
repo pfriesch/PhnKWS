@@ -232,8 +232,8 @@ class Trainer(BaseTrainer):
 
                         out_save = output[output_lab].data.cpu().numpy()
 
-                        if output_lab in self.config['test'] and self.config['test'][output_lab][
-                            'normalize_posteriors']:
+                        if output_lab in self.config['test'] and \
+                                self.config['test'][output_lab]['normalize_posteriors']:
                             # read the config file
                             counts = load_counts(self.config['test'][output_lab]['normalize_with_counts_from_file'])
                             out_save = out_save - np.log(counts / np.sum(counts))

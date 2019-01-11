@@ -21,8 +21,8 @@ source <(grep = $cfg_file | sed 's/ *= */=/g')
 
 cd $(dirname "$BASH_SOURCE")
 
-path.sh
-cmd.sh
+./path.sh
+./cmd.sh
 
 
 ## Begin configuration section
@@ -34,7 +34,7 @@ num_threads=1
 
 echo "$0 $@"  # Print the command line for logging
 
-parse_options.sh || exit 1;
+./parse_options.sh || exit 1;
 
 if [ $# != 3 ]; then
    echo "Wrong #arguments ($#, expected 5)"

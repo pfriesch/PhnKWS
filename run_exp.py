@@ -7,7 +7,7 @@ import jsondiff
 import torch
 
 from data_loader import kaldi_io
-from utils import configure_logger, folder_to_checkpoint, code_versioning
+from utils import configure_logger, folder_to_checkpoint, code_versioning, recursive_update
 from utils.utils import model_init, \
     optimizer_init, lr_scheduler_init, loss_init, set_seed, get_posterior_norm_data, metrics_init
 from trainer import Trainer
@@ -20,10 +20,9 @@ def setup_run(config, logger):
     set_seed(config['exp']['seed'])
 
     config, N_out_lab = get_posterior_norm_data(config, logger)
-    config["arch"]["args"]["N_out_lab"] = N_out_lab
 
     model = model_init(config['arch']['name'], fea_index_length=config['arch']['args']['fea_index_length'],
-                       lab_cd_num=[config['arch']['args']['N_out_lab']['lab_cd']])
+                       lab_cd_num=N_out_lab['lab_cd'])
 
     trainable_params = filter(lambda p: p.requires_grad, model.parameters())
     optimizer = optimizer_init(config, trainable_params)
@@ -48,14 +47,20 @@ def main(config_path, resume_path, debug):
 
     if resume_path:
         resume_config = torch.load(folder_to_checkpoint(args.resume))['config']
+        # also the results won't be the same give the different random seeds with different number of draws
+        del config['exp']['name']
+        recursive_update(resume_config, config)
+
         result = jsondiff.diff(config, resume_config)
         print("".join(["="] * 80))
         print("Resume with these changes in the config:")
         print("".join(["-"] * 80))
         print(json.dumps(result, indent=1))
         print("".join(["="] * 80))
-        # also the results won't be the same give the different random seeds with different number of draws
+
         config = resume_config
+        start_time = datetime.datetime.now().strftime('_%Y%m%d_%H%M%S')
+        config['exp']['name'] = config['exp']['name'] + "r-" + start_time
     else:
         start_time = datetime.datetime.now().strftime('_%Y%m%d_%H%M%S')
         config['exp']['name'] = config['exp']['name'] + start_time

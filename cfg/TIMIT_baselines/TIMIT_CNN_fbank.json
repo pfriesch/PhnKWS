@@ -154,7 +154,7 @@
     }
   },
   "decoding": {
-    "decoding_script_folder": "utils/kaldi_decoding_scripts",
+    "decoding_script_folder": "kaldi_decoding_scripts",
     "decoding_script": "decode_dnn.sh",
     "decoding_proto": "proto/decoding.proto",
     "min_active": 200,

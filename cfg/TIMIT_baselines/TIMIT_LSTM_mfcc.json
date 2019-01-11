@@ -3,9 +3,9 @@
     "save_dir": "exp",
     "name": "TIMIT_LSTM_mfcc",
     "seed": 2234,
-    "n_gpu": 0,
+    "n_gpu": 1,
     "prefetch_to_gpu": false,
-    "n_epochs_tr": 10,
+    "n_epochs_tr": 24,
     "save_period": 1
   },
   "data_use": {
@@ -71,7 +71,7 @@
       "fea": {
         "mfcc": {
           "fea_lst": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/feats.scp",
-          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/mfcc/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=2 ark:- ark:- |",
+          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/mfcc/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=2 ark:- ark:- |",
           "cw_left": 0,
           "cw_right": 0
         }
@@ -111,12 +111,12 @@
   //    }
   //  },
   "training": {
-    "batch_size_train": 8,
+    "batch_size_train": 32,
     "max_seq_length_train": 1000,
     "increase_seq_length_train": true,
     "start_seq_len_train": 100,
     "multply_factor_seq_len_train": 2,
-    "batch_size_valid": 8,
+    "batch_size_valid": 32,
     "max_seq_length_valid": 1000,
     "clip_grad_norm": -1,
     "optimizer": {
@@ -155,7 +155,7 @@
     }
   },
   "decoding": {
-    "decoding_script_folder": "utils/kaldi_decoding_scripts",
+    "decoding_script_folder": "kaldi_decoding_scripts",
     "decoding_script": "decode_dnn.sh",
     "decoding_proto": "proto/decoding.proto",
     "min_active": 200,
