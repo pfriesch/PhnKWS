@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from neural_networks.modules.utils import LayerNorm, act_fun, flip
+from nets.modules.utils import LayerNorm, act_fun, flip
 
 
 class LSTM(nn.Module):

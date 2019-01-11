@@ -9,9 +9,9 @@ import torch
 import torch.optim as optim
 import matplotlib
 
-from neural_networks.TIMIT_LSTM import TIMIT_LSTM
-from neural_networks.losses.mtl_mono_cd_loss import MtlMonoCDLoss
-from neural_networks.metrics.metrics import LabCDAccuracy, LabMonoAccuracy
+from nets.TIMIT_LSTM import TIMIT_LSTM
+from nets.losses.mtl_mono_cd_loss import MtlMonoCDLoss
+from nets.metrics.metrics import LabCDAccuracy, LabMonoAccuracy
 
 matplotlib.use('agg')
 import matplotlib.pyplot as plt

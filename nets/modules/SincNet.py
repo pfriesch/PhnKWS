@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import numpy as np
 
-from neural_networks.modules.utils import act_fun, LayerNorm
+from nets.modules.utils import act_fun, LayerNorm
 
 
 class SincNet(nn.Module):

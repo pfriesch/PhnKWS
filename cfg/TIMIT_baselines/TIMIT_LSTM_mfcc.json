@@ -1,6 +1,5 @@
 {
   "exp": {
-    "run_nn_script": "run_nn.py",
     "save_dir": "exp",
     "name": "TIMIT_LSTM_mfcc",
     "seed": 2234,
@@ -40,8 +39,7 @@
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
-      },
-      "n_chunks": 3
+      }
     },
     "TIMIT_dev": {
       "fea": {
@@ -67,8 +65,7 @@
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
-      },
-      "n_chunks": 1
+      }
     },
     "TIMIT_test": {
       "fea": {
@@ -94,8 +91,7 @@
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
-      },
-      "n_chunks": 1
+      }
     }
   },
   //    "google_speech_commands_test": {
@@ -111,8 +107,7 @@
   //        "lab_text": {
   //          "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
   //        }
-  //      },
-  //      "n_chunks": 1
+  //      }
   //    }
   //  },
   "training": {
@@ -160,7 +155,7 @@
     }
   },
   "decoding": {
-    "decoding_script_folder": "kaldi_decoding_scripts",
+    "decoding_script_folder": "utils/kaldi_decoding_scripts",
     "decoding_script": "decode_dnn.sh",
     "decoding_proto": "proto/decoding.proto",
     "min_active": 200,
