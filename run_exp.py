@@ -6,20 +6,20 @@ import os
 import jsondiff
 import torch
 
-from data_loader import kaldi_io
-from utils import configure_logger, folder_to_checkpoint, code_versioning, recursive_update
-from utils.utils import model_init, \
-    optimizer_init, lr_scheduler_init, loss_init, set_seed, get_posterior_norm_data, metrics_init
+from nets import model_init, optimizer_init, lr_scheduler_init, metrics_init, loss_init
+from utils.logger_config import logger
+from utils.util import code_versioning, folder_to_checkpoint, recursive_update
+from utils.utils import set_seed, get_posterior_norm_data
 from trainer import Trainer
 from utils.utils import check_environment, read_json
 
 check_environment()
 
 
-def setup_run(config, logger):
+def setup_run(config):
     set_seed(config['exp']['seed'])
 
-    config, N_out_lab = get_posterior_norm_data(config, logger)
+    config, N_out_lab = get_posterior_norm_data(config)
 
     model = model_init(config['arch']['name'], fea_index_length=config['arch']['args']['fea_index_length'],
                        lab_cd_num=N_out_lab['lab_cd'])
@@ -72,17 +72,15 @@ def main(config_path, resume_path, debug):
     if not os.path.exists(out_folder):
         os.makedirs(out_folder + '/exp_files')
 
-    default_logger = configure_logger('default', os.path.join(out_folder, 'log.log'))
-    kaldi_io.logger = default_logger
+    logger.configure_logger(out_folder)
 
-    model, loss, metrics, optimizer, config, lr_scheduler = setup_run(config, default_logger)
+    model, loss, metrics, optimizer, config, lr_scheduler = setup_run(config)
 
     trainer = Trainer(model, loss, metrics, optimizer,
                       resume_path=resume_path,
                       config=config,
                       do_validation=True,
                       lr_scheduler=lr_scheduler,
-                      logger=default_logger,
                       debug=debug)
     trainer.train()
 

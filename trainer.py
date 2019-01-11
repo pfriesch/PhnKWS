@@ -11,6 +11,7 @@ from data_loader import kaldi_io
 from data_loader.data_util import load_counts
 from data_loader.kaldi_data_loader import KaldiDataLoader
 from data_loader.kaldi_dataset import KaldiDataset
+from utils.logger_config import logger
 from utils.utils import check_environment, run_shell
 
 check_environment()
@@ -19,17 +20,12 @@ check_environment()
 class Trainer(BaseTrainer):
 
     def __init__(self, model, loss, metrics, optimizer, resume_path, config, do_validation,
-                 lr_scheduler=None, logger=None, debug=False):
-        super(Trainer, self).__init__(model, loss, metrics, optimizer, lr_scheduler, resume_path, config, logger)
+                 lr_scheduler, debug=False):
+        super(Trainer, self).__init__(model, loss, metrics, optimizer, lr_scheduler, resume_path, config)
         self.config = config
         self.do_validation = do_validation
         self.log_step = int(np.sqrt(config['training']['batch_size_train']))
         self.debug = debug
-
-        if self.config['training']['increase_seq_length_train']:
-            self.max_seq_length_curr = self.config['training']['start_seq_len_train']
-        else:
-            self.max_seq_length_curr = self.config['training']['max_seq_length_train']
 
     def _eval_metrics(self, output, target):
         acc_metrics = {}
@@ -63,6 +59,7 @@ class Trainer(BaseTrainer):
 
         dataset = KaldiDataset(self.config['datasets'][tr_data]['fea'], self.config['datasets'][tr_data]['lab'],
                                self.model.context_left, self.model.context_right,
+                               self.max_seq_length_train_curr,
                                self.tensorboard_logger, debug=self.debug)
         data_loader = KaldiDataLoader(dataset,
                                       self.config['training']['batch_size_train'],
@@ -72,7 +69,7 @@ class Trainer(BaseTrainer):
                                       device=self.device,
                                       num_workers=0)
 
-        with tqdm(total=len(data_loader), disable=not self.logger.isEnabledFor(logging.INFO)) as pbar:
+        with tqdm(total=len(data_loader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
             pbar.set_description('T e:{} l: {} '.format(epoch, '-'))
             for batch_idx, (sample_names, inputs, targets) in enumerate(data_loader):
 
@@ -115,13 +112,6 @@ class Trainer(BaseTrainer):
             valid_log = self._valid_epoch(epoch)
             log.update(valid_log)
 
-        #  if needed, update sentence_length
-        if self.config['training']['increase_seq_length_train']:
-            self.max_seq_length_curr = self.max_seq_length_curr * int(
-                self.config['training']['multply_factor_seq_len_train'])
-            if self.max_seq_length_curr > self.config['training']['max_seq_length_train']:
-                self.max_seq_length_curr = self.config['training']['max_seq_length_train']
-
         return log
 
     def _valid_epoch(self, epoch):
@@ -141,6 +131,7 @@ class Trainer(BaseTrainer):
         dataset = KaldiDataset(self.config['datasets'][valid_data]['fea'],
                                self.config['datasets'][valid_data]['lab'],
                                self.model.context_left, self.model.context_right,
+                               self.config['training']['max_seq_length_valid'],
                                self.tensorboard_logger,
                                debug=self.debug)
 
@@ -152,7 +143,7 @@ class Trainer(BaseTrainer):
                                             device=self.device,
                                             num_workers=0)
 
-        with tqdm(total=len(valid_data_loader), disable=not self.logger.isEnabledFor(logging.INFO)) as pbar:
+        with tqdm(total=len(valid_data_loader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
             pbar.set_description('V e:{} l: {} '.format(epoch, '-'))
             for batch_idx, (sample_names, inputs, targets) in enumerate(valid_data_loader):
                 inputs = {k: v.to(self.device) for k, v in inputs.items()}
@@ -195,7 +186,9 @@ class Trainer(BaseTrainer):
         dataset = KaldiDataset(self.config['datasets'][test_data]['fea'],
                                self.config['datasets'][test_data]['lab'],
                                self.model.context_left, self.model.context_right,
-                               self.tensorboard_logger, debug=self.debug)
+                               max_sequence_length=- 1,
+                               tensorboard_logger=self.tensorboard_logger,
+                               debug=self.debug)
 
         test_data_loader = KaldiDataLoader(dataset,
                                            batch_size,
@@ -219,7 +212,7 @@ class Trainer(BaseTrainer):
         if self.config['exp']['prefetch_to_gpu'] is not None:
             test_data_loader.dataset.move_to(self.device)
 
-        with tqdm(total=len(test_data_loader), disable=not self.logger.isEnabledFor(logging.INFO)) as pbar:
+        with tqdm(total=len(test_data_loader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
             pbar.set_description('E e:{}           '.format(epoch))
             for batch_idx, (sample_names, inputs, targets) in tqdm(enumerate(test_data_loader)):
                 inputs = {k: v.to(self.device) for k, v in inputs.items()}
@@ -259,7 +252,7 @@ class Trainer(BaseTrainer):
                         pbar.update()
                         #### /Logging ####
                     else:
-                        self.logger.debug("Skipping saving forward for decoding for key {}".format(output_lab))
+                        logger.debug("Skipping saving forward for decoding for key {}".format(output_lab))
 
         for out_name in self.config['test'].keys():
             post_file[out_name].close()
@@ -277,7 +270,7 @@ class Trainer(BaseTrainer):
 
             for data in forward_data_lst:
 
-                self.logger.debug('Decoding {} output {}'.format(data, out_lab))
+                logger.debug('Decoding {} output {}'.format(data, out_lab))
 
                 info_file = '{}/exp_files/decoding_{}_{}.info'.format(out_folder, data, out_lab)
 
@@ -310,7 +303,7 @@ class Trainer(BaseTrainer):
                         os.path.abspath(config_dec_file),
                         out_dec_folder,
                         files_dec)
-                    run_shell(cmd_decode, self.logger)
+                    run_shell(cmd_decode, logger)
 
                     # TODO remove ark files if needed
                     # if not forward_save_files:
@@ -320,8 +313,8 @@ class Trainer(BaseTrainer):
 
                 # Print WER results and write info file
                 cmd_res = './scripts/check_res_dec.sh ' + out_dec_folder
-                results = run_shell(cmd_res, self.logger).decode('utf-8')
-                self.logger.info(results)
+                results = run_shell(cmd_res, logger).decode('utf-8')
+                logger.info(results)
 
                 results = results.split("|")
                 wer = float(results[0].split(" ")[1].strip())
@@ -330,7 +323,7 @@ class Trainer(BaseTrainer):
                                                          for elem in results[2].split(" ") if len(elem) > 0]
                 decoding_str = "WER: {} Corr: {} Sub: {} Del: {} Ins: {} Err: {}" \
                     .format(wer, _corr, _sub, _del, _ins, _err)
-                self.logger.info(decoding_str)
+                logger.info(decoding_str)
                 decoding_results.append(decoding_str)
 
                 self.tensorboard_logger.add_scalar("wer", wer)

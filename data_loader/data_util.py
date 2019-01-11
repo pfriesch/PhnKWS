@@ -1,6 +1,7 @@
 import numpy as np
 
 from data_loader import kaldi_io
+from utils.logger_config import logger
 
 
 def load_counts(class_counts_file):
@@ -24,7 +25,7 @@ def read_fea(fea_dict):
     return fea_loaded
 
 
-def read_lab_fea(fea_dict, lab_dict):
+def read_lab_fea(fea_dict, lab_dict, max_sequence_length):
     fea_loaded = {}
     lab_loaded = {}
 
@@ -53,7 +54,42 @@ def read_lab_fea(fea_dict, lab_dict):
             for filename in fea_loaded[fea]:
                 assert fea_loaded[fea][filename].shape[0] == len(lab_loaded[lab][filename])
 
-    # make sure labs and feats have the same features
+    min_sequence_length = max_sequence_length // 4  # TODO remove with 1/4 of max length -> add to config
+
+    chunked_files = []
+    fea_loaded_update = {k: {} for k in fea_loaded}
+    lab_loaded_update = {k: {} for k in lab_loaded}
+
+    for fea in fea_loaded:
+        for filename in fea_loaded[fea]:
+            if len(fea_loaded[fea][filename]) > max_sequence_length:
+                for i in range(0, (len(fea_loaded[fea][filename]) // max_sequence_length) + 1):
+                    if len(fea_loaded[fea][filename][i * max_sequence_length:
+                    i * max_sequence_length + max_sequence_length]) > min_sequence_length:
+
+                        filename_new = filename + "_c" + str(i)
+
+                        fea_loaded_update[fea][filename_new] = fea_loaded[fea][filename][i * max_sequence_length:
+                                                                                         i * max_sequence_length + max_sequence_length]
+                        for lab in lab_loaded:
+                            lab_loaded_update[lab][filename_new] = lab_loaded[lab][filename][i * max_sequence_length:
+                                                                                             i * max_sequence_length + max_sequence_length]
+                    else:
+                        logger.debug("remove sample {} which is too short with length {}"
+                                     .format(filename, len(fea_loaded[fea][filename][i * max_sequence_length:
+                                                                                     i * max_sequence_length + max_sequence_length])))
+                chunked_files.append(filename)
+
+    for lab in lab_loaded:
+        for filename in chunked_files:
+            del lab_loaded[lab][filename]
+        lab_loaded[lab].update(lab_loaded_update[lab])
+    for fea in fea_loaded:
+        for filename in chunked_files:
+            del fea_loaded[fea][filename]
+        fea_loaded[fea].update(fea_loaded_update[fea])
+
+    # assert make sure labs and feats have the same features
     for fea in fea_loaded:
         fea_sample_ids = sorted(list(fea_loaded[fea].keys()))
         for lab in lab_loaded:

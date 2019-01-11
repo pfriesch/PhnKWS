@@ -1,11 +1,12 @@
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence
 
+from base.base_model import BaseModel
 from nets.modules.LSTM_cudnn import LSTM
 from nets.modules.MLP import MLP
 
 
-class TIMIT_LSTM(nn.Module):
+class TIMIT_LSTM(BaseModel):
     def __init__(self, inp_dim, lab_cd_num):
         super(TIMIT_LSTM, self).__init__()
 

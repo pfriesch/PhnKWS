@@ -7,23 +7,24 @@ from data_loader.data_util import read_lab_fea, apply_context, make_big_chunk
 
 class KaldiDataset(object):
 
-    def __init__(self, fea_dict, lab_dict, context_left, context_right, tensorboard_logger, debug=False):
+    def __init__(self, fea_dict, lab_dict, context_left, context_right, max_sequence_length, tensorboard_logger,
+                 debug=False):
         self.tensorboard_logger = tensorboard_logger
         start_time = time.time()
 
-        feat_dict, lab_dict = read_lab_fea(fea_dict, lab_dict)
+        _fea_dict, _lab_dict = read_lab_fea(fea_dict, lab_dict, max_sequence_length)
 
         if debug:
-            for lab in lab_dict:
-                lab_dict[lab] = dict(list(lab_dict[lab].items())[:30])
-            for fea in feat_dict:
-                feat_dict[fea] = dict(list(feat_dict[fea].items())[:30])
+            for lab in _lab_dict:
+                _lab_dict[lab] = dict(sorted(list(_lab_dict[lab].items()), key=lambda x: x[0])[:30])
+            for fea in _fea_dict:
+                _fea_dict[fea] = dict(sorted(list(_fea_dict[fea].items()), key=lambda x: x[0])[:30])
 
         # TODO split files that are too long
-        lab_dict = apply_context(lab_dict, context_left, context_right)
+        _lab_dict = apply_context(_lab_dict, context_left, context_right)
 
         # TODO make multiple chunks if too big
-        sample_name, feat_chunks, lab_chunks = make_big_chunk(feat_dict, lab_dict)
+        sample_name, feat_chunks, lab_chunks = make_big_chunk(_fea_dict, _lab_dict)
         self.feat_chunks = {fea: torch.from_numpy(feat_chunks[fea]).float()
                             for fea, v in feat_chunks.items()}
         self.lab_chunks = {lab: torch.from_numpy(lab_chunks[lab]).long()

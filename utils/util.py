@@ -31,16 +31,14 @@ def folder_to_checkpoint(folder):
 
 
 def code_versioning():
-    try:
-        # todo make sure exp folder is in gitignore
-        branches = subprocess.check_output(['git', 'branch']).decode("utf-8").split("\n")
-        current_branch = [b for b in branches if b.startswith("*")][0].split(" ")[1]
-        assert current_branch == 'runs_log'
+    # todo make sure exp folder is in gitignore
+    branches = subprocess.check_output(['git', 'branch']).decode("utf-8").split("\n")
+    current_branch = [b for b in branches if b.startswith("*")][0].split(" ")[1]
+    assert current_branch == 'runs_log'
 
-        subprocess.check_output(['git', 'add', '--all'])
+    subprocess.check_output(['git', 'add', '--all'])
+    _diff = subprocess.check_output(['git', 'diff', '--exit-code'])
+    if len(_diff) > 0:
         _ret_val = subprocess.check_output(['git', 'commit', '-am', 'update'])
 
-        return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode("utf-8").strip()
-    except Exception as e:
-        print(e)
-        warnings.warn(e)
+    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode("utf-8").strip()

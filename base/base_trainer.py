@@ -5,6 +5,7 @@ import time
 
 import torch
 
+from utils.logger_config import logger
 from utils.tensorboard_logger import WriterTensorboardX
 from utils.util import ensure_dir, folder_to_checkpoint
 
@@ -14,9 +15,8 @@ class BaseTrainer:
     Base class for all trainers
     """
 
-    def __init__(self, model, loss, metrics, optimizer, lr_scheduler, resume_path, config, logger=None):
+    def __init__(self, model, loss, metrics, optimizer, lr_scheduler, resume_path, config):
         self.config = config
-        self.logger = logger
 
         # setup GPU device if available, move model into configured device
         self.device, device_ids = self._prepare_device(config['exp']['n_gpu'])
@@ -28,6 +28,7 @@ class BaseTrainer:
         self.metrics = metrics
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
+        self.max_seq_length_train_curr = self.config['training']['start_seq_len_train']
 
         self.epochs = config['exp']['n_epochs_tr']
         self.save_period = config['exp']['save_period']
@@ -67,11 +68,11 @@ class BaseTrainer:
         """
         n_gpu = torch.cuda.device_count()
         if n_gpu_use > 0 and n_gpu == 0:
-            self.logger.warning(
+            logger.warning(
                 "Warning: There\'s no GPU available on this machine, training will be performed on CPU.")
             n_gpu_use = 0
         if n_gpu_use > n_gpu:
-            self.logger.warning(
+            logger.warning(
                 "Warning: The number of GPU\'s configured to use is {}, but only {} are available on this machine.".format(
                     n_gpu_use, n_gpu))
             n_gpu_use = n_gpu
@@ -86,18 +87,21 @@ class BaseTrainer:
 
         epoch = self.start_epoch
         for epoch in range(self.start_epoch, self.epochs):
-            self.logger.info('----- Epoch {} / {} -----'.format(format(epoch, "03d"), format(self.epochs, "03d")))
+            logger.info('----- Epoch {} / {} -----'.format(format(epoch, "03d"), format(self.epochs, "03d")))
 
             start_time = time.time()
-
             result = self._train_epoch(epoch)
-
             elapsed_time_epoch = time.time() - start_time
-
             self.tensorboard_logger.add_scalar("elapsed_time_epoch", elapsed_time_epoch)
 
-            if self.lr_scheduler is not None:
-                self.lr_scheduler.step(result['valid_loss'], epoch=epoch)
+            self.tensorboard_logger.add_scalar("lr", self.lr_scheduler.current_lr())
+            self.lr_scheduler.step(result['valid_loss'], epoch=epoch)
+
+            self.tensorboard_logger.add_scalar("max_seq_length_train_curr", self.max_seq_length_train_curr)
+            if self.config['training']['increase_seq_length_train']:
+                self.max_seq_length_train_curr *= self.config['training']['multply_factor_seq_len_train']
+                if self.max_seq_length_train_curr > self.config['training']['max_seq_length_train']:
+                    self.max_seq_length_train_curr = self.config['training']['max_seq_length_train']
 
             # save logged informations into log dict
             log = {'epoch': epoch}
@@ -105,9 +109,9 @@ class BaseTrainer:
             log.update(result)
 
             # print logged informations to the screen
-            if self.logger is not None:
+            if logger is not None:
                 for key, value in log.items():
-                    self.logger.info('    {:10s}: {}'.format(str(key), value))
+                    logger.info('    {:10s}: {}'.format(str(key), value))
 
             # evaluate model performance according to configured metric, save best checkpoint as model_best
             best = False
@@ -117,7 +121,7 @@ class BaseTrainer:
                     improved = (self.mnt_mode == 'min' and log[self.mnt_metric] < self.mnt_best) or \
                                (self.mnt_mode == 'max' and log[self.mnt_metric] > self.mnt_best)
                 except KeyError:
-                    self.logger.warning(
+                    logger.warning(
                         "Warning: Metric '{}' is not found. Model performance monitoring is disabled.".format(
                             self.mnt_metric))
                     self.mnt_mode = 'off'
@@ -132,7 +136,7 @@ class BaseTrainer:
                     not_improved_count += 1
 
                 if not_improved_count > self.early_stop:
-                    self.logger.info(
+                    logger.info(
                         "Validation performance didn\'t improve for {} epochs. Training stops.".format(self.early_stop))
                     break
 
@@ -140,7 +144,7 @@ class BaseTrainer:
                 self._save_checkpoint(epoch, save_best=best)
 
         result_eval = self._eval_epoch(epoch)
-        self.logger.info(result_eval)
+        logger.info(result_eval)
 
     def _train_epoch(self, epoch):
         """
@@ -171,33 +175,33 @@ class BaseTrainer:
         }
         filename = os.path.join(self.checkpoint_dir, 'checkpoint-epoch{}.pth'.format(epoch))
         torch.save(state, filename)
-        self.logger.info("Saving checkpoint: {} ...".format(filename))
+        logger.info("Saving checkpoint: {} ...".format(filename))
 
         if epoch > 3:
             filename_prev = os.path.join(self.checkpoint_dir, 'checkpoint-epoch{}.pth'.format(epoch - 3))
             if os.path.exists(filename_prev):
                 os.remove(filename_prev)
-                self.logger.info("Removing old checkpoint: {} ...".format(filename_prev))
+                logger.info("Removing old checkpoint: {} ...".format(filename_prev))
 
         if save_best:
             best_path = os.path.join(self.checkpoint_dir, 'model_best.pth')
             torch.save(state, best_path)
-            self.logger.info("Saving current best: {} ...".format('model_best.pth'))
+            logger.info("Saving current best: {} ...".format('model_best.pth'))
 
     def _resume_checkpoint(self, resume_folder_path):
         resume_path = folder_to_checkpoint(resume_folder_path)
 
-        self.logger.info("Loading checkpoint: {} ...".format(resume_path))
+        logger.info("Loading checkpoint: {} ...".format(resume_path))
         checkpoint = torch.load(resume_path)
         self.start_epoch = checkpoint['epoch'] + 1
         self.model.load_state_dict(checkpoint['state_dict'])
 
         # load optimizer state from checkpoint only when optimizer type is not changed.
         # if checkpoint['config']['optimizer']['type'] != self.config['optimizer']['type']: #TODO add check
-        #     self.logger.warning('Warning: Optimizer type given in config file is different from that of checkpoint. ' + \
+        #     logger.warning('Warning: Optimizer type given in config file is different from that of checkpoint. ' + \
         #                         'Optimizer parameters not being resumed.')
         # else:
         self.optimizer.load_state_dict(checkpoint['optimizer'])
         self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
 
-        self.logger.info("Checkpoint '{}' (epoch {}) loaded".format(resume_path, self.start_epoch))
+        logger.info("Checkpoint '{}' (epoch {}) loaded".format(resume_path, self.start_epoch))
