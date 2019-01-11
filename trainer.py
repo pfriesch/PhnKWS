@@ -8,8 +8,9 @@ from tqdm import tqdm
 
 from base.base_trainer import BaseTrainer
 from data_loader import kaldi_io
+from data_loader.data_util import load_counts
 from data_loader.kaldi_data_loader import KaldiDataLoader
-from data_loader.kaldi_dataset import load_counts, KaldiDataset
+from data_loader.kaldi_dataset import KaldiDataset
 from utils.utils import check_environment, run_shell
 
 check_environment()
@@ -34,7 +35,7 @@ class Trainer(BaseTrainer):
         acc_metrics = {}
         for metric in self.metrics:
             acc_metrics[metric] = self.metrics[metric](output, target)
-            self.writer.add_scalar(metric, acc_metrics[metric])
+            self.tensorboard_logger.add_scalar(metric, acc_metrics[metric])
         return acc_metrics
 
     def _train_epoch(self, epoch):
@@ -54,13 +55,15 @@ class Trainer(BaseTrainer):
             The metrics in log must have the key 'metrics'.
         """
         self.model.train()
+        self.tensorboard_logger.set_step((epoch - 1), mode='train')
         tr_data = self.config['data_use']['train_with']
 
         train_loss = 0
         train_metrics = {metric: 0 for metric in self.metrics}
 
         dataset = KaldiDataset(self.config['datasets'][tr_data]['fea'], self.config['datasets'][tr_data]['lab'],
-                               self.model.context_left, self.model.context_right, debug=self.debug)
+                               self.model.context_left, self.model.context_right,
+                               self.tensorboard_logger, debug=self.debug)
         data_loader = KaldiDataLoader(dataset,
                                       self.config['training']['batch_size_train'],
                                       shuffle=False,
@@ -87,16 +90,22 @@ class Trainer(BaseTrainer):
 
                 self.optimizer.step()
 
-                self.writer.set_step((epoch - 1) * len(data_loader) + batch_idx)
-                for _loss in loss:
-                    self.writer.add_scalar(_loss, loss[_loss].item())
+                #### Logging ####
+                self.tensorboard_logger.set_step((epoch - 1) * len(data_loader) + batch_idx)
+                for _loss, loss_value in loss.items():
+                    self.tensorboard_logger.add_scalar(_loss, loss_value.item())
                 train_loss += loss["loss_final"].item()
+                _train_metrics = self._eval_metrics(output, targets)
                 train_metrics = {metric: train_metrics[metric] + metric_value.item() for
-                                 metric, metric_value in self._eval_metrics(output, targets).items()}
+                                 metric, metric_value
+                                 in _train_metrics.items()}
+                for metric, metric_value in _train_metrics.items():
+                    self.tensorboard_logger.add_scalar(metric, metric_value.item())
 
                 pbar.set_description('T e:{} l: {:.6f} '.format(epoch,
                                                                 loss["loss_final"].item()))
                 pbar.update()
+                #### /Logging ####
 
         log = {'train_loss': train_loss / len(data_loader),
                'train_metrics':
@@ -123,6 +132,7 @@ class Trainer(BaseTrainer):
             The validation metrics in log must have the key 'val_metrics'.
         """
         self.model.eval()
+        self.tensorboard_logger.set_step((epoch - 1), mode='valid')
         valid_data = self.config['data_use']['valid_with']
 
         valid_loss = 0
@@ -130,7 +140,9 @@ class Trainer(BaseTrainer):
 
         dataset = KaldiDataset(self.config['datasets'][valid_data]['fea'],
                                self.config['datasets'][valid_data]['lab'],
-                               self.model.context_left, self.model.context_right, debug=self.debug)
+                               self.model.context_left, self.model.context_right,
+                               self.tensorboard_logger,
+                               debug=self.debug)
 
         valid_data_loader = KaldiDataLoader(dataset,
                                             self.config['training']['batch_size_valid'],
@@ -149,17 +161,21 @@ class Trainer(BaseTrainer):
                 output = self.model(inputs)
                 loss = self.loss(output, targets)
 
-                self.writer.set_step((epoch - 1) * len(valid_data_loader) + batch_idx, 'valid')
-                self.writer.add_scalar('loss', loss["loss_final"].item())
-                self.writer.add_scalar('loss_cd', loss["loss_cd"].item())
-                self.writer.add_scalar('loss_mono', loss["loss_mono"].item())
+                #### Logging ####
+                self.tensorboard_logger.set_step((epoch - 1) * len(valid_data_loader) + batch_idx, 'valid')
+                for _loss, loss_value in loss.items():
+                    self.tensorboard_logger.add_scalar(_loss, loss_value.item())
                 valid_loss += loss["loss_final"].item()
+                _eval_metrics = self._eval_metrics(output, targets)
                 valid_metrics = {metric: valid_metrics[metric] + metric_value.item() for
                                  metric, metric_value
-                                 in self._eval_metrics(output, targets).items()}
+                                 in _eval_metrics.items()}
+                for metric, metric_value in _eval_metrics.items():
+                    self.tensorboard_logger.add_scalar(metric, metric_value.item())
 
                 pbar.set_description('V e:{} l: {:.6f} '.format(epoch, loss["loss_final"].item()))
                 pbar.update()
+                #### /Logging ####
 
         return {'valid_loss': valid_loss / len(valid_data_loader),
                 'valid_metrics': {metric: valid_metrics[metric] / len(valid_data_loader) for metric in
@@ -167,20 +183,19 @@ class Trainer(BaseTrainer):
 
     def _eval_epoch(self, epoch):
         self.model.eval()
+        self.tensorboard_logger.set_step((epoch - 1), mode='eval')
         batch_size = 1
         max_seq_length = -1
 
         test_data = self.config['data_use']['test_with']
         out_folder = os.path.join(self.config['exp']['save_dir'], self.config['exp']['name'])
 
-        log_forward = []
-        log_decoded = []
-
         test_metrics = {metric: 0 for metric in self.metrics}
 
         dataset = KaldiDataset(self.config['datasets'][test_data]['fea'],
                                self.config['datasets'][test_data]['lab'],
-                               self.model.context_left, self.model.context_right, debug=self.debug)
+                               self.model.context_left, self.model.context_right,
+                               self.tensorboard_logger, debug=self.debug)
 
         test_data_loader = KaldiDataLoader(dataset,
                                            batch_size,
@@ -202,56 +217,58 @@ class Trainer(BaseTrainer):
             post_file[out_name] = kaldi_io.open_or_fd(out_file, 'wb')
 
         if self.config['exp']['prefetch_to_gpu'] is not None:
-            # start_time = time.time() #TODO benchmark everything
             test_data_loader.dataset.move_to(self.device)
-            # elapsed_time_load = time.time() - start_time
 
-        for batch_idx, (sample_names, inputs, targets) in tqdm(enumerate(test_data_loader)):
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            targets = {k: v.to(self.device) for k, v in targets.items()}
+        with tqdm(total=len(test_data_loader), disable=not self.logger.isEnabledFor(logging.INFO)) as pbar:
+            pbar.set_description('E e:{}           '.format(epoch))
+            for batch_idx, (sample_names, inputs, targets) in tqdm(enumerate(test_data_loader)):
+                inputs = {k: v.to(self.device) for k, v in inputs.items()}
+                targets = {k: v.to(self.device) for k, v in targets.items()}
 
-            output = self.model(inputs)
+                output = self.model(inputs)
 
-            for output_lab in output:
-                if output_lab in self.config['test'].keys():
+                for output_lab in output:
+                    if output_lab in self.config['test'].keys():
 
-                    out_save = output[output_lab].data.cpu().numpy()
+                        out_save = output[output_lab].data.cpu().numpy()
 
-                    if output_lab in self.config['test'] and self.config['test'][output_lab][
-                        'normalize_posteriors']:
-                        # read the config file
-                        counts = load_counts(self.config['test'][output_lab]['normalize_with_counts_from_file'])
-                        out_save = out_save - np.log(counts / np.sum(counts))
+                        if output_lab in self.config['test'] and self.config['test'][output_lab][
+                            'normalize_posteriors']:
+                            # read the config file
+                            counts = load_counts(self.config['test'][output_lab]['normalize_with_counts_from_file'])
+                            out_save = out_save - np.log(counts / np.sum(counts))
 
-                        # save the output
-                        # data_name = file ids
-                        # out save shape <class 'tuple'>: (124, 1944)
-                        # post_file dict out_dnn2: buffered wirter
-                    assert out_save.shape[1] == 1
-                    assert len(sample_names) == 1
-                    kaldi_io.write_mat(post_file[output_lab], out_save.squeeze(), sample_names[0])
+                            # save the output
+                            # data_name = file ids
+                            # out save shape <class 'tuple'>: (124, 1944)
+                            # post_file dict out_dnn2: buffered wirter
+                        assert out_save.shape[1] == 1
+                        assert len(sample_names) == 1
+                        kaldi_io.write_mat(post_file[output_lab], out_save.squeeze(), sample_names[0])
 
-                    self.writer.set_step((epoch - 1) * len(test_data_loader) + batch_idx, 'forward')
+                        #### Logging ####
+                        self.tensorboard_logger.set_step((epoch - 1) * len(test_data_loader) + batch_idx, 'eval')
+                        _test_metrics = self._eval_metrics(output, targets)
+                        test_metrics = {metric: test_metrics[metric] + metric_value.item() for
+                                        metric, metric_value
+                                        in _test_metrics.items()}
+                        for metric, metric_value in _test_metrics.items():
+                            self.tensorboard_logger.add_scalar(metric, metric_value.item())
 
-                    test_metrics = {metric: test_metrics[metric] + metric_value.item()
-                                    for metric, metric_value in
-                                    self._eval_metrics(output, targets).items()}
-                else:
-                    self.logger.debug("Skipping saving forward for decoding for key {}".format(output_lab))
+                        pbar.set_description('E e:{}           '.format(epoch))
+                        pbar.update()
+                        #### /Logging ####
+                    else:
+                        self.logger.debug("Skipping saving forward for decoding for key {}".format(output_lab))
 
         for out_name in self.config['test'].keys():
             post_file[out_name].close()
 
-        results_forward = {}
-        results_forward['valid_metrics'] = {metric: test_metrics[metric] / len(test_data_loader)
-                                            for metric in test_metrics}
+        test_metrics = {metric: test_metrics[metric] / len(test_data_loader)
+                        for metric in test_metrics}
 
-        log_forward.append(results_forward)
+        decoding_results = []
         #### DECODING ####
-
-        # --------DECODING--------#
-        # dec_lst = glob.glob(out_folder + '/exp_files/*_to_decode.ark')
-
         for out_lab in self.config['test']:
 
             # forward_data_lst = self.config['data_use']['test_with'] #TODO multiple forward sets
@@ -260,7 +277,7 @@ class Trainer(BaseTrainer):
 
             for data in forward_data_lst:
 
-                print('Decoding %s output %s' % (data, out_lab))
+                self.logger.debug('Decoding {} output {}'.format(data, out_lab))
 
                 info_file = '{}/exp_files/decoding_{}_{}.info'.format(out_folder, data, out_lab)
 
@@ -282,7 +299,7 @@ class Trainer(BaseTrainer):
                     config_dec.write(configfile)
 
                 out_folder = os.path.abspath(out_folder)
-                files_dec = '{}/exp_files/forward_{}_ep*_ck*_{}_to_decode.ark'.format(out_folder, data, out_lab)
+                files_dec = '{}/exp_files/forward_{}_ep*_{}_to_decode.ark'.format(out_folder, data, out_lab)
                 out_dec_folder = '{}/decode_{}_{}'.format(out_folder, data, out_lab)
 
                 if not (os.path.exists(info_file)):
@@ -303,11 +320,27 @@ class Trainer(BaseTrainer):
 
                 # Print WER results and write info file
                 cmd_res = './scripts/check_res_dec.sh ' + out_dec_folder
-                wers = run_shell(cmd_res, self.logger).decode('utf-8')
-                # res_file = open(res_file_path, "a") #TODO
-                # res_file.write('%s\n' % wers)
-                print(wers)
+                results = run_shell(cmd_res, self.logger).decode('utf-8')
+                self.logger.info(results)
 
-            # TODO Saving Loss and Err as .txt and plotting curves
+                results = results.split("|")
+                wer = float(results[0].split(" ")[1].strip())
 
-        return {'log_forward': log_forward, 'log_decoded': log_decoded}
+                _corr, _sub, _del, _ins, _err, _s_err = [float(elem.strip())
+                                                         for elem in results[2].split(" ") if len(elem) > 0]
+                decoding_str = "WER: {} Corr: {} Sub: {} Del: {} Ins: {} Err: {}" \
+                    .format(wer, _corr, _sub, _del, _ins, _err)
+                self.logger.info(decoding_str)
+                decoding_results.append(decoding_str)
+
+                self.tensorboard_logger.add_scalar("wer", wer)
+                self.tensorboard_logger.add_scalar("_corr", _corr)
+                self.tensorboard_logger.add_scalar("_sub", _sub)
+                self.tensorboard_logger.add_scalar("_del", _del)
+                self.tensorboard_logger.add_scalar("_ins", _ins)
+                self.tensorboard_logger.add_scalar("_err", _err)
+                self.tensorboard_logger.add_scalar("_s_err", _s_err)
+
+            # TODO plotting curves
+
+        return {'test_metrics': test_metrics, "decoding_results": decoding_results}

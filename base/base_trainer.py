@@ -4,8 +4,8 @@ import json
 
 import torch
 
+from utils.tensorboard_logger import WriterTensorboardX
 from utils.util import ensure_dir, folder_to_checkpoint
-from utils.visualization import WriterTensorboardX
 
 
 class BaseTrainer:
@@ -48,12 +48,12 @@ class BaseTrainer:
         # setup directory for checkpoint saving
         self.checkpoint_dir = os.path.join(config['exp']['save_dir'], config['exp']['name'], 'checkpoints')
         # setup visualization writer instance
-        writer_dir = os.path.join(self.checkpoint_dir, "logs")
-        self.writer = WriterTensorboardX(writer_dir, enable=True)
+        self.tensorboard_logger = WriterTensorboardX(
+            os.path.join(config['exp']['save_dir'], config['exp']['name'], "logs"))
 
         # Save configuration file into checkpoint directory:
         ensure_dir(self.checkpoint_dir)
-        config_save_path = os.path.join(self.checkpoint_dir, 'config.json')
+        config_save_path = os.path.join(config['exp']['save_dir'], config['exp']['name'], 'config.json')
         with open(config_save_path, 'w') as handle:
             json.dump(config, handle, indent=4, sort_keys=False)
 
@@ -184,11 +184,11 @@ class BaseTrainer:
         self.model.load_state_dict(checkpoint['state_dict'])
 
         # load optimizer state from checkpoint only when optimizer type is not changed.
-        if checkpoint['config']['optimizer']['type'] != self.config['optimizer']['type']:
-            self.logger.warning('Warning: Optimizer type given in config file is different from that of checkpoint. ' + \
-                                'Optimizer parameters not being resumed.')
-        else:
-            self.optimizer.load_state_dict(checkpoint['optimizer'])
-            self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+        # if checkpoint['config']['optimizer']['type'] != self.config['optimizer']['type']: #TODO add check
+        #     self.logger.warning('Warning: Optimizer type given in config file is different from that of checkpoint. ' + \
+        #                         'Optimizer parameters not being resumed.')
+        # else:
+        self.optimizer.load_state_dict(checkpoint['optimizer'])
+        self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
 
         self.logger.info("Checkpoint '{}' (epoch {}) loaded".format(resume_path, self.start_epoch))

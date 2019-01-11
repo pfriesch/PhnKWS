@@ -4,7 +4,7 @@
     "save_dir": "exp",
     "name": "TIMIT_LSTM_mfcc",
     "seed": 2234,
-    "n_gpu": 1,
+    "n_gpu": 0,
     "prefetch_to_gpu": false,
     "n_epochs_tr": 10,
     "save_period": 1
@@ -73,7 +73,7 @@
     "TIMIT_test": {
       "fea": {
         "mfcc": {
-          "fea_lst": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/feats.scp",
+          "fea_lst": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/feats.scp",
           "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/mfcc/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=2 ark:- ark:- |",
           "cw_left": 0,
           "cw_right": 0
@@ -81,17 +81,17 @@
       },
       "lab": {
         "lab_cd": {
-          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
+          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
           "lab_opts": "ali-to-pdf",
           "lab_count_file": "auto",
-          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         },
         "lab_mono": {
-          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
+          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
           "lab_opts": "ali-to-phones --per-frame=true",
           "lab_count_file": "none",
-          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
       },

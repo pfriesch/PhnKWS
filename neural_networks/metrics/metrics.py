@@ -1,6 +1,5 @@
 import torch
-import torch.nn.functional as F
-from torch.nn import NLLLoss, Module
+from torch.nn import Module
 from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence
 
 

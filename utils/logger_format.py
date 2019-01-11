@@ -1,6 +1,8 @@
 from copy import copy
 from logging import Formatter
 
+#used in logger.py
+
 MAPPING = {
     'DEBUG': 37,  # white
     'INFO': 36,  # cyan

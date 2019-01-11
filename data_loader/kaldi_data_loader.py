@@ -2,9 +2,6 @@ import time
 
 from torch.nn.utils.rnn import pack_sequence
 from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
-
-from data_loader.kaldi_dataset import KaldiDataset
 
 
 def collate_fn(sample_list):
@@ -37,9 +34,11 @@ class KaldiDataLoader(DataLoader):
         self.dataset = dataset
         self.n_samples = len(self.dataset)
         if prefetch_to_gpu:
-            # start_time = time.time() #TODO benchmark everything
             self.dataset.move_to(device)
-            # elapsed_time_load = time.time() - start_time
+
+        # pin_memory = use_gpu and not prefetch_to_gpu
+        # TODO packed sequence from collate_fn does not work with pin_memory
+        pin_memory = False
 
         assert (prefetch_to_gpu and num_workers == 0) or not prefetch_to_gpu
 
@@ -47,6 +46,6 @@ class KaldiDataLoader(DataLoader):
                                               batch_size,
                                               shuffle,
                                               collate_fn=collate_fn,
-                                              pin_memory=use_gpu and not prefetch_to_gpu,
+                                              pin_memory=pin_memory,
                                               num_workers=num_workers,
                                               drop_last=False)

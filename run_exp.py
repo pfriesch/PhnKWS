@@ -30,7 +30,7 @@ def setup_run(config, logger):
 
     lr_scheduler = lr_scheduler_init(config, optimizer)
 
-    # logger.info(model) #TODO
+    logger.debug(model)
     metrics = metrics_init(config)
 
     loss = loss_init(config)

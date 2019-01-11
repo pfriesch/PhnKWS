@@ -78,7 +78,7 @@ def check_environment():
 
 
 def run_shell(cmd, logger):
-    logger.info("RUN: {}".format(cmd))
+    logger.debug("RUN: {}".format(cmd))
     if cmd.split(" ")[0].endswith(".sh"):
         if not (os.path.isfile(cmd.split(" ")[0]) and os.access(cmd.split(" ")[0], os.X_OK)):
             logger.warn("{} does not exist or is not runnable!".format(cmd.split(" ")[0]))
@@ -92,7 +92,7 @@ def run_shell(cmd, logger):
         raise RuntimeError("Call: {} had nonzero return code: {}, stderr: {}".format(cmd, return_code, err))
     # logger.warn("ERROR: {}".format(err.decode("utf-8")))
 
-    logger.info("OUTPUT: {}".format(output.decode("utf-8")))
+    logger.debug("OUTPUT: {}".format(output.decode("utf-8")))
     return output
 
 
