@@ -13,12 +13,36 @@ class LabMonoAccuracy(Module):
         if isinstance(target["lab_mono"], PackedSequence):
             target['lab_mono'] = pad_packed_sequence(target['lab_mono'], padding_value=ignore_index)[0]
 
-        num_mono_labs = output['out_mono'].shape[2]
+        len = output['out_mono'].shape[0]
+        batch_size = output['out_mono'].shape[1]
 
-        accuracy = torch.mean((output['out_mono'].view(-1, num_mono_labs).max(dim=1)[1] ==
-                               target['lab_mono'].view(-1)).to(dtype=torch.float32))
+        pred = output['out_mono'].view(len * batch_size, -1).max(dim=1)[1]
+        lab = target['lab_mono'].view(-1)
+
+        accuracy = torch.mean((pred == lab).to(dtype=torch.float32))
 
         return accuracy
+
+
+class LabMonoError(Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, output, target):
+        ignore_index = -1
+        if isinstance(target["lab_mono"], PackedSequence):
+            target['lab_mono'] = pad_packed_sequence(target['lab_mono'], padding_value=ignore_index)[0]
+
+        len = output['out_mono'].shape[0]
+        batch_size = output['out_mono'].shape[1]
+
+        pred = output['out_mono'].view(len * batch_size, -1).max(dim=1)[1]
+        lab = target['lab_mono'].view(-1)
+
+        error = torch.mean((pred != lab).to(dtype=torch.float32))
+
+        return error
 
 
 class LabCDAccuracy(Module):
@@ -31,9 +55,33 @@ class LabCDAccuracy(Module):
         if isinstance(target["lab_cd"], PackedSequence):
             target['lab_cd'] = pad_packed_sequence(target['lab_cd'], padding_value=ignore_index)[0]
 
-        num_mono_labs = output['out_cd'].shape[2]
+        len = output['out_cd'].shape[0]
+        batch_size = output['out_cd'].shape[1]
 
-        accuracy = torch.mean((output['out_cd'].view(-1, num_mono_labs).max(dim=1)[1] ==
-                               target['lab_cd'].view(-1)).to(dtype=torch.float32))
+        pred = output['out_cd'].view(len * batch_size, -1).max(dim=1)[1]
+        lab = target['lab_cd'].view(-1)
+
+        accuracy = torch.mean((pred == lab).to(dtype=torch.float32))
 
         return accuracy
+
+
+class LabCDError(Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, output, target):
+        ignore_index = -1
+        if isinstance(target["lab_cd"], PackedSequence):
+            target['lab_cd'] = pad_packed_sequence(target['lab_cd'], padding_value=ignore_index)[0]
+
+        len = output['out_cd'].shape[0]
+        batch_size = output['out_cd'].shape[1]
+
+        pred = output['out_cd'].view(len * batch_size, -1).max(dim=1)[1]
+        lab = target['lab_cd'].view(-1)
+
+        error = torch.mean((pred != lab).to(dtype=torch.float32))
+
+        return error

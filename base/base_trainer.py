@@ -15,7 +15,7 @@ class BaseTrainer:
     Base class for all trainers
     """
 
-    def __init__(self, model, loss, metrics, optimizer, lr_scheduler, resume_path, config):
+    def __init__(self, model, loss, metrics, optimizers, lr_schedulers, resume_path, config):
         self.config = config
 
         # setup GPU device if available, move model into configured device
@@ -26,8 +26,8 @@ class BaseTrainer:
 
         self.loss = loss
         self.metrics = metrics
-        self.optimizer = optimizer
-        self.lr_scheduler = lr_scheduler
+        self.optimizers = optimizers
+        self.lr_schedulers = lr_schedulers
         self.max_seq_length_train_curr = self.config['training']['start_seq_len_train']
 
         self.epochs = config['exp']['n_epochs_tr']
@@ -94,8 +94,9 @@ class BaseTrainer:
             elapsed_time_epoch = time.time() - start_time
             self.tensorboard_logger.add_scalar("elapsed_time_epoch", elapsed_time_epoch)
 
-            self.tensorboard_logger.add_scalar("lr", self.lr_scheduler.current_lr())
-            self.lr_scheduler.step(result['valid_loss'], epoch=epoch)
+            for _idx, lr_scheduler in enumerate(self.lr_schedulers):
+                self.tensorboard_logger.add_scalar("lr_{}".format(_idx), lr_scheduler.current_lr())
+                lr_scheduler.step(result['valid_loss'], epoch=epoch)
 
             self.tensorboard_logger.add_scalar("max_seq_length_train_curr", self.max_seq_length_train_curr)
             if self.config['training']['increase_seq_length_train']:
@@ -168,8 +169,8 @@ class BaseTrainer:
         state = {
             'epoch': epoch,
             'state_dict': self.model.state_dict(),
-            'optimizer': self.optimizer.state_dict(),
-            'lr_scheduler': self.lr_scheduler.state_dict(),
+            'optimizers': [opti.state_dict() for opti in self.optimizers],
+            'lr_schedulers': [lr_scheduler.state_dict() for lr_scheduler in self.lr_schedulers],
             'monitor_best': self.mnt_best,
             'config': self.config
         }
@@ -201,7 +202,9 @@ class BaseTrainer:
         #     logger.warning('Warning: Optimizer type given in config file is different from that of checkpoint. ' + \
         #                         'Optimizer parameters not being resumed.')
         # else:
-        self.optimizer.load_state_dict(checkpoint['optimizer'])
-        self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+        for _idx, opti in enumerate(checkpoint['optimizer']):
+            self.optimizers[_idx].load_state_dict(opti)
+        for _idx, lr_scheduler in enumerate(checkpoint['lr_scheduler']):
+            self.lr_schedulers[_idx].load_state_dict(lr_scheduler)
 
         logger.info("Checkpoint '{}' (epoch {}) loaded".format(resume_path, self.start_epoch))

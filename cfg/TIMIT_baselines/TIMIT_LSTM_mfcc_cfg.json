@@ -1,0 +1,176 @@
+{
+  "exp": {
+    "save_dir": "exp",
+    "name": "TIMIT_LSTM_mfcc",
+    "seed": 2234,
+    "n_gpu": 1,
+    "prefetch_to_gpu": false,
+    "n_epochs_tr": 10,
+    "save_period": 1
+  },
+  "data_use": {
+    //todo allow multiple inputs
+    "train_with": "TIMIT_tr",
+    "valid_with": "TIMIT_dev",
+    "test_with": "TIMIT_test"
+  },
+  "datasets": {
+    "TIMIT_tr": {
+      "fea": {
+        "mfcc": {
+          "fea_lst": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/feats.scp",
+          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/train/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/mfcc/cmvn_train.ark ark:- ark:- | add-deltas --delta-order=2 ark:- ark:- |",
+          "cw_left": 0,
+          "cw_right": 0
+        }
+      },
+      "lab": {
+        "lab_cd": {
+          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
+          "lab_opts": "ali-to-pdf",
+          "lab_count_file": "auto",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        },
+        "lab_mono": {
+          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
+          "lab_opts": "ali-to-phones --per-frame=true",
+          "lab_count_file": "none",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        }
+      }
+    },
+    "TIMIT_dev": {
+      "fea": {
+        "mfcc": {
+          "fea_lst": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/feats.scp",
+          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/mfcc/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=2 ark:- ark:- |",
+          "cw_left": 0,
+          "cw_right": 0
+        }
+      },
+      "lab": {
+        "lab_cd": {
+          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
+          "lab_opts": "ali-to-pdf",
+          "lab_count_file": "auto",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        },
+        "lab_mono": {
+          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
+          "lab_opts": "ali-to-phones --per-frame=true",
+          "lab_count_file": "none",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        }
+      }
+    },
+    "TIMIT_test": {
+      "fea": {
+        "mfcc": {
+          "fea_lst": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/feats.scp",
+          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/mfcc/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=2 ark:- ark:- |",
+          "cw_left": 0,
+          "cw_right": 0
+        }
+      },
+      "lab": {
+        "lab_cd": {
+          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
+          "lab_opts": "ali-to-pdf",
+          "lab_count_file": "auto",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        },
+        "lab_mono": {
+          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
+          "lab_opts": "ali-to-phones --per-frame=true",
+          "lab_count_file": "none",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        }
+      }
+    }
+  },
+  //    "google_speech_commands_test": {
+  //      "fea": {
+  //        "mfcc": {
+  //          "fea_lst": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/feats.scp",
+  //          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/mfcc_kws/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=2 ark:- ark:- |",
+  //          "cw_left": 0,
+  //          "cw_right": 0
+  //        }
+  //      },
+  //      "lab": {
+  //        "lab_text": {
+  //          "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
+  //        }
+  //      }
+  //    }
+  //  },
+  "training": {
+    "batch_size_train": 8,
+    "max_seq_length_train": 1000,
+    "increase_seq_length_train": true,
+    "start_seq_len_train": 100,
+    "multply_factor_seq_len_train": 2,
+    "batch_size_valid": 8,
+    "max_seq_length_valid": 1000,
+    "sort_by_feat": "mfcc",
+    "clip_grad_norm": -1,
+    "optimizer": {
+      "type": "triple_rmsprop",
+      "args": {
+        //        "lr": 0.0016
+      }
+    },
+    "lr_scheduler": {
+      "arch_halving_factor": 0.5,
+      "arch_improvement_threshold": 0.001
+    }
+  },
+  "arch": {
+    "name": "TIMIT_LSTM",
+    "args": {
+      "fea_index_length": 39
+    },
+    "loss": {
+      "name": "mtl_mono_cd",
+      "args": {
+        "weight_mono": 1.0
+      }
+    },
+    "metrics": [
+      "acc_lab_cd",
+      "err_lab_cd",
+      "acc_lab_mono",
+      "err_lab_mono"
+    ]
+  },
+  "test": {
+    "out_cd": {
+      "normalize_posteriors": true,
+      "normalize_with_counts_from": "lab_cd",
+      "save_out_file": true,
+      "require_decoding": true
+    }
+  },
+  "decoding": {
+    "decoding_script_folder": "kaldi_decoding_scripts",
+    "decoding_script": "decode_dnn.sh",
+    "decoding_proto": "proto/decoding.proto",
+    "min_active": 200,
+    "max_active": 7000,
+    "max_mem": 50000000,
+    "beam": 13.0,
+    "latbeam": 8.0,
+    "acwt": 0.2,
+    "max_arcs": -1.0,
+    "skip_scoring": "false",
+    "scoring_script": "local/score.sh",
+    "scoring_opts": "\"--min-lmwt 1 --max-lmwt 10\"",
+    "norm_vars": false
+  }
+}

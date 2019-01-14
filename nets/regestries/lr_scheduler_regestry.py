@@ -19,12 +19,16 @@ class ReduceLROnPlateau(optim.lr_scheduler.ReduceLROnPlateau):
                                 ' of group {} to {:.4e}.'.format(epoch, i, new_lr))
 
 
-def lr_scheduler_init(config, optimizer):
-    return ReduceLROnPlateau(optimizer,
-                             mode='min',
-                             factor=config['training']['lr_scheduler']['arch_halving_factor'],
-                             patience=1,
-                             verbose=True,
-                             threshold=config['training']['lr_scheduler'][
-                                 'arch_improvement_threshold'],
-                             threshold_mode='rel')
+def lr_scheduler_init(config, optimizers):
+    lr_schedulers = []
+    for optimizers in optimizers:
+        lr_schedulers.append(ReduceLROnPlateau(optimizers,
+                                               mode='min',
+                                               factor=config['training']['lr_scheduler']['arch_halving_factor'],
+                                               patience=1,
+                                               verbose=True,
+                                               threshold=config['training']['lr_scheduler'][
+                                                   'arch_improvement_threshold'],
+                                               threshold_mode='rel'))
+
+    return lr_schedulers

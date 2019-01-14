@@ -15,13 +15,13 @@ class MtlMonoCDLoss(Module):
         if any([isinstance(target[lab], PackedSequence) for lab in target]):
             target = {lab: pad_packed_sequence(target[lab], padding_value=ignore_index)[0] for lab in target}
 
-        num_cd_labs = output['out_cd'].shape[2]
-        num_mono_labs = output['out_mono'].shape[2]
+        len = output['out_cd']
+        batch_size = output['out_cd'].shape[1]
 
-        loss_cd = F.nll_loss(output['out_cd'].view(-1, num_cd_labs),
+        loss_cd = F.nll_loss(output['out_cd'].view(len * batch_size, -1),
                              target['lab_cd'].view(-1),
                              ignore_index=ignore_index)
-        loss_mono = F.nll_loss(output['out_mono'].view(-1, num_mono_labs),
+        loss_mono = F.nll_loss(output['out_mono'].view(len * batch_size, -1),
                                target['lab_mono'].view(-1),
                                ignore_index=ignore_index)
 

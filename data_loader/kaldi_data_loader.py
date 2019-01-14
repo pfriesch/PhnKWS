@@ -1,7 +1,7 @@
-import time
-
 from torch.nn.utils.rnn import pack_sequence
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Sampler
+
+from data_loader.kaldi_dataset import KaldiDataset
 
 
 def collate_fn(sample_list):
@@ -27,10 +27,22 @@ def collate_fn(sample_list):
     return sample_names, fea_dict, lab_dict
 
 
+class SortedSampler(Sampler):
+    def __init__(self, ordering_length, sort_by_feat):
+        self.ordering_length = ordering_length
+        self.feat = sort_by_feat
+
+    def __iter__(self):
+        return iter([idx_length['idx'] for filename, idx_length in self.ordering_length[self.feat].items()])
+
+    def __len__(self):
+        return len(self.ordering_length[self.feat])
+
+
 class KaldiDataLoader(DataLoader):
 
-    def __init__(self, dataset, batch_size, shuffle, use_gpu, prefetch_to_gpu,
-                 device, num_workers):
+    def __init__(self, dataset: KaldiDataset, batch_size, use_gpu, prefetch_to_gpu,
+                 device, num_workers, sort_by_feat=None):
         self.dataset = dataset
         self.n_samples = len(self.dataset)
         if prefetch_to_gpu:
@@ -44,7 +56,11 @@ class KaldiDataLoader(DataLoader):
 
         super(KaldiDataLoader, self).__init__(self.dataset,
                                               batch_size,
-                                              shuffle,
+                                              sampler=
+                                              SortedSampler(
+                                                  self.dataset.ordering_length,
+                                                  sort_by_feat=sort_by_feat) if sort_by_feat is not None
+                                              else None,
                                               collate_fn=collate_fn,
                                               pin_memory=pin_memory,
                                               num_workers=num_workers,

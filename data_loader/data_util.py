@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import numpy as np
 
 from data_loader import kaldi_io
@@ -25,7 +27,7 @@ def read_fea(fea_dict):
     return fea_loaded
 
 
-def read_lab_fea(fea_dict, lab_dict, max_sequence_length):
+def read_lab_fea(fea_dict, lab_dict, max_sequence_length, context_size):
     fea_loaded = {}
     lab_loaded = {}
 
@@ -54,7 +56,9 @@ def read_lab_fea(fea_dict, lab_dict, max_sequence_length):
             for filename in fea_loaded[fea]:
                 assert fea_loaded[fea][filename].shape[0] == len(lab_loaded[lab][filename])
 
-    min_sequence_length = max_sequence_length // 4  # TODO remove with 1/4 of max length -> add to config
+    # TODO remove with 1/4 of max length -> add to config
+    # TODO add option weather the context_size is applied to the minimum sequence length
+    min_sequence_length = max_sequence_length // 4 + context_size
 
     chunked_files = []
     fea_loaded_update = {k: {} for k in fea_loaded}
@@ -97,6 +101,18 @@ def read_lab_fea(fea_dict, lab_dict, max_sequence_length):
             assert fea_sample_ids == lab_sample_ids
 
     return fea_loaded, lab_loaded
+
+
+def get_order_by_length(feat_dict):
+    ordering_length = {}
+    for fea in feat_dict:
+        ordering_length[fea] = \
+            sorted(enumerate(feat_dict[fea]),
+                   key=lambda _idx_filename: feat_dict[fea][_idx_filename[1]].shape[0])
+        ordering_length[fea] = OrderedDict([(filename, {"idx": _idx,
+                                                        "length": feat_dict[fea][filename].shape[0]})
+                                            for _idx, filename in ordering_length[fea]])
+    return ordering_length
 
 
 def apply_context(lab_dict, context_left, context_right):

@@ -2,7 +2,7 @@ import time
 
 import torch
 
-from data_loader.data_util import read_lab_fea, apply_context, make_big_chunk
+from data_loader.data_util import read_lab_fea, apply_context, make_big_chunk, get_order_by_length
 
 
 class KaldiDataset(object):
@@ -12,13 +12,15 @@ class KaldiDataset(object):
         self.tensorboard_logger = tensorboard_logger
         start_time = time.time()
 
-        _fea_dict, _lab_dict = read_lab_fea(fea_dict, lab_dict, max_sequence_length)
+        _fea_dict, _lab_dict = read_lab_fea(fea_dict, lab_dict, max_sequence_length, context_left + context_right)
 
         if debug:
             for lab in _lab_dict:
                 _lab_dict[lab] = dict(sorted(list(_lab_dict[lab].items()), key=lambda x: x[0])[:30])
             for fea in _fea_dict:
                 _fea_dict[fea] = dict(sorted(list(_fea_dict[fea].items()), key=lambda x: x[0])[:30])
+
+        self.ordering_length = get_order_by_length(_fea_dict)
 
         # TODO split files that are too long
         _lab_dict = apply_context(_lab_dict, context_left, context_right)

@@ -19,9 +19,9 @@ check_environment()
 
 class Trainer(BaseTrainer):
 
-    def __init__(self, model, loss, metrics, optimizer, resume_path, config, do_validation,
-                 lr_scheduler, debug=False):
-        super(Trainer, self).__init__(model, loss, metrics, optimizer, lr_scheduler, resume_path, config)
+    def __init__(self, model, loss, metrics, optimizers, resume_path, config, do_validation,
+                 lr_schedulers, debug=False):
+        super(Trainer, self).__init__(model, loss, metrics, optimizers, lr_schedulers, resume_path, config)
         self.config = config
         self.do_validation = do_validation
         self.log_step = int(np.sqrt(config['training']['batch_size_train']))
@@ -63,11 +63,11 @@ class Trainer(BaseTrainer):
                                self.tensorboard_logger, debug=self.debug)
         data_loader = KaldiDataLoader(dataset,
                                       self.config['training']['batch_size_train'],
-                                      shuffle=False,
                                       use_gpu=self.config["exp"]["n_gpu"] > 0,
                                       prefetch_to_gpu=self.config['exp']['prefetch_to_gpu'],
                                       device=self.device,
-                                      num_workers=0)
+                                      num_workers=0,
+                                      sort_by_feat=self.config['training']['sort_by_feat'])
 
         with tqdm(total=len(data_loader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
             pbar.set_description('T e:{} l: {} '.format(epoch, '-'))
@@ -76,16 +76,21 @@ class Trainer(BaseTrainer):
                 inputs = {k: v.to(self.device) for k, v in inputs.items()}
                 targets = {k: v.to(self.device) for k, v in targets.items()}
 
-                self.optimizer.zero_grad()
+                for opti in self.optimizers:
+                    opti.zero_grad()
                 output = self.model(inputs)
                 loss = self.loss(output, targets)
                 loss["loss_final"].backward()
 
+                # TODO assert out.shape[1] >= lab_dnn.max() and lab_dnn.min() >= 0, \
+                #     "lab_dnn max of {} is bigger than shape of output {} or min {} is smaller than 0" \
+                #         .format(lab_dnn.max().cpu().numpy(), out.shape[1], lab_dnn.min().cpu().numpy())
+
                 if self.config['training']['clip_grad_norm'] > 0:
                     trainable_params = filter(lambda p: p.requires_grad, self.model.parameters())
                     torch.nn.utils.clip_grad_norm_(trainable_params, self.config['training']['clip_grad_norm'])
-
-                self.optimizer.step()
+                for opti in self.optimizers:
+                    opti.step()
 
                 #### Logging ####
                 self.tensorboard_logger.set_step((epoch - 1) * len(data_loader) + batch_idx)
@@ -98,6 +103,10 @@ class Trainer(BaseTrainer):
                                  in _train_metrics.items()}
                 for metric, metric_value in _train_metrics.items():
                     self.tensorboard_logger.add_scalar(metric, metric_value.item())
+
+                for fea in inputs:
+                    total_padding = torch.sum((torch.ones_like(inputs[fea][1]) * inputs[fea][1][0]) - inputs[fea][1])
+                    self.tensorboard_logger.add_scalar('total_padding_{}'.format(fea), total_padding.item())
 
                 pbar.set_description('T e:{} l: {:.6f} '.format(epoch,
                                                                 loss["loss_final"].item()))
@@ -137,7 +146,6 @@ class Trainer(BaseTrainer):
 
         valid_data_loader = KaldiDataLoader(dataset,
                                             self.config['training']['batch_size_valid'],
-                                            shuffle=False,
                                             use_gpu=self.config["exp"]["n_gpu"] > 0,
                                             prefetch_to_gpu=self.config['exp']['prefetch_to_gpu'] is not None,
                                             device=self.device,
@@ -153,20 +161,19 @@ class Trainer(BaseTrainer):
                 loss = self.loss(output, targets)
 
                 #### Logging ####
-                self.tensorboard_logger.set_step((epoch - 1) * len(valid_data_loader) + batch_idx, 'valid')
-                for _loss, loss_value in loss.items():
-                    self.tensorboard_logger.add_scalar(_loss, loss_value.item())
                 valid_loss += loss["loss_final"].item()
                 _eval_metrics = self._eval_metrics(output, targets)
                 valid_metrics = {metric: valid_metrics[metric] + metric_value.item() for
                                  metric, metric_value
                                  in _eval_metrics.items()}
-                for metric, metric_value in _eval_metrics.items():
-                    self.tensorboard_logger.add_scalar(metric, metric_value.item())
-
                 pbar.set_description('V e:{} l: {:.6f} '.format(epoch, loss["loss_final"].item()))
                 pbar.update()
                 #### /Logging ####
+
+        self.tensorboard_logger.set_step((epoch - 1) * len(valid_data_loader), 'valid')
+        self.tensorboard_logger.add_scalar('valid_loss', valid_loss / len(valid_data_loader))
+        for metric in valid_metrics:
+            self.tensorboard_logger.add_scalar(metric, valid_metrics[metric] / len(valid_data_loader))
 
         return {'valid_loss': valid_loss / len(valid_data_loader),
                 'valid_metrics': {metric: valid_metrics[metric] / len(valid_data_loader) for metric in
@@ -186,13 +193,12 @@ class Trainer(BaseTrainer):
         dataset = KaldiDataset(self.config['datasets'][test_data]['fea'],
                                self.config['datasets'][test_data]['lab'],
                                self.model.context_left, self.model.context_right,
-                               max_sequence_length=- 1,
+                               max_sequence_length=max_seq_length,
                                tensorboard_logger=self.tensorboard_logger,
                                debug=self.debug)
 
         test_data_loader = KaldiDataLoader(dataset,
                                            batch_size,
-                                           shuffle=False,
                                            use_gpu=self.config["exp"]["n_gpu"] > 0,
                                            prefetch_to_gpu=self.config['exp']['prefetch_to_gpu'] is not None,
                                            device=self.device,
@@ -240,19 +246,20 @@ class Trainer(BaseTrainer):
                         kaldi_io.write_mat(post_file[output_lab], out_save.squeeze(), sample_names[0])
 
                         #### Logging ####
-                        self.tensorboard_logger.set_step((epoch - 1) * len(test_data_loader) + batch_idx, 'eval')
                         _test_metrics = self._eval_metrics(output, targets)
                         test_metrics = {metric: test_metrics[metric] + metric_value.item() for
                                         metric, metric_value
                                         in _test_metrics.items()}
-                        for metric, metric_value in _test_metrics.items():
-                            self.tensorboard_logger.add_scalar(metric, metric_value.item())
 
                         pbar.set_description('E e:{}           '.format(epoch))
                         pbar.update()
                         #### /Logging ####
                     else:
                         logger.debug("Skipping saving forward for decoding for key {}".format(output_lab))
+
+        self.tensorboard_logger.set_step((epoch - 1) * len(test_data_loader), 'eval')
+        for metric, metric_value in test_metrics.items():
+            self.tensorboard_logger.add_scalar(metric, test_metrics[metric] / len(test_data_loader))
 
         for out_name in self.config['test'].keys():
             post_file[out_name].close()

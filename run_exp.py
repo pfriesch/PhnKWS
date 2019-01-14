@@ -24,17 +24,16 @@ def setup_run(config):
     model = model_init(config['arch']['name'], fea_index_length=config['arch']['args']['fea_index_length'],
                        lab_cd_num=N_out_lab['lab_cd'])
 
-    trainable_params = filter(lambda p: p.requires_grad, model.parameters())
-    optimizer = optimizer_init(config, trainable_params)
+    optimizers = optimizer_init(config, model)
 
-    lr_scheduler = lr_scheduler_init(config, optimizer)
+    lr_schedulers = lr_scheduler_init(config, optimizers)
 
     logger.debug(model)
     metrics = metrics_init(config)
 
     loss = loss_init(config)
 
-    return model, loss, metrics, optimizer, config, lr_scheduler
+    return model, loss, metrics, optimizers, config, lr_schedulers
 
 
 def main(config_path, resume_path, debug):
@@ -74,13 +73,13 @@ def main(config_path, resume_path, debug):
 
     logger.configure_logger(out_folder)
 
-    model, loss, metrics, optimizer, config, lr_scheduler = setup_run(config)
+    model, loss, metrics, optimizers, config, lr_schedulers = setup_run(config)
 
-    trainer = Trainer(model, loss, metrics, optimizer,
+    trainer = Trainer(model, loss, metrics, optimizers,
                       resume_path=resume_path,
                       config=config,
                       do_validation=True,
-                      lr_scheduler=lr_scheduler,
+                      lr_schedulers=lr_schedulers,
                       debug=debug)
     trainer.train()
 
