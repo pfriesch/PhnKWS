@@ -16,18 +16,18 @@
   },
   "datasets": {
     "TIMIT_tr": {
-      "fea": {
+      "features": {
         "fbank": {
-          "fea_lst": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/feats_fbank.scp",
-          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/train/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_train.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
+          "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/feats_fbank.scp",
+          "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/train/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_train.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
           "cw_left": 5,
           "cw_right": 5
         }
       },
-      "lab": {
+      "labels": {
         "lab_cd": {
-          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
-          "lab_opts": "ali-to-pdf",
+          "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
+          "label_opts": "ali-to-pdf",
           "lab_count_file": "auto",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
@@ -35,18 +35,18 @@
       }
     },
     "TIMIT_dev": {
-      "fea": {
+      "features": {
         "fbank": {
-          "fea_lst": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/feats_fbank.scp",
-          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
+          "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/feats_fbank.scp",
+          "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
           "cw_left": 5,
           "cw_right": 5
         }
       },
-      "lab": {
+      "labels": {
         "lab_cd": {
-          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
-          "lab_opts": "ali-to-pdf",
+          "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
+          "label_opts": "ali-to-pdf",
           "lab_count_file": "auto",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
@@ -54,18 +54,18 @@
       }
     },
     "TIMIT_test": {
-      "fea": {
+      "features": {
         "fbank": {
-          "fea_lst": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/feats_fbank.scp",
-          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
+          "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/feats_fbank.scp",
+          "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
           "cw_left": 5,
           "cw_right": 5
         }
       },
-      "lab": {
+      "labels": {
         "lab_cd": {
-          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
-          "lab_opts": "ali-to-pdf",
+          "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
+          "label_opts": "ali-to-pdf",
           "lab_count_file": "auto",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
@@ -74,15 +74,15 @@
     }
   },
   //    "google_speech_commands_test": {
-  //      "fea": {
+  //      "features": {
   //        "mfcc": {
-  //          "fea_lst": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/feats.scp",
-  //          "fea_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/mfcc_kws/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=2 ark:- ark:- |",
+  //          "feature_lst_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/feats.scp",
+  //          "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/mfcc_kws/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=2 ark:- ark:- |",
   //          "cw_left": 0,
   //          "cw_right": 0
   //        }
   //      },
-  //      "lab": {
+  //      "labels": {
   //        "lab_text": {
   //          "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
   //        }
@@ -115,7 +115,7 @@
       "fea_index_length": 39
     },
     "loss": {
-      "name": "lab_cd",
+      "name": "lab_cd"
     },
     "metrics": [
       "acc_lab_cd",

@@ -1,5 +1,3 @@
-from distutils.util import strtobool
-
 import torch.nn.functional as F
 import torch.nn as nn
 

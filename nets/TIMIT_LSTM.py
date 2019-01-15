@@ -1,4 +1,3 @@
-import torch.nn as nn
 from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence
 
 from base.base_model import BaseModel

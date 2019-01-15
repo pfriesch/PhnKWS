@@ -133,7 +133,7 @@ if num_hid_layers == 0 and o.bottleneck_dim != 0:
             print("<Softmax> <InputDim> %d <OutputDim> %d" % (num_leaves, num_leaves))
         else:
             print("<BlockSoftmax> <InputDim> %d <OutputDim> %d <BlockDims> %s" % (
-            num_leaves, num_leaves, o.block_softmax_dims))
+                num_leaves, num_leaves, o.block_softmax_dims))
     print("</NnetProto>")
     # We are done!
     sys.exit(0)
@@ -149,7 +149,7 @@ if num_hid_layers == 0:
             print("<Softmax> <InputDim> %d <OutputDim> %d" % (num_leaves, num_leaves))
         else:
             print("<BlockSoftmax> <InputDim> %d <OutputDim> %d <BlockDims> %s" % (
-            num_leaves, num_leaves, o.block_softmax_dims))
+                num_leaves, num_leaves, o.block_softmax_dims))
     print("</NnetProto>")
     # We are done!
     sys.exit(0)
@@ -215,7 +215,7 @@ if o.with_softmax:
         print("<Softmax> <InputDim> %d <OutputDim> %d" % (num_leaves, num_leaves))
     else:
         print("<BlockSoftmax> <InputDim> %d <OutputDim> %d <BlockDims> %s" % (
-        num_leaves, num_leaves, o.block_softmax_dims))
+            num_leaves, num_leaves, o.block_softmax_dims))
 
 # End the prototype
 print("</NnetProto>")

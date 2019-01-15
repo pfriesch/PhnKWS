@@ -78,7 +78,7 @@ feat_dim = int(args[0]);
 ### End parse options 
 
 feat_raw_dim = feat_dim / (o.delta_order + 1) / (
-            o.splice * 2 + 1) - o.pitch_dim  # we need number of feats without deltas and splice and pitch
+        o.splice * 2 + 1) - o.pitch_dim  # we need number of feats without deltas and splice and pitch
 
 # Check
 assert (feat_dim > 0)
@@ -103,8 +103,9 @@ convolution_proto = ''
 
 convolution_proto += "<ConvolutionalComponent> <InputDim> %d <OutputDim> %d <PatchDim> %d <PatchStep> %d <PatchStride> %d <BiasMean> %f <BiasRange> %f <ParamStddev> %f <MaxNorm> %f\n" % \
                      (
-                     feat_raw_dim * (o.delta_order + 1) * (o.splice * 2 + 1), o.num_filters1 * num_patch1, o.patch_dim1,
-                     o.patch_step1, feat_raw_dim, -1.0, 2.0, 0.02, 30)  # ~8x11x3 = 264 inputs
+                         feat_raw_dim * (o.delta_order + 1) * (o.splice * 2 + 1), o.num_filters1 * num_patch1,
+                         o.patch_dim1,
+                         o.patch_step1, feat_raw_dim, -1.0, 2.0, 0.02, 30)  # ~8x11x3 = 264 inputs
 convolution_proto += "<%sPoolingComponent> <InputDim> %d <OutputDim> %d <PoolSize> %d <PoolStep> %d <PoolStride> %d\n" % \
                      (o.pool_type, o.num_filters1 * num_patch1, o.num_filters1 * num_pool, o.pool_size, o.pool_step,
                       o.num_filters1)

@@ -1,7 +1,7 @@
 from copy import copy
 from logging import Formatter
 
-#used in logger.py
+# used in logger.py
 
 MAPPING = {
     'DEBUG': 37,  # white

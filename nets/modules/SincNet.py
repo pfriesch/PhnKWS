@@ -1,4 +1,3 @@
-from distutils.util import strtobool
 import math
 
 import torch

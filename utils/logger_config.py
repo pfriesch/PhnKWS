@@ -1,6 +1,5 @@
 import logging
 import logging.config
-
 import os
 
 from data_loader import kaldi_io

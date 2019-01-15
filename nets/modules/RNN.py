@@ -1,5 +1,3 @@
-from distutils.util import strtobool
-
 import torch
 import torch.nn as nn
 
@@ -13,10 +11,10 @@ class RNN(nn.Module):
 
         # Reading parameters
         self.input_dim = inp_dim
-        self.rnn_lay =  options['rnn_lay']
-        self.rnn_drop =  options['rnn_drop']
-        self.rnn_use_batchnorm =  options['rnn_use_batchnorm']
-        self.rnn_use_laynorm =  options['rnn_use_laynorm']
+        self.rnn_lay = options['rnn_lay']
+        self.rnn_drop = options['rnn_drop']
+        self.rnn_use_batchnorm = options['rnn_use_batchnorm']
+        self.rnn_use_laynorm = options['rnn_use_laynorm']
         self.rnn_use_laynorm_inp = options['rnn_use_laynorm_inp']
         self.rnn_use_batchnorm_inp = options['rnn_use_batchnorm_inp']
         self.rnn_orthinit = options['rnn_orthinit']

@@ -57,7 +57,7 @@ class Trainer(BaseTrainer):
         train_loss = 0
         train_metrics = {metric: 0 for metric in self.metrics}
 
-        dataset = KaldiDataset(self.config['datasets'][tr_data]['fea'], self.config['datasets'][tr_data]['lab'],
+        dataset = KaldiDataset(self.config['datasets'][tr_data]['features'], self.config['datasets'][tr_data]['labels'],
                                self.model.context_left, self.model.context_right,
                                self.max_seq_length_train_curr,
                                self.tensorboard_logger, debug=self.debug)
@@ -104,14 +104,14 @@ class Trainer(BaseTrainer):
                 for metric, metric_value in _train_metrics.items():
                     self.tensorboard_logger.add_scalar(metric, metric_value.item())
 
-                for fea in inputs:
-                    total_padding = torch.sum((torch.ones_like(inputs[fea][1]) * inputs[fea][1][0]) - inputs[fea][1])
-                    self.tensorboard_logger.add_scalar('total_padding_{}'.format(fea), total_padding.item())
+                for feat_name in inputs:
+                    total_padding = torch.sum(
+                        (torch.ones_like(inputs[feat_name][1]) * inputs[feat_name][1][0]) - inputs[feat_name][1])
+                    self.tensorboard_logger.add_scalar('total_padding_{}'.format(feat_name), total_padding.item())
 
                 pbar.set_description('T e:{} l: {:.6f} a: {}'.format(epoch,
                                                                      loss["loss_final"].item(),
-                                                                     train_metrics['acc_lab_cd'].items()
-                                                                     ))
+                                                                     _train_metrics['acc_lab_cd'].item()))
                 pbar.update()
                 #### /Logging ####
 
@@ -139,8 +139,8 @@ class Trainer(BaseTrainer):
         valid_loss = 0
         valid_metrics = {metric: 0 for metric in self.metrics}
 
-        dataset = KaldiDataset(self.config['datasets'][valid_data]['fea'],
-                               self.config['datasets'][valid_data]['lab'],
+        dataset = KaldiDataset(self.config['datasets'][valid_data]['features'],
+                               self.config['datasets'][valid_data]['labels'],
                                self.model.context_left, self.model.context_right,
                                self.config['training']['max_seq_length_valid'],
                                self.tensorboard_logger,
@@ -192,8 +192,8 @@ class Trainer(BaseTrainer):
 
         test_metrics = {metric: 0 for metric in self.metrics}
 
-        dataset = KaldiDataset(self.config['datasets'][test_data]['fea'],
-                               self.config['datasets'][test_data]['lab'],
+        dataset = KaldiDataset(self.config['datasets'][test_data]['features'],
+                               self.config['datasets'][test_data]['labels'],
                                self.model.context_left, self.model.context_right,
                                max_sequence_length=max_seq_length,
                                tensorboard_logger=self.tensorboard_logger,
@@ -228,15 +228,15 @@ class Trainer(BaseTrainer):
 
                 output = self.model(inputs)
 
-                for output_lab in output:
-                    if output_lab in self.config['test'].keys():
+                for output_label in output:
+                    if output_label in self.config['test'].keys():
 
-                        out_save = output[output_lab].data.cpu().numpy()
+                        out_save = output[output_label].data.cpu().numpy()
 
-                        if output_lab in self.config['test'] and \
-                                self.config['test'][output_lab]['normalize_posteriors']:
+                        if output_label in self.config['test'] and \
+                                self.config['test'][output_label]['normalize_posteriors']:
                             # read the config file
-                            counts = load_counts(self.config['test'][output_lab]['normalize_with_counts_from_file'])
+                            counts = load_counts(self.config['test'][output_label]['normalize_with_counts_from_file'])
                             out_save = out_save - np.log(counts / np.sum(counts))
 
                             # save the output
@@ -245,7 +245,7 @@ class Trainer(BaseTrainer):
                             # post_file dict out_dnn2: buffered wirter
                         assert out_save.shape[1] == 1
                         assert len(sample_names) == 1
-                        kaldi_io.write_mat(post_file[output_lab], out_save.squeeze(), sample_names[0])
+                        kaldi_io.write_mat(post_file[output_label], out_save.squeeze(), sample_names[0])
 
                         #### Logging ####
                         _test_metrics = self._eval_metrics(output, targets)
@@ -257,7 +257,7 @@ class Trainer(BaseTrainer):
                         pbar.update()
                         #### /Logging ####
                     else:
-                        logger.debug("Skipping saving forward for decoding for key {}".format(output_lab))
+                        logger.debug("Skipping saving forward for decoding for key {}".format(output_label))
 
         self.tensorboard_logger.set_step((epoch - 1) * len(test_data_loader), 'eval')
         for metric, metric_value in test_metrics.items():
@@ -292,8 +292,8 @@ class Trainer(BaseTrainer):
                     config_dec.set('decoding', dec_key, str(self.config['decoding'][dec_key]))
 
                 # add graph_dir, datadir, alidir
-                lab_field = self.config['datasets'][data]['lab']['lab_cd']
-                config_dec.set('decoding', 'alidir', os.path.abspath(lab_field['lab_folder']))
+                lab_field = self.config['datasets'][data]['labels']['lab_cd']
+                config_dec.set('decoding', 'alidir', os.path.abspath(lab_field['label_folder']))
                 config_dec.set('decoding', 'data', os.path.abspath(lab_field['lab_data_folder']))
                 config_dec.set('decoding', 'graphdir', os.path.abspath(lab_field['lab_graph']))
 

@@ -1,5 +1,6 @@
 from tensorboardX import SummaryWriter
 
+
 class WriterTensorboardX(SummaryWriter):
     def __init__(self, log_dir=None, comment='', **kwargs):
         super().__init__(log_dir, comment, **kwargs)
@@ -33,7 +34,8 @@ class WriterTensorboardX(SummaryWriter):
     def add_image_with_boxes(self, tag, img_tensor, box_tensor, global_step=None, walltime=None, dataformats='CHW',
                              **kwargs):
         assert global_step is None, "use the actual writer object if you want to specify the global step"
-        super().add_image_with_boxes('{}/{}'.format(self.mode, tag), img_tensor, box_tensor, self.step, walltime, dataformats, **kwargs)
+        super().add_image_with_boxes('{}/{}'.format(self.mode, tag), img_tensor, box_tensor, self.step, walltime,
+                                     dataformats, **kwargs)
 
     def add_figure(self, tag, figure, global_step=None, close=True, walltime=None):
         assert global_step is None, "use the actual writer object if you want to specify the global step"
@@ -53,13 +55,15 @@ class WriterTensorboardX(SummaryWriter):
 
     def add_pr_curve(self, tag, labels, predictions, global_step=None, num_thresholds=127, weights=None, walltime=None):
         assert global_step is None, "use the actual writer object if you want to specify the global step"
-        super().add_pr_curve('{}/{}'.format(self.mode, tag), labels, predictions, self.step, num_thresholds, weights, walltime)
+        super().add_pr_curve('{}/{}'.format(self.mode, tag), labels, predictions, self.step, num_thresholds, weights,
+                             walltime)
 
     def add_pr_curve_raw(self, tag, true_positive_counts, false_positive_counts, true_negative_counts,
                          false_negative_counts, precision, recall, global_step=None, num_thresholds=127, weights=None,
                          walltime=None):
         assert global_step is None, "use the actual writer object if you want to specify the global step"
-        super().add_pr_curve_raw('{}/{}'.format(self.mode, tag), true_positive_counts, false_positive_counts, true_negative_counts,
+        super().add_pr_curve_raw('{}/{}'.format(self.mode, tag), true_positive_counts, false_positive_counts,
+                                 true_negative_counts,
                                  false_negative_counts, precision, recall, self.step, num_thresholds, weights,
                                  walltime)
 

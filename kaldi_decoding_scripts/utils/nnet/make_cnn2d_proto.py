@@ -124,7 +124,7 @@ feat_dim = int(args[0])
 ### End parse options 
 
 feat_raw_dim = feat_dim / (o.delta_order + 1) / (
-            o.splice * 2 + 1) - o.pitch_dim  # we need number of feats without deltas and splice and pitch
+        o.splice * 2 + 1) - o.pitch_dim  # we need number of feats without deltas and splice and pitch
 o.cnn1_fmap_y_len = feat_raw_dim
 o.cnn1_fmap_x_len = o.splice * 2 + 1
 
@@ -199,8 +199,9 @@ convolution_proto += "<Convolutional2DComponent> <InputDim> %d <OutputDim> %d <F
                       o.cnn1_filt_y_len, o.cnn1_filt_x_step, o.cnn1_filt_y_step, o.cnn1_connect_fmap, 0.0, 0.0, 0.01)
 convolution_proto += "<%sPooling2DComponent> <InputDim> %d <OutputDim> %d <FmapXLen> %d <FmapYLen> %d <PoolXLen> %d <PoolYLen> %d <PoolXStep> %d <PoolYStep> %d\n" % \
                      (
-                     o.pool1_type, pool1_input_dim, pool1_output_dim, pool1_fmap_x_len, pool1_fmap_y_len, o.pool1_x_len,
-                     o.pool1_y_len, o.pool1_x_step, o.pool1_y_step)
+                         o.pool1_type, pool1_input_dim, pool1_output_dim, pool1_fmap_x_len, pool1_fmap_y_len,
+                         o.pool1_x_len,
+                         o.pool1_y_len, o.pool1_x_step, o.pool1_y_step)
 convolution_proto += "<Rescale> <InputDim> %d <OutputDim> %d <InitParam> %f\n" % \
                      (pool1_output_dim, pool1_output_dim, 1.0)
 convolution_proto += "<AddShift> <InputDim> %d <OutputDim> %d <InitParam> %f\n" % \

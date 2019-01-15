@@ -112,15 +112,15 @@ def compute_avg_performance(info_lst):
 
 
 def get_posterior_norm_data(config):
-    train_dataset_lab = config['datasets'][config['data_use']['train_with']]['lab']
+    train_dataset_lab = config['datasets'][config['data_use']['train_with']]['labels']
     N_out_lab = {}
 
     for forward_out in config['test']:
         normalize_with_counts_from = config['test'][forward_out]['normalize_with_counts_from']
         if config['test'][forward_out]['normalize_posteriors']:
             # Try to automatically retrieve the config file
-            assert "ali-to-pdf" in train_dataset_lab[normalize_with_counts_from]['lab_opts']
-            folder_lab_count = train_dataset_lab[normalize_with_counts_from]['lab_folder']
+            assert "ali-to-pdf" in train_dataset_lab[normalize_with_counts_from]['label_opts']
+            folder_lab_count = train_dataset_lab[normalize_with_counts_from]['label_folder']
             cmd = "hmm-info " + folder_lab_count + "/final.mdl | awk '/pdfs/{print $4}'"
             output = run_shell(cmd)
             N_out = int(output.decode().rstrip())

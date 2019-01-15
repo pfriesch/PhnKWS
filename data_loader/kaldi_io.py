@@ -4,8 +4,13 @@
 # Copyright 2014-2016  Brno University of Technology (author: Karel Vesely)
 # Licensed under the Apache License, Version 2.0 (the "License")
 
+import sys
+import os
+import re
+import gzip
+import struct
+
 import numpy as np
-import sys, os, re, gzip, struct
 
 #################################################
 # Adding kaldi tools to shell path,
