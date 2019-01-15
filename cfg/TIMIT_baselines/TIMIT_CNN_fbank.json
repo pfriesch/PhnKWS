@@ -31,13 +31,6 @@
           "lab_count_file": "auto",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
-        },
-        "lab_mono": {
-          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
-          "lab_opts": "ali-to-phones --per-frame=true",
-          "lab_count_file": "none",
-          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
-          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
       }
     },
@@ -57,13 +50,6 @@
           "lab_count_file": "auto",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
-        },
-        "lab_mono": {
-          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
-          "lab_opts": "ali-to-phones --per-frame=true",
-          "lab_count_file": "none",
-          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
-          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
       }
     },
@@ -81,13 +67,6 @@
           "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
           "lab_opts": "ali-to-pdf",
           "lab_count_file": "auto",
-          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
-          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
-        },
-        "lab_mono": {
-          "lab_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
-          "lab_opts": "ali-to-phones --per-frame=true",
-          "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
@@ -120,9 +99,9 @@
     "max_seq_length_valid": 1000,
     "clip_grad_norm": -1,
     "optimizer": {
-      "type": "adam",
+      "type": "sgd",
       "args": {
-        "lr": 0.001
+        "lr": 0.08
       }
     },
     "lr_scheduler": {
@@ -137,12 +116,10 @@
     },
     "loss": {
       "name": "lab_cd",
-      "args": {
-        "weight_mono": 1.0
-      }
     },
     "metrics": [
-      "acc_lab_cd"
+      "acc_lab_cd",
+      "err_lab_cd"
     ]
   },
   "test": {

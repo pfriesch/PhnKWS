@@ -70,7 +70,7 @@ class Trainer(BaseTrainer):
                                       sort_by_feat=self.config['training']['sort_by_feat'])
 
         with tqdm(total=len(data_loader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
-            pbar.set_description('T e:{} l: {} '.format(epoch, '-'))
+            pbar.set_description('T e:{} l: {} a: {}'.format(epoch, '-', '-'))
             for batch_idx, (sample_names, inputs, targets) in enumerate(data_loader):
 
                 inputs = {k: v.to(self.device) for k, v in inputs.items()}
@@ -108,8 +108,10 @@ class Trainer(BaseTrainer):
                     total_padding = torch.sum((torch.ones_like(inputs[fea][1]) * inputs[fea][1][0]) - inputs[fea][1])
                     self.tensorboard_logger.add_scalar('total_padding_{}'.format(fea), total_padding.item())
 
-                pbar.set_description('T e:{} l: {:.6f} '.format(epoch,
-                                                                loss["loss_final"].item()))
+                pbar.set_description('T e:{} l: {:.6f} a: {}'.format(epoch,
+                                                                     loss["loss_final"].item(),
+                                                                     train_metrics['acc_lab_cd'].items()
+                                                                     ))
                 pbar.update()
                 #### /Logging ####
 

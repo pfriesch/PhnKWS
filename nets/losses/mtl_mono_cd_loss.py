@@ -1,6 +1,5 @@
-import torch
 import torch.nn.functional as F
-from torch.nn import NLLLoss, Module
+from torch.nn import Module
 from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence
 
 
@@ -25,5 +24,5 @@ class MtlMonoCDLoss(Module):
                                target['lab_mono'].view(-1),
                                ignore_index=ignore_index)
 
-        loss_final = loss_cd + (self.weight_mono * loss_mono)
+        loss_final = (self.weight_mono * loss_mono) + loss_cd
         return {"loss_final": loss_final, "loss_cd": loss_cd, "loss_mono": loss_mono}

@@ -2,12 +2,12 @@ from torch import optim
 
 
 def optimizer_init(config, model):
+    optimizers = []
     if config['training']['optimizer']['type'] == 'adam':
         trainable_params = filter(lambda p: p.requires_grad, model.parameters())
         optimizers = [optim.Adam(trainable_params, **config['training']['optimizer']["args"])]
 
-    elif config['training']['optimizer']['type'] == 'triple_rmsprop':
-        optimizers = []
+    elif config['training']['optimizer']['type'] == 'lstm_triple_rmsprop':
         trainable_params_lstm = filter(lambda p: p.requires_grad, model.lstm.parameters())
         optimizers.append(optim.RMSprop(trainable_params_lstm,
                                         lr=0.0016,
@@ -35,7 +35,9 @@ def optimizer_init(config, model):
                                         momentum=0,
                                         centered=False))
 
-
+    elif config['training']['optimizer']['type'] == 'sgd':
+        trainable_params = filter(lambda p: p.requires_grad, model.cnn.parameters())
+        optimizers.append(optim.SGD(trainable_params, **config['training']['optimizer']["args"]))
     else:
         raise ValueError
 
