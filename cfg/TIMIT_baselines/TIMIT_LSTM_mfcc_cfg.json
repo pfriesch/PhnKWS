@@ -121,7 +121,7 @@
     "sort_by_feat": "mfcc",
     "clip_grad_norm": -1,
     "optimizer": {
-      "type": "triple_rmsprop",
+      "type": "lstm_triple_rmsprop",
       "args": {
         //        "lr": 0.0016
       }

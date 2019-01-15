@@ -48,6 +48,13 @@ class KaldiDataset(object):
         elapsed_time_load = time.time() - start_time
         self.tensorboard_logger.add_scalar("init_dataset", elapsed_time_load)
 
+    def _get_by_filename(self, filename):
+        index = self.sample_names.index(filename)
+        return ({fea: self.feat_chunks[fea][v['start_idx']:v['end_idx']]
+                 for fea, v in self.samples[index]['fea'].items()},
+                {lab: self.lab_chunks[lab][v['start_idx']:v['end_idx']]
+                 for lab, v in self.samples[index]['lab'].items()})
+
     def __getitem__(self, index):
         return (self.sample_names[index],
                 {fea: self.feat_chunks[fea][v['start_idx']:v['end_idx']]
