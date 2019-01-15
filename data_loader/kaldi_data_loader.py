@@ -1,7 +1,40 @@
+import random
+
+import torch
 from torch.nn.utils.rnn import pack_sequence
 from torch.utils.data import DataLoader, Sampler
 
 from data_loader.kaldi_dataset import KaldiDataset
+
+
+def collate_fn_zero_pad(sample_list):
+    fea_keys = list(sample_list[0][1].keys())
+    lab_keys = list(sample_list[0][2].keys())
+
+    batch_size = len(sample_list)
+    max_length = 0
+    for sample in sample_list:
+        _len = sample[1][fea_keys[0]].shape[0]
+        if _len > max_length:
+            max_length = _len
+
+    sample_names = []
+
+    fea_dict = {k: torch.zeros(max_length, batch_size, sample_list[0][1][k].shape[1]) for k in fea_keys}
+    lab_dict = {k: torch.zeros(max_length, batch_size, dtype=torch.int64) for k in lab_keys}
+    for _idx, sample in enumerate(sample_list):
+        _len = sample[1][fea_keys[0]].shape[0]
+
+        padding_zeros = max_length - _len
+        padding_zeros_left = random.randint(0, padding_zeros)
+
+        sample_names.append(sample[0])
+        for fea in fea_dict:
+            fea_dict[fea][padding_zeros_left: padding_zeros_left + _len, _idx, :] = sample[1][fea]
+        for lab in lab_dict:
+            lab_dict[lab][padding_zeros_left: padding_zeros_left + _len, _idx] = sample[2][lab]
+
+    return sample_names, fea_dict, lab_dict
 
 
 def collate_fn(sample_list):
@@ -61,7 +94,7 @@ class KaldiDataLoader(DataLoader):
                                                   self.dataset.ordering_length,
                                                   sort_by_feat=sort_by_feat) if sort_by_feat is not None
                                               else None,
-                                              collate_fn=collate_fn,
+                                              collate_fn=collate_fn_zero_pad,
                                               pin_memory=pin_memory,
                                               num_workers=num_workers,
                                               drop_last=False)
