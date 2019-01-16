@@ -44,6 +44,11 @@ class TIMIT_LSTM(BaseModel):
         if isinstance(out_dnn, PackedSequence):
             # Padd with zeros
             out_dnn, sequence_lengths = pad_packed_sequence(out_dnn)
+
+        max_len = x.shape[0]
+        batch_size = x.shape[1]
+        out_dnn = out_dnn.view(max_len * batch_size, -1)
+
         out_cd = self.mlp_lab_cd(out_dnn)
         out_mono = self.mlp_lab_mono(out_dnn)
         return {"out_cd": out_cd, "out_mono": out_mono}

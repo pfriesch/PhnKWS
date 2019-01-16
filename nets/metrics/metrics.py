@@ -13,8 +13,8 @@ class LabMonoAccuracy(Module):
         if isinstance(target["lab_mono"], PackedSequence):
             target['lab_mono'] = pad_packed_sequence(target['lab_mono'], padding_value=ignore_index)[0]
 
-        len = output['out_mono'].shape[0]
-        batch_size = output['out_mono'].shape[1]
+        len = target['lab_mono'].shape[0]
+        batch_size = target['lab_mono'].shape[1]
 
         pred = output['out_mono'].view(len * batch_size, -1).max(dim=1)[1]
         lab = target['lab_mono'].view(-1)
@@ -34,8 +34,8 @@ class LabMonoError(Module):
         if isinstance(target["lab_mono"], PackedSequence):
             target['lab_mono'] = pad_packed_sequence(target['lab_mono'], padding_value=ignore_index)[0]
 
-        len = output['out_mono'].shape[0]
-        batch_size = output['out_mono'].shape[1]
+        len = target['lab_mono'].shape[0]
+        batch_size = target['lab_mono'].shape[1]
 
         pred = output['out_mono'].view(len * batch_size, -1).max(dim=1)[1]
         lab = target['lab_mono'].view(-1)
@@ -55,8 +55,8 @@ class LabCDAccuracy(Module):
         if isinstance(target["lab_cd"], PackedSequence):
             target['lab_cd'] = pad_packed_sequence(target['lab_cd'], padding_value=ignore_index)[0]
 
-        len = output['out_cd'].shape[0]
-        batch_size = output['out_cd'].shape[1]
+        len = target['lab_cd'].shape[0]
+        batch_size = target['lab_cd'].shape[1]
 
         pred = output['out_cd'].view(len * batch_size, -1).max(dim=1)[1]
         lab = target['lab_cd'].view(-1)
@@ -76,8 +76,8 @@ class LabCDError(Module):
         if isinstance(target["lab_cd"], PackedSequence):
             target['lab_cd'] = pad_packed_sequence(target['lab_cd'], padding_value=ignore_index)[0]
 
-        len = output['out_cd'].shape[0]
-        batch_size = output['out_cd'].shape[1]
+        len = target['lab_cd'].shape[0]
+        batch_size = target['lab_cd'].shape[1]
 
         pred = output['out_cd'].view(len * batch_size, -1).max(dim=1)[1]
         lab = target['lab_cd'].view(-1)
