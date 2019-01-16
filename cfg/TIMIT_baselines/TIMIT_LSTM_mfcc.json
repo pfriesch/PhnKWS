@@ -5,7 +5,7 @@
     "seed": 2234,
     "n_gpu": 1,
     "prefetch_to_gpu": false,
-    "n_epochs_tr": 24,
+    "n_epochs_tr": 10,
     "save_period": 1
   },
   "data_use": {

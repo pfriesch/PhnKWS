@@ -52,3 +52,16 @@ class TIMIT_LSTM(BaseModel):
         out_cd = self.mlp_lab_cd(out_dnn)
         out_mono = self.mlp_lab_mono(out_dnn)
         return {"out_cd": out_cd, "out_mono": out_mono}
+
+    # def load_cfg(self):
+    #     nns = torch.load("/mnt/data/pytorch-kaldi_cfg/nns.pyt")
+    #
+    #     _lstm = {k.replace("lstm.0.", "lstm."): nns['LSTM_cudnn_layers'][k] for k in nns['LSTM_cudnn_layers']}
+    #     _MLP_layers = {k: nns['MLP_layers'][k] for k in nns['MLP_layers']}
+    #     _MLP_layers2 = {k: nns['MLP_layers2'][k] for k in nns['MLP_layers2']}
+    #     # curr_state = self.lstm.state_dict()
+    #     self.lstm.load_state_dict(_lstm)
+    #     self.mlp_lab_cd.load_state_dict(_MLP_layers)
+    #     self.mlp_lab_mono.load_state_dict(_MLP_layers2)
+    #
+    #     print("Done Loading")

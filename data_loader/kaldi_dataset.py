@@ -48,7 +48,7 @@ class KaldiDataset(object):
         self.label_chunks = {k: v.to(device) for k, v in self.label_chunks.items()}
 
         elapsed_time_load = time.time() - start_time
-        self.tensorboard_logger.add_scalar("init_dataset", elapsed_time_load)
+        self.tensorboard_logger.add_scalar("move_to_gpu_dataset", elapsed_time_load)
 
     def _get_by_filename(self, filename):
         index = self.sample_names.index(filename)
@@ -66,3 +66,21 @@ class KaldiDataset(object):
 
     def __len__(self):
         return len(self.samples)
+
+    def save(self, path):
+        torch.save({
+            "ordering_length": self.ordering_length,
+            "feature_chunks": self.feature_chunks,
+            "label_chunks": self.label_chunks,
+            "sample_names": self.sample_names,
+            "samples": self.samples,
+            "feature_dim": self.feature_dim}, path)
+
+    def load(self, path):
+        _load_dict = torch.load(path)
+        self.ordering_length = _load_dict["ordering_length"]
+        self.feature_chunks = _load_dict["feature_chunks"]
+        self.label_chunks = _load_dict["label_chunks"]
+        self.sample_names = _load_dict["sample_names"]
+        self.samples = _load_dict["samples"]
+        self.feature_dim = _load_dict["feature_dim"]

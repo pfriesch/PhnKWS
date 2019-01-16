@@ -51,7 +51,7 @@ class Trainer(BaseTrainer):
             The metrics in log must have the key 'metrics'.
         """
         self.model.train()
-        self.tensorboard_logger.set_step((epoch - 1), mode='train')
+        self.tensorboard_logger.set_step((epoch - 1), 'train')
         tr_data = self.config['data_use']['train_with']
 
         train_loss = 0
@@ -76,7 +76,7 @@ class Trainer(BaseTrainer):
                 inputs = {k: v.to(self.device) for k, v in inputs.items()}
                 targets = {k: v.to(self.device) for k, v in targets.items()}
 
-                for opti in self.optimizers:
+                for opti in self.optimizers.values():
                     opti.zero_grad()
                 output = self.model(inputs)
                 loss = self.loss(output, targets)
@@ -89,11 +89,11 @@ class Trainer(BaseTrainer):
                 if self.config['training']['clip_grad_norm'] > 0:
                     trainable_params = filter(lambda p: p.requires_grad, self.model.parameters())
                     torch.nn.utils.clip_grad_norm_(trainable_params, self.config['training']['clip_grad_norm'])
-                for opti in self.optimizers:
+                for opti in self.optimizers.values():
                     opti.step()
 
                 #### Logging ####
-                self.tensorboard_logger.set_step((epoch - 1) * len(data_loader) + batch_idx)
+                self.tensorboard_logger.set_step((epoch - 1) * len(data_loader) + batch_idx, 'train')
                 for _loss, loss_value in loss.items():
                     self.tensorboard_logger.add_scalar(_loss, loss_value.item())
                 train_loss += loss["loss_final"].item()
@@ -109,9 +109,9 @@ class Trainer(BaseTrainer):
                         (torch.ones_like(inputs[feat_name][1]) * inputs[feat_name][1][0]) - inputs[feat_name][1])
                     self.tensorboard_logger.add_scalar('total_padding_{}'.format(feat_name), total_padding.item())
 
-                pbar.set_description('T e:{} l: {:.6f} a: {}'.format(epoch,
-                                                                     loss["loss_final"].item(),
-                                                                     _train_metrics['acc_lab_cd'].item()))
+                pbar.set_description('T e:{} l: {:.4f} a: {:.3f}'.format(epoch,
+                                                                         loss["loss_final"].item(),
+                                                                         _train_metrics['acc_lab_cd'].item()))
                 pbar.update()
                 #### /Logging ####
 
@@ -119,13 +119,14 @@ class Trainer(BaseTrainer):
                'train_metrics':
                    {metric: train_metrics[metric] / len(data_loader)
                     for metric in train_metrics}}
+        global_step = epoch * len(data_loader)
         if self.do_validation:
-            valid_log = self._valid_epoch(epoch)
+            valid_log = self._valid_epoch(epoch, global_step=global_step)
             log.update(valid_log)
 
-        return log
+        return log, global_step
 
-    def _valid_epoch(self, epoch):
+    def _valid_epoch(self, epoch, global_step):
         """
         Validate after training an epoch
         :return: A log that contains information about validation
@@ -133,7 +134,6 @@ class Trainer(BaseTrainer):
             The validation metrics in log must have the key 'val_metrics'.
         """
         self.model.eval()
-        self.tensorboard_logger.set_step((epoch - 1), mode='valid')
         valid_data = self.config['data_use']['valid_with']
 
         valid_loss = 0
@@ -168,11 +168,11 @@ class Trainer(BaseTrainer):
                 valid_metrics = {metric: valid_metrics[metric] + metric_value.item() for
                                  metric, metric_value
                                  in _eval_metrics.items()}
-                pbar.set_description('V e:{} l: {:.6f} '.format(epoch, loss["loss_final"].item()))
+                pbar.set_description('V e:{} l: {:.4f} '.format(epoch, loss["loss_final"].item()))
                 pbar.update()
                 #### /Logging ####
 
-        self.tensorboard_logger.set_step((epoch - 1) * len(valid_data_loader), 'valid')
+        self.tensorboard_logger.set_step(global_step, 'valid')
         self.tensorboard_logger.add_scalar('valid_loss', valid_loss / len(valid_data_loader))
         for metric in valid_metrics:
             self.tensorboard_logger.add_scalar(metric, valid_metrics[metric] / len(valid_data_loader))
@@ -181,9 +181,8 @@ class Trainer(BaseTrainer):
                 'valid_metrics': {metric: valid_metrics[metric] / len(valid_data_loader) for metric in
                                   valid_metrics}}
 
-    def _eval_epoch(self, epoch):
+    def _eval_epoch(self, epoch, global_step):
         self.model.eval()
-        self.tensorboard_logger.set_step((epoch - 1), mode='eval')
         batch_size = 1
         max_seq_length = -1
 
@@ -221,13 +220,14 @@ class Trainer(BaseTrainer):
             test_data_loader.dataset.move_to(self.device)
 
         with tqdm(total=len(test_data_loader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
-            pbar.set_description('E e:{}           '.format(epoch))
+            pbar.set_description('E e:{}    '.format(epoch))
             for batch_idx, (sample_names, inputs, targets) in tqdm(enumerate(test_data_loader)):
                 inputs = {k: v.to(self.device) for k, v in inputs.items()}
                 targets = {k: v.to(self.device) for k, v in targets.items()}
 
                 output = self.model(inputs)
 
+                warned_label = False
                 for output_label in output:
                     if output_label in self.config['test'].keys():
 
@@ -243,7 +243,7 @@ class Trainer(BaseTrainer):
                             # data_name = file ids
                             # out save shape <class 'tuple'>: (124, 1944)
                             # post_file dict out_dnn2: buffered wirter
-                        assert out_save.shape[1] == 1
+                        assert len(out_save.shape) == 2
                         assert len(sample_names) == 1
                         kaldi_io.write_mat(post_file[output_label], out_save.squeeze(), sample_names[0])
 
@@ -257,9 +257,11 @@ class Trainer(BaseTrainer):
                         pbar.update()
                         #### /Logging ####
                     else:
-                        logger.debug("Skipping saving forward for decoding for key {}".format(output_label))
+                        if not warned_label:
+                            logger.debug("Skipping saving forward for decoding for key {}".format(output_label))
+                            warned_label = True
 
-        self.tensorboard_logger.set_step((epoch - 1) * len(test_data_loader), 'eval')
+        self.tensorboard_logger.set_step(global_step, 'eval')
         for metric, metric_value in test_metrics.items():
             self.tensorboard_logger.add_scalar(metric, test_metrics[metric] / len(test_data_loader))
 
@@ -312,7 +314,7 @@ class Trainer(BaseTrainer):
                         os.path.abspath(config_dec_file),
                         out_dec_folder,
                         files_dec)
-                    run_shell(cmd_decode, logger)
+                    run_shell(cmd_decode)
 
                     # TODO remove ark files if needed
                     # if not forward_save_files:
@@ -322,7 +324,7 @@ class Trainer(BaseTrainer):
 
                 # Print WER results and write info file
                 cmd_res = './scripts/check_res_dec.sh ' + out_dec_folder
-                results = run_shell(cmd_res, logger).decode('utf-8')
+                results = run_shell(cmd_res).decode('utf-8')
                 logger.info(results)
 
                 results = results.split("|")
@@ -335,13 +337,7 @@ class Trainer(BaseTrainer):
                 logger.info(decoding_str)
                 decoding_results.append(decoding_str)
 
-                self.tensorboard_logger.add_scalar("wer", wer)
-                self.tensorboard_logger.add_scalar("_corr", _corr)
-                self.tensorboard_logger.add_scalar("_sub", _sub)
-                self.tensorboard_logger.add_scalar("_del", _del)
-                self.tensorboard_logger.add_scalar("_ins", _ins)
-                self.tensorboard_logger.add_scalar("_err", _err)
-                self.tensorboard_logger.add_scalar("_s_err", _s_err)
+                self.tensorboard_logger.add_text("WER results", decoding_str)
 
             # TODO plotting curves
 

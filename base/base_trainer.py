@@ -2,12 +2,28 @@ import os
 import math
 import json
 import time
+import threading
 
 import torch
 
 from utils.logger_config import logger
 from utils.tensorboard_logger import WriterTensorboardX
-from utils.util import ensure_dir, folder_to_checkpoint
+from utils.util import ensure_dir, folder_to_checkpoint, every
+
+nvidia_smi_enabled = False
+try:
+    import nvidia_smi
+
+    nvidia_smi.nvmlInit()
+    handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)  # gpu0
+    # TODO handle mutiple gpus
+    nvidia_smi_enabled = True
+
+
+except ImportError:
+    import warnings
+
+    warnings.warn('GPU usage loggin disabled. Install nvidia-ml-py or nvidia-ml-py3 to enable it.')
 
 
 class BaseTrainer:
@@ -62,6 +78,17 @@ class BaseTrainer:
         if resume_path:
             self._resume_checkpoint(resume_path)
 
+        self.log_gpu_usage()
+
+        threading.Thread(target=lambda: every(1, self.log_gpu_usage, logger)).start()
+
+    def log_gpu_usage(self):
+        if nvidia_smi_enabled:
+            res = nvidia_smi.nvmlDeviceGetUtilizationRates(handle)
+            self.tensorboard_logger.add_scalar('usage', res.gpu, mode="gpu", global_step=-1)
+            res = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+            self.tensorboard_logger.add_scalar('memory_usage_MiB', int(res.used / 10e5), mode="gpu", global_step=-1)
+
     def _prepare_device(self, n_gpu_use):
         """
         setup GPU device if available, move model into configured device
@@ -86,17 +113,21 @@ class BaseTrainer:
         """
 
         epoch = self.start_epoch
+        global_step = 0
         for epoch in range(self.start_epoch, self.epochs):
             logger.info('----- Epoch {} / {} -----'.format(format(epoch, "03d"), format(self.epochs, "03d")))
 
             start_time = time.time()
-            result = self._train_epoch(epoch)
+            result_log, global_step = self._train_epoch(epoch)
             elapsed_time_epoch = time.time() - start_time
+            self.tensorboard_logger.set_step(global_step, 'train')
+
             self.tensorboard_logger.add_scalar("elapsed_time_epoch", elapsed_time_epoch)
 
-            for _idx, lr_scheduler in enumerate(self.lr_schedulers):
-                self.tensorboard_logger.add_scalar("lr_{}".format(_idx), lr_scheduler.current_lr())
-                lr_scheduler.step(result['valid_loss'], epoch=epoch)
+            for lr_scheduler_name in self.lr_schedulers:
+                self.tensorboard_logger.add_scalar("lr_{}".format(lr_scheduler_name),
+                                                   self.lr_schedulers[lr_scheduler_name].current_lr())
+                self.lr_schedulers[lr_scheduler_name].step(result_log['valid_loss'], epoch=epoch)
 
             self.tensorboard_logger.add_scalar("max_seq_length_train_curr", self.max_seq_length_train_curr)
             if self.config['training']['increase_seq_length_train']:
@@ -107,7 +138,7 @@ class BaseTrainer:
             # save logged informations into log dict
             log = {'epoch': epoch}
             log.update({'epoch_elapsed_time': elapsed_time_epoch})
-            log.update(result)
+            log.update(result_log)
 
             # print logged informations to the screen
             if logger is not None:
@@ -144,7 +175,7 @@ class BaseTrainer:
             if epoch % self.save_period == 0:
                 self._save_checkpoint(epoch, save_best=best)
 
-        result_eval = self._eval_epoch(epoch)
+        result_eval = self._eval_epoch(epoch, global_step)
         logger.info(result_eval)
 
     def _train_epoch(self, epoch):
@@ -155,7 +186,7 @@ class BaseTrainer:
         """
         raise NotImplementedError
 
-    def _eval_epoch(self, epoch):
+    def _eval_epoch(self, epoch, global_step):
         raise NotImplementedError
 
     def _save_checkpoint(self, epoch, save_best=False):
@@ -169,8 +200,9 @@ class BaseTrainer:
         state = {
             'epoch': epoch,
             'state_dict': self.model.state_dict(),
-            'optimizers': [opti.state_dict() for opti in self.optimizers],
-            'lr_schedulers': [lr_scheduler.state_dict() for lr_scheduler in self.lr_schedulers],
+            'optimizers': {opti_name: self.optimizers[opti_name].state_dict() for opti_name in self.optimizers},
+            'lr_schedulers': {lr_sched_name: self.lr_schedulers[lr_sched_name].state_dict()
+                              for lr_sched_name in self.lr_schedulers},
             'monitor_best': self.mnt_best,
             'config': self.config
         }
@@ -202,9 +234,9 @@ class BaseTrainer:
         #     logger.warning('Warning: Optimizer type given in config file is different from that of checkpoint. ' + \
         #                         'Optimizer parameters not being resumed.')
         # else:
-        for _idx, opti in enumerate(checkpoint['optimizer']):
-            self.optimizers[_idx].load_state_dict(opti)
-        for _idx, lr_scheduler in enumerate(checkpoint['lr_scheduler']):
-            self.lr_schedulers[_idx].load_state_dict(lr_scheduler)
+        for opti_name in checkpoint['optimizers']:
+            self.optimizers[opti_name].load_state_dict(checkpoint['optimizers'][opti_name])
+        for lr_sched_name in checkpoint['lr_schedulers']:
+            self.lr_schedulers[lr_sched_name].load_state_dict(checkpoint['lr_schedulers'][lr_sched_name])
 
         logger.info("Checkpoint '{}' (epoch {}) loaded".format(resume_path, self.start_epoch))
