@@ -13,16 +13,20 @@ from utils.utils import set_seed, get_posterior_norm_data
 from trainer import Trainer
 from utils.utils import check_environment, read_json
 
-check_environment()
 
-
-def setup_run(config):
+def setup_run(config, local):
     set_seed(config['exp']['seed'])
 
-    config, N_out_lab = get_posterior_norm_data(config)
+    if not local:
+        config, N_out_lab = get_posterior_norm_data(config)
 
-    model = model_init(config['arch']['name'], fea_index_length=config['arch']['args']['fea_index_length'],
-                       lab_cd_num=N_out_lab['lab_cd'])
+        model = model_init(config['arch']['name'], fea_index_length=config['arch']['args']['fea_index_length'],
+                           lab_cd_num=N_out_lab['lab_cd'])
+    else:
+        N_out_lab = {'lab_cd': 1944}
+
+        model = model_init(config['arch']['name'], fea_index_length=config['arch']['args']['fea_index_length'],
+                           lab_cd_num=N_out_lab['lab_cd'])
 
     optimizers = optimizer_init(config, model)
 
@@ -36,9 +40,12 @@ def setup_run(config):
     return model, loss, metrics, optimizers, config, lr_schedulers
 
 
-def main(config_path, resume_path, debug):
+def main(config_path, resume_path, debug, local):
     config = read_json(config_path)
-    if not debug:
+
+    if not local:
+        check_environment()
+    if not debug and not local:
         git_commit = code_versioning()
         if 'versioning' not in config:
             config['versioning'] = {}
@@ -72,15 +79,17 @@ def main(config_path, resume_path, debug):
         os.makedirs(out_folder + '/exp_files')
 
     logger.configure_logger(out_folder)
+    logger.info("Experiment name : {}".format(out_folder))
 
-    model, loss, metrics, optimizers, config, lr_schedulers = setup_run(config)
+    model, loss, metrics, optimizers, config, lr_schedulers = setup_run(config, local)
 
     trainer = Trainer(model, loss, metrics, optimizers,
                       resume_path=resume_path,
                       config=config,
                       do_validation=True,
                       lr_schedulers=lr_schedulers,
-                      debug=debug)
+                      debug=debug,
+                      local=local)
     trainer.train()
 
 
@@ -94,9 +103,11 @@ if __name__ == '__main__':
                         help='indices of GPUs to enable (default: all)')
     parser.add_argument('--debug', default=False, action='store_true',
                         help='Run in debug mode with few samples')
+    parser.add_argument('--local', default=False, action='store_true',
+                        help='Run in local mode without kaldi install')
     args = parser.parse_args()
 
     if args.device:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.device
 
-    main(args.config, args.resume, debug=args.debug)
+    main(args.config, args.resume, debug=args.debug, local=args.local)

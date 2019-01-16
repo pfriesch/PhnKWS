@@ -1,9 +1,9 @@
 import torch.nn.functional as F
-from torch.nn import Module
+from torch import nn
 from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence
 
 
-class MtlMonoCDLoss(Module):
+class MtlMonoCDLoss(nn.Module):
 
     def __init__(self, weight_mono=1.0):
         super().__init__()

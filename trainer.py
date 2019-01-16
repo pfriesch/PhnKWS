@@ -12,20 +12,19 @@ from data_loader.data_util import load_counts
 from data_loader.kaldi_data_loader import KaldiDataLoader
 from data_loader.kaldi_dataset import KaldiDataset
 from utils.logger_config import logger
-from utils.utils import check_environment, run_shell
-
-check_environment()
+from utils.utils import run_shell
 
 
 class Trainer(BaseTrainer):
 
     def __init__(self, model, loss, metrics, optimizers, resume_path, config, do_validation,
-                 lr_schedulers, debug=False):
+                 lr_schedulers, debug=False, local=False):
         super(Trainer, self).__init__(model, loss, metrics, optimizers, lr_schedulers, resume_path, config)
         self.config = config
         self.do_validation = do_validation
         self.log_step = int(np.sqrt(config['training']['batch_size_train']))
         self.debug = debug
+        self.local = local
 
     def _eval_metrics(self, output, target):
         acc_metrics = {}
@@ -60,7 +59,7 @@ class Trainer(BaseTrainer):
         dataset = KaldiDataset(self.config['datasets'][tr_data]['features'], self.config['datasets'][tr_data]['labels'],
                                self.model.context_left, self.model.context_right,
                                self.max_seq_length_train_curr,
-                               self.tensorboard_logger, debug=self.debug)
+                               self.tensorboard_logger, self.debug, self.local)
         data_loader = KaldiDataLoader(dataset,
                                       self.config['training']['batch_size_train'],
                                       use_gpu=self.config["exp"]["n_gpu"] > 0,
@@ -144,7 +143,7 @@ class Trainer(BaseTrainer):
                                self.model.context_left, self.model.context_right,
                                self.config['training']['max_seq_length_valid'],
                                self.tensorboard_logger,
-                               debug=self.debug)
+                               self.debug, self.local)
 
         valid_data_loader = KaldiDataLoader(dataset,
                                             self.config['training']['batch_size_valid'],

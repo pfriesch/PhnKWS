@@ -20,10 +20,13 @@ try:
     nvidia_smi_enabled = True
 
 
-except ImportError:
+except Exception as e:
     import warnings
 
-    warnings.warn('GPU usage loggin disabled. Install nvidia-ml-py or nvidia-ml-py3 to enable it.')
+    if isinstance(e, ImportError):
+        warnings.warn('GPU usage loggin disabled. Install nvidia-ml-py or nvidia-ml-py3 to enable it.')
+    else:
+        warnings.warn('{}'.format(e))
 
 
 class BaseTrainer:
@@ -68,6 +71,9 @@ class BaseTrainer:
         # setup visualization writer instance
         self.tensorboard_logger = WriterTensorboardX(
             os.path.join(config['exp']['save_dir'], config['exp']['name'], "logs"))
+
+        # if hasattr(model, "get_sample_input"):
+        #     self.tensorboard_logger.add_graph(model, model.get_sample_input(), True)
 
         # Save configuration file into checkpoint directory:
         ensure_dir(self.checkpoint_dir)

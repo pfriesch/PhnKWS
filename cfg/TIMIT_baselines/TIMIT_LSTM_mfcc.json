@@ -5,7 +5,7 @@
     "seed": 2234,
     "n_gpu": 1,
     "prefetch_to_gpu": false,
-    "n_epochs_tr": 10,
+    "n_epochs_tr": 24,
     "save_period": 1
   },
   "data_use": {
@@ -121,9 +121,9 @@
     "sort_by_feat": "mfcc",
     "clip_grad_norm": -1,
     "optimizer": {
-      "type": "lstm_triple_rmsprop",
+      "type": "adam",
       "args": {
-        //        "lr": 0.0016
+        "lr": 0.0016
       }
     },
     "lr_scheduler": {

@@ -1,9 +1,9 @@
 import torch.nn.functional as F
-from torch.nn import Module
+from torch import nn
 from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence
 
 
-class CDLoss(Module):
+class CDLoss(nn.Module):
 
     def forward(self, output, target):
         ignore_index = -1

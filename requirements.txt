@@ -1,3 +1,4 @@
+jsondiff
 torch>=1.0
 matplotlib>=2.1.0
 scipy>=1.0.0

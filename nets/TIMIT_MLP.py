@@ -39,6 +39,11 @@ class TIMIT_MLP(nn.Module):
 
     def forward(self, x):
         x = x['mfcc']
+
+        max_len = x.shape[0]
+        batch_size = x.shape[1]
+        x = x.view(max_len * batch_size, -1)
+
         out_dnn = self.mlp(x)
         out_cd = self.mlp_lab_cd(out_dnn)
         out_mono = self.mlp_lab_mono(out_dnn)

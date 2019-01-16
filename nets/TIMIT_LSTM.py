@@ -53,6 +53,11 @@ class TIMIT_LSTM(BaseModel):
         out_mono = self.mlp_lab_mono(out_dnn)
         return {"out_cd": out_cd, "out_mono": out_mono}
 
+    def get_sample_input(self):
+        # TODO impl graph plotting wiht proper naming
+        raise NotImplementedError
+        # return torch.zeros((10, 5, 39))
+
     # def load_cfg(self):
     #     nns = torch.load("/mnt/data/pytorch-kaldi_cfg/nns.pyt")
     #
