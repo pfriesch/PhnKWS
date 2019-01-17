@@ -1,9 +1,9 @@
 import configparser
 import os.path
 import random
-import subprocess
 import json
 
+import subprocess
 import numpy as np
 import torch
 import matplotlib
@@ -111,12 +111,13 @@ def compute_avg_performance(info_lst):
     return [loss, error, time]
 
 
-def get_posterior_norm_data(config):
+def get_dataset_metadata(config):
     train_dataset_lab = config['datasets'][config['data_use']['train_with']]['labels']
     N_out_lab = {}
 
     for forward_out in config['test']:
         normalize_with_counts_from = config['test'][forward_out]['normalize_with_counts_from']
+        assert 'label_opts' in train_dataset_lab[normalize_with_counts_from]
         if config['test'][forward_out]['normalize_posteriors']:
             # Try to automatically retrieve the config file
             assert "ali-to-pdf" in train_dataset_lab[normalize_with_counts_from]['label_opts']
@@ -132,7 +133,4 @@ def get_posterior_norm_data(config):
                 N_out) + " \"ark:ali-to-pdf " + folder_lab_count + "/final.mdl \\\"ark:gunzip -c " + folder_lab_count + "/ali.*.gz |\\\" ark:- |\" " + count_file_path
             run_shell(cmd)
             config['test'][forward_out]['normalize_with_counts_from_file'] = count_file_path
-
-    return config, N_out_lab
-
-    # TODO check config
+            config['arch']['args']['lab_cd_num'] = N_out

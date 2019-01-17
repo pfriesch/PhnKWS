@@ -4,7 +4,7 @@ import torch
 from torch.nn.utils.rnn import pack_sequence
 from torch.utils.data import DataLoader, Sampler
 
-from data_loader.kaldi_dataset import KaldiDataset
+from data.kaldi_dataset import KaldiDataset
 
 
 def collate_fn_zero_pad(sample_list):

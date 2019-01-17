@@ -1,32 +1,23 @@
-import argparse
-import datetime
 import json
 import os
 
+import argparse
+import datetime
 import jsondiff
 import torch
 
 from nets import model_init, optimizer_init, lr_scheduler_init, metrics_init, loss_init
 from utils.logger_config import logger
 from utils.util import code_versioning, folder_to_checkpoint, recursive_update
-from utils.utils import set_seed, get_posterior_norm_data
+from utils.utils import set_seed
 from trainer import Trainer
 from utils.utils import check_environment, read_json
 
 
-def setup_run(config, local):
+def setup_run(config):
     set_seed(config['exp']['seed'])
 
-    if not local:
-        config, N_out_lab = get_posterior_norm_data(config)
-
-        model = model_init(config['arch']['name'], fea_index_length=config['arch']['args']['fea_index_length'],
-                           lab_cd_num=N_out_lab['lab_cd'])
-    else:
-        N_out_lab = {'lab_cd': 1944}
-
-        model = model_init(config['arch']['name'], fea_index_length=config['arch']['args']['fea_index_length'],
-                           lab_cd_num=N_out_lab['lab_cd'])
+    model = model_init(config)
 
     optimizers = optimizer_init(config, model)
 
@@ -81,7 +72,7 @@ def main(config_path, resume_path, debug, local):
     logger.configure_logger(out_folder)
     logger.info("Experiment name : {}".format(out_folder))
 
-    model, loss, metrics, optimizers, config, lr_schedulers = setup_run(config, local)
+    model, loss, metrics, optimizers, config, lr_schedulers = setup_run(config)
 
     trainer = Trainer(model, loss, metrics, optimizers,
                       resume_path=resume_path,

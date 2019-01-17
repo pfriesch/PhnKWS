@@ -2,7 +2,7 @@ import logging
 import logging.config
 import os
 
-from data_loader import kaldi_io
+from data import kaldi_io
 
 
 class Logger(object):

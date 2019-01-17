@@ -5,11 +5,11 @@ from nets.modules.LSTM_cudnn import LSTM
 from nets.modules.MLP import MLP
 
 
-class TIMIT_LSTM(BaseModel):
-    def __init__(self, inp_dim, lab_cd_num):
-        super(TIMIT_LSTM, self).__init__()
+class LSTM_cd_mono(BaseModel):
+    def __init__(self, input_feat_length, input_feat_name, lab_cd_num, lab_mono_num, ):
+        super(LSTM_cd_mono, self).__init__()
 
-        self.lstm = LSTM(inp_dim,
+        self.lstm = LSTM(input_feat_length,
                          hidden_size=550,
                          num_layers=4,
                          bias=True,
@@ -27,7 +27,7 @@ class TIMIT_LSTM(BaseModel):
                               dnn_act=["softmax"])
 
         self.mlp_lab_mono = MLP(self.lstm.out_dim,
-                                dnn_lay=[48],
+                                dnn_lay=[lab_mono_num],
                                 dnn_drop=[0.0],
                                 dnn_use_laynorm_inp=False,
                                 dnn_use_batchnorm_inp=False,
@@ -37,9 +37,10 @@ class TIMIT_LSTM(BaseModel):
 
         self.context_left = 0
         self.context_right = 0
+        self.input_feat_name = input_feat_name
 
     def forward(self, x):
-        x = x['mfcc']
+        x = x[self.input_feat_name]
         out_dnn = self.lstm(x)
         if isinstance(out_dnn, PackedSequence):
             # Padd with zeros

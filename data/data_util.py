@@ -2,7 +2,7 @@ from collections import OrderedDict
 
 import numpy as np
 
-from data_loader import kaldi_io
+from data import kaldi_io
 
 
 def load_counts(class_counts_file):
@@ -124,6 +124,8 @@ def get_order_by_length(feature_dict):
                                                      for _idx, filename in ordering_length[feature_name]])
     return ordering_length
 
+def collapse_alignment(label_dict):
+    raise NotImplementedError
 
 def apply_context(label_dict, context_left, context_right):
     for label_name in label_dict:

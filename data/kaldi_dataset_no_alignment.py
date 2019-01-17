@@ -1,53 +1,51 @@
-import os
 import time
 
 import torch
 
-from data_loader.data_util import load_data, apply_context, make_big_chunk, get_order_by_length
+from data.data_util import load_data, apply_context, make_big_chunk, get_order_by_length, collapse_alignment
 
 
-class KaldiDataset(object):
+class KaldiDatasetNoAlignment(object):
 
     def __init__(self, feature_dict, label_dict, context_left, context_right, max_sequence_length, tensorboard_logger,
                  debug=False, local=False):
         start_time = time.time()
+        assert local == False
 
-        if local:
-            path = "dataset_full_timit.pyt"
-            if os.path.exists(path):
-                self.load(path)
-        else:
+        raise NotImplementedError #TODO get pure phonemes without alignment/ silences from kaldi
+        _feature_dict, _label_dict = load_data(feature_dict, label_dict, max_sequence_length,
+                                               context_left + context_right)
 
-            _feature_dict, _label_dict = load_data(feature_dict, label_dict, max_sequence_length,
-                                                   context_left + context_right)
+        if debug:
+            for label_name in _label_dict:
+                _label_dict[label_name] = dict(
+                    sorted(list(_label_dict[label_name].items()), key=lambda x: x[0])[:30])
+            for feat_name in _feature_dict:
+                _feature_dict[feat_name] = dict(
+                    sorted(list(_feature_dict[feat_name].items()), key=lambda x: x[0])[:30])
 
-            if debug:
-                for label_name in _label_dict:
-                    _label_dict[label_name] = dict(
-                        sorted(list(_label_dict[label_name].items()), key=lambda x: x[0])[:30])
-                for feat_name in _feature_dict:
-                    _feature_dict[feat_name] = dict(
-                        sorted(list(_feature_dict[feat_name].items()), key=lambda x: x[0])[:30])
+        # TODO split files that are too long
+        _label_dict = apply_context(_label_dict, context_left, context_right)
 
-            # TODO split files that are too long
-            _label_dict = apply_context(_label_dict, context_left, context_right)
+        #TODO collaps alignment
+        _label_dict = collapse_alignment(_label_dict)
 
-            # TODO make multiple chunks if too big
-            sample_name, feature_chunks, label_chunks = make_big_chunk(_feature_dict, _label_dict)
+        # TODO make multiple chunks if too big
+        sample_name, feature_chunks, label_chunks = make_big_chunk(_feature_dict, _label_dict)
 
-            self.ordering_length = get_order_by_length(_feature_dict)
+        self.ordering_length = get_order_by_length(_feature_dict)
 
-            self.feature_chunks = {feat_name: torch.from_numpy(feature_chunks[feat_name]).float()
-                                   for feat_name, v in feature_chunks.items()}
-            self.label_chunks = {label_name: torch.from_numpy(label_chunks[label_name]).long()
-                                 for label_name, v in label_chunks.items()}
-            self.sample_names, self.samples = zip(*list(sample_name.items()))
+        self.feature_chunks = {feat_name: torch.from_numpy(feature_chunks[feat_name]).float()
+                               for feat_name, v in feature_chunks.items()}
+        self.label_chunks = {label_name: torch.from_numpy(label_chunks[label_name]).long()
+                             for label_name, v in label_chunks.items()}
+        self.sample_names, self.samples = zip(*list(sample_name.items()))
 
-            self.feature_dim = {feat_name: v.shape[1] for feat_name, v in self.feature_chunks.items()}
+        self.feature_dim = {feat_name: v.shape[1] for feat_name, v in self.feature_chunks.items()}
 
-            elapsed_time_load = time.time() - start_time
-            self.tensorboard_logger = tensorboard_logger
-            self.tensorboard_logger.add_scalar("init_dataset", elapsed_time_load)
+        elapsed_time_load = time.time() - start_time
+        self.tensorboard_logger = tensorboard_logger
+        self.tensorboard_logger.add_scalar("init_dataset", elapsed_time_load)
 
     def move_to(self, device):
         start_time = time.time()

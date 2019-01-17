@@ -7,10 +7,10 @@ import torch
 from tqdm import tqdm
 
 from base.base_trainer import BaseTrainer
-from data_loader import kaldi_io
-from data_loader.data_util import load_counts
-from data_loader.kaldi_data_loader import KaldiDataLoader
-from data_loader.kaldi_dataset import KaldiDataset
+from data import kaldi_io
+from data.data_util import load_counts
+from data.kaldi_data_loader import KaldiDataLoader
+from data.kaldi_dataset import KaldiDataset
 from utils.logger_config import logger
 from utils.utils import run_shell
 
