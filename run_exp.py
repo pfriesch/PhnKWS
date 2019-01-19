@@ -1,21 +1,27 @@
 import json
 import os
-
 import argparse
 import datetime
+
 import jsondiff
 import torch
 
+from data.data_util import prepare_labels
 from modules import model_init, optimizer_init, lr_scheduler_init, metrics_init, loss_init
 from utils.logger_config import logger
 from utils.util import code_versioning, folder_to_checkpoint, recursive_update
 from utils.utils import set_seed
 from trainer import Trainer
 from utils.utils import check_environment, read_json
+from utils.utils import get_dataset_metadata
 
 
 def setup_run(config):
     set_seed(config['exp']['seed'])
+    config = get_dataset_metadata(config)
+
+    if not config['arch']['framewise_labels']:
+        prepare_labels(config['datasets'], config['arch']['args']['phn_mapping'])
 
     model = model_init(config)
 

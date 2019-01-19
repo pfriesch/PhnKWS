@@ -75,6 +75,8 @@ class Trainer(BaseTrainer):
                                              debug=self.debug,
                                              local=self.local)
 
+        self.tensorboard_logger.add_scalar("max_seq_length_train_curr", self.max_seq_length_train_curr, global_step)
+
         with tqdm(total=len(data_loader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
             pbar.set_description('T e:{} l: {} a: {}'.format(epoch, '-', '-'))
             for batch_idx, (sample_names, inputs, targets) in enumerate(data_loader):
@@ -116,7 +118,9 @@ class Trainer(BaseTrainer):
                             (torch.ones_like(inputs[feat_name][1]) * inputs[feat_name][1][0]) - inputs[feat_name][1])
                         self.tensorboard_logger.add_scalar('total_padding_{}'.format(feat_name), total_padding.item())
                     else:
-                        raise NotImplementedError
+                        total_padding = (targets['lab_cd'] == 0).sum()
+                        # TODO check if 0 is only padding or also a label
+                        self.tensorboard_logger.add_scalar('total_padding_{}'.format(feat_name), total_padding.item())
 
                 pbar.set_description('T e:{} l: {:.4f} a: {:.3f}'.format(epoch,
                                                                          loss["loss_final"].item(),

@@ -3,7 +3,6 @@ import os.path
 import random
 import json
 import subprocess
-from collections import namedtuple
 
 import numpy as np
 import torch
@@ -112,9 +111,6 @@ def compute_avg_performance(info_lst):
     return [loss, error, time]
 
 
-PhoneMapping = namedtuple('PhoneMapping', ['all_phone_info', 'used_dict', 'id_mapping'])
-
-
 def phn_mapping(phone_path, no_triphone=True, no_spoken_noise=True, no_silence=True, no_eps=True, start_idx=1):
     phone_path = os.path.join(phone_path, "phones.txt")
     with open(phone_path, "r") as f:
@@ -150,7 +146,13 @@ def phn_mapping(phone_path, no_triphone=True, no_spoken_noise=True, no_silence=T
 
     id_mapping = {id_true: phn_used_dict[phn_new] for phn_true, id_true, phn_new in phn_all if phn_new is not None}
 
-    return PhoneMapping(phn_all, phn_used_dict, id_mapping)
+    return {'all_phone_info': phn_all, 'used_dict': phn_used_dict,
+            'id_mapping': id_mapping,
+            'no_triphone': no_triphone,
+            'no_spoken_noise': no_spoken_noise,
+            'no_silence': no_silence,
+            'no_eps': no_eps,
+            'start_idx': start_idx}
 
 
 def get_dataset_metadata(config):
@@ -186,5 +188,8 @@ def get_dataset_metadata(config):
                                                no_silence=True,
                                                no_eps=True)
     config['arch']['args']['phn_mapping'] = _phn_mapping
-    if config['arch']['framewise_labels']:
-        config['arch']['args']['lab_phn_num'] = len(_phn_mapping['lab_phn'].used_dict) + 1  # one for ctc blank symbol
+    if not config['arch']['framewise_labels']:
+        # one for ctc blank symbol
+        config['arch']['args']['lab_phn_num'] = len(_phn_mapping['lab_phn']['used_dict']) + 1
+
+    return config

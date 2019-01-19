@@ -4,8 +4,8 @@
     "name": "libri_LSTM_fbank",
     "seed": 2234,
     "n_gpu": 1,
-    "prefetch_to_gpu": false,
-    "n_epochs_tr": 1,
+    "prefetch_to_gpu": true,
+    "n_epochs_tr": 10,
     "save_period": 1
   },
   "data_use": {
@@ -18,10 +18,11 @@
     "train_clean_100": {
       "features": {
         "fbank": {
-          "feature_lst_path": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/train_clean_100/feats_fbank_debug.scp",
+          "feature_lst_path": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/train_clean_100/feats_fbank.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/librispeech/s5/data/train_clean_100/utt2spk  ark:/mnt/data/libs/kaldi/egs/librispeech/s5/fbank/cmvn_train_clean_100.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
           "cw_left": 0,
-          "cw_right": 0
+          "cw_right": 0,
+          "n_chunks": 10
         }
       },
       "labels": {
@@ -30,17 +31,19 @@
           "label_opts": "ali-to-phones",
           "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/train_clean_100/",
-          "lab_graph": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/graph_tgsmall/"
+          "lab_graph": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/graph_tgsmall/",
+          "label_folder_extracted": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/labels_extracted/"
         }
       }
     },
     "dev_clean": {
       "features": {
         "fbank": {
-          "feature_lst_path": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/dev_clean/feats_fbank_debug.scp",
+          "feature_lst_path": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/dev_clean/feats_fbank.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/librispeech/s5/data/dev_clean/utt2spk  ark:/mnt/data/libs/kaldi/egs/librispeech/s5/fbank/cmvn_dev_clean.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
           "cw_left": 0,
-          "cw_right": 0
+          "cw_right": 0,
+          "n_chunks": 2
         }
       },
       "labels": {
@@ -49,17 +52,19 @@
           "label_opts": "ali-to-phones",
           "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/dev_clean/",
-          "lab_graph": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/graph_tgsmall/"
+          "lab_graph": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/graph_tgsmall/",
+          "label_folder_extracted": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/labels_extracted/"
         }
       }
     },
     "test_clean": {
       "features": {
         "fbank": {
-          "feature_lst_path": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/test_clean/feats_fbank_debug.scp",
+          "feature_lst_path": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/test_clean/feats_fbank.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/librispeech/s5/data/test_clean/utt2spk  ark:/mnt/data/libs/kaldi/egs/librispeech/s5/fbank/cmvn_test_clean.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
           "cw_left": 0,
-          "cw_right": 0
+          "cw_right": 0,
+          "n_chunks": 2
         }
       },
       "labels": {
@@ -68,7 +73,8 @@
           "label_opts": "ali-to-phones",
           "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/test_clean/",
-          "lab_graph": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/graph_tgsmall/"
+          "lab_graph": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/graph_tgsmall/",
+          "label_folder_extracted": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/labels_extracted/"
         }
       }
     }
@@ -115,7 +121,7 @@
     "framewise_labels": false,
     "args": {
       "input_feat_length": 40,
-      "input_feat_name": "fbank",
+      "input_feat_name": "fbank"
     },
     "loss": {
       "name": "ctc_phn",

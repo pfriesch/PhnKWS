@@ -1,10 +1,12 @@
 import os
 import re
-
 import subprocess
-
 import collections
 import threading
+import time
+
+from utils.logger_config import Logger
+from utils.tensorboard_logger import WriterTensorboardX
 
 
 def recursive_update(_dict, _update_dict):
@@ -56,3 +58,25 @@ def every(delay, task, logger, stop_switch: threading.Event):
                 # traceback.print_exc()
                 # in production code you might want to have this instead of course:
                 logger.exception("Problem while executing repetitive task. traceback: {}".format(e))
+
+
+class Timer:
+
+    def __init__(self, name, loggers, global_step=None):
+        super().__init__()
+        self.name = name
+        self.loggers = loggers
+        self.global_step = global_step
+
+    def __enter__(self):
+        self.start = time.clock()
+        return self
+
+    def __exit__(self, *args):
+        self.end = time.clock()
+        self.interval = self.end - self.start
+        for logger in self.loggers:
+            if isinstance(logger, WriterTensorboardX):
+                logger.add_scalar(self.name, self.interval, global_step=self.global_step)
+            elif isinstance(logger, Logger):
+                logger.debug("{} took {:.5f}s".format(self.name, self.interval))

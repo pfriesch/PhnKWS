@@ -1,11 +1,14 @@
+import json
 import os
 import random
 from collections import OrderedDict, Counter
+from functools import reduce
 
 import numpy as np
 
 from data import kaldi_io
 from utils.logger_config import logger
+from utils.util import Timer
 
 
 def load_counts(class_counts_file):
@@ -40,78 +43,170 @@ def chunk_scp(feature_lst_path, N_chunks, out_dir):
     return chunk_paths, len(lines)
 
 
-def load_data_unaligned(feature_dict, label_dict, phn_mapping, max_sequence_length):
+def prepare_labels(datasets, phn_mapping):
+    for dataset in datasets:
+        with Timer("prepare_labels_{}".format(dataset), [logger]) as t:
+
+            label_dict = datasets[dataset]['labels']
+            metadata = {"phn_mapping": phn_mapping}
+
+            for label_name in label_dict:
+
+                filename = "{}_extracted".format(label_name)
+                out_path = os.path.join(label_dict[label_name]['label_folder_extracted'], dataset, filename + ".npz")
+                if not os.path.exists(out_path):
+                    if not os.path.exists(os.path.dirname(out_path)):
+                        os.makedirs(os.path.dirname(out_path))
+
+                    label_folder = label_dict[label_name]['label_folder']
+                    label_opts = label_dict[label_name]['label_opts']
+
+                    _phn_mapping = phn_mapping[label_name]
+                    debug_removed_ids = Counter()
+
+                    def map_label(label):
+                        nonlocal _phn_mapping
+                        #### Debugging
+                        for _lab_id in label:
+                            if _lab_id not in _phn_mapping['id_mapping']:
+                                debug_removed_ids[_lab_id] += 1
+                        #### /Debugging
+
+                        labels_new = [_phn_mapping['id_mapping'][_lab_id] for _lab_id in label if
+                                      _lab_id in _phn_mapping['id_mapping']]
+
+                        assert 0 not in labels_new
+
+                        # We probably do not want to remove repeating phonemes since we do not know if there is a silence between them. Also it can't hurt too much to detect the same phoneneme twice?!...
+                        ## Remove repeating characters
+                        ## labels_new = [i for i, _ in itertools.groupby(labels_new)]
+                        return np.array(labels_new)
+
+                    labels_loaded = \
+                        {k: map_label(v) for k, v in
+                         kaldi_io.read_vec_int_ark(
+                             'gunzip -c {}/ali*.gz | {} {}/final.mdl ark:- ark:-|'
+                                 .format(label_folder, label_opts, label_folder))}
+
+                    filenames, label_values = zip(*labels_loaded.items())
+
+                    label_dict[label_name]['labels_extracted'] = out_path
+                    np.savez(out_path, filenames=list(filenames), labels=np.array(list(label_values)))
+                    with open(out_path[:-4] + "_metadata.json", "w") as f:
+                        json.dump(metadata, f)
+                else:
+                    label_dict[label_name]['labels_extracted'] = out_path
+                    logger.debug("Labels already extracted at {}".format(out_path))
+
+
+def load_data_unaligned(feature_dict, label_dict, phn_mapping, max_sequence_length,
+                        check_for_feat_label_mismatch=False, tensorboard_logger=None):
     features_loaded = {}
     labels_loaded = {}
 
-    for feature_name in feature_dict:
-        feature_lst_path = feature_dict[feature_name]['feature_lst_path']
-        feature_opts = feature_dict[feature_name]['feature_opts']
-
-        num_ignored = 0
-
-        def short_enough(_m):
-            nonlocal num_ignored
-            _short_enough = max_sequence_length < 0 or len(_m) < max_sequence_length
-            num_ignored += int(not _short_enough)
-            return _short_enough
-
-        features_loaded[feature_name] = \
-            {k: m for k, m in
-             kaldi_io.read_mat_ark('ark:copy-feats scp:{} ark:- |{}'.format(feature_lst_path, feature_opts))
-             if short_enough(m)}
-        logger.info("Ignored {} features in data loading since they where too long".format(num_ignored))
-        assert len(features_loaded[feature_name]) > 0
-
-    for label_name in label_dict:
-
-        label_folder = label_dict[label_name]['label_folder']
-        label_opts = label_dict[label_name]['label_opts']
-
-        _phn_mapping = phn_mapping[label_name]
-        debug_removed_ids = Counter()
-
-        def map_label(label):
-            nonlocal _phn_mapping
-            #### Debugging
-            for _lab_id in label:
-                if _lab_id not in _phn_mapping.id_mapping:
-                    debug_removed_ids[_lab_id] += 1
-            #### /Debugging
-
-            labels_new = [_phn_mapping.id_mapping[_lab_id] for _lab_id in label if _lab_id in _phn_mapping.id_mapping]
-
-            assert 0 not in labels_new
-
-            # We probably do not want to remove repeating phonemes since we do not know if there is a silence between them. Also it can't hurt too much to detect the same phoneneme twice?!...
-            ## Remove repeating characters
-            ## labels_new = [i for i, _ in itertools.groupby(labels_new)]
-            return np.array(labels_new)
+    with Timer("features_elapsed_time_load", [tensorboard_logger, logger]) as t:
 
         for feature_name in feature_dict:
-            # Note that I'm copying only the aligments of the loaded feature
-            labels_loaded[label_name] = \
-                {k: map_label(v) for k, v in
-                 kaldi_io.read_vec_int_ark(
-                     'gunzip -c {}/ali*.gz | {} {}/final.mdl ark:- ark:-|'
-                         .format(label_folder, label_opts, label_folder))
-                 if k in features_loaded[feature_name]}
+            feature_lst_path = feature_dict[feature_name]['feature_lst_path']
+            feature_opts = feature_dict[feature_name]['feature_opts']
 
-            logger.info("removed these indices: {}".format(
-                {next(t[0] for t in _phn_mapping.all_phone_info if _id == t[1]): count
-                 for _id, count in debug_removed_ids.items()}))
+            num_ignored = 0
 
-            # This way I remove all the features without an aligment (see log file in alidir "Did not Succeded")
+            def short_enough(_m):
+                nonlocal num_ignored
+                _short_enough = max_sequence_length < 0 or len(_m) < max_sequence_length
+                num_ignored += int(not _short_enough)
+                return _short_enough
+
             features_loaded[feature_name] = \
-                {k: v for k, v in list(features_loaded[feature_name].items()) if
-                 k in labels_loaded[label_name]}
+                {k: m for k, m in
+                 kaldi_io.read_mat_ark('ark:copy-feats scp:{} ark:- |{}'.format(feature_lst_path, feature_opts))
+                 if short_enough(m)}
+            logger.info("Ignored {} features in data loading since they where too long".format(num_ignored))
+            assert len(features_loaded[feature_name]) > 0
 
-            # check length of label_name and feat
-            for filename in features_loaded[feature_name]:
-                if not features_loaded[feature_name][filename].shape[0] > 0:
-                    logger.warn("file {} has 0 length feature".format(filename))
-                if not len(labels_loaded[label_name][filename]) > 0:
-                    logger.warn("file {} has 0 length label".format(filename))
+        all_feat_files_inersect = reduce(lambda s1, s2: s1.intersection(s2),
+                                         [set(features_loaded[feature_name].keys()) for feature_name in
+                                          features_loaded])
+
+        if check_for_feat_label_mismatch:
+
+            all_feat_files_union = reduce(lambda s1, s2: s1.union(s2),
+                                          [set(features_loaded[feature_name].keys()) for feature_name in
+                                           features_loaded])
+            removed_files = all_feat_files_union - all_feat_files_inersect
+            if len(removed_files) > 0:
+                logger.debug(
+                    "Removed {} features since they were only present in one feature set".format(len(removed_files)))
+
+    # TODO  assert set(features_loaded[feature_name]) == set(features_loaded[feature_name])
+
+    with Timer("labels_elapsed_time_load", [tensorboard_logger, logger]) as t:
+
+        for label_name in label_dict:
+
+            if 'labels_extracted' in label_dict[label_name]:
+                _loaded = np.load(label_dict[label_name]['labels_extracted'])
+
+                labels_loaded[label_name] = {k: v for k, v in zip(iter(_loaded['filenames']), iter(_loaded['labels']))
+                                             if k in all_feat_files_inersect}
+
+            else:
+
+                label_folder = label_dict[label_name]['label_folder']
+                label_opts = label_dict[label_name]['label_opts']
+
+                _phn_mapping = phn_mapping[label_name]
+                debug_removed_ids = Counter()
+
+                def map_label(label):
+                    nonlocal _phn_mapping
+                    #### Debugging
+                    for _lab_id in label:
+                        if _lab_id not in _phn_mapping.id_mapping:
+                            debug_removed_ids[_lab_id] += 1
+                    #### /Debugging
+
+                    labels_new = [_phn_mapping.id_mapping[_lab_id] for _lab_id in label if
+                                  _lab_id in _phn_mapping.id_mapping]
+
+                    assert 0 not in labels_new
+
+                    # We probably do not want to remove repeating phonemes since we do not know if there is a silence between them. Also it can't hurt too much to detect the same phoneneme twice?!...
+                    ## Remove repeating characters
+                    ## labels_new = [i for i, _ in itertools.groupby(labels_new)]
+                    return np.array(labels_new)
+
+                labels_loaded[label_name] = \
+                    {k: map_label(v) for k, v in
+                     kaldi_io.read_vec_int_ark(
+                         'gunzip -c {}/ali*.gz | {} {}/final.mdl ark:- ark:-|'
+                             .format(label_folder, label_opts, label_folder))
+                     if k in all_feat_files_inersect}
+
+            if check_for_feat_label_mismatch:
+
+                logger.info("removed these indices: {}".format(
+                    {next(t[0] for t in _phn_mapping.all_phone_info if _id == t[1]): count
+                     for _id, count in debug_removed_ids.items()}))
+
+                # This way I remove all the features without an aligment (see log file in alidir "Did not Succeded")
+                for feature_name in feature_dict:
+                    len_before = len(features_loaded[feature_name])
+                    features_loaded[feature_name] = \
+                        {k: v for k, v in list(features_loaded[feature_name].items()) if
+                         k in labels_loaded[label_name]}
+                    if len_before > len(features_loaded[feature_name]):
+                        logger.debug(
+                            "Removed {} features without labels".format(
+                                len_before - len(features_loaded[feature_name])))
+
+                # check length of label_name and feat
+                for filename in features_loaded[feature_name]:
+                    if not features_loaded[feature_name][filename].shape[0] > 0:
+                        logger.warn("file {} has 0 length feature".format(filename))
+                    if not len(labels_loaded[label_name][filename]) > 0:
+                        logger.warn("file {} has 0 length label".format(filename))
 
     return features_loaded, labels_loaded
 
@@ -131,87 +226,94 @@ def load_features(feature_dict):
     return features_loaded
 
 
-def load_data(feature_dict, label_dict, max_sequence_length, context_size):
+def load_data(feature_dict, label_dict, max_sequence_length, context_size, tensorboard_logger=None):
     features_loaded = {}
     labels_loaded = {}
 
-    for feature_name in feature_dict:
-        feature_lst_path = feature_dict[feature_name]['feature_lst_path']
-        feature_opts = feature_dict[feature_name]['feature_opts']
-
-        features_loaded[feature_name] = \
-            {k: m for k, m in
-             kaldi_io.read_mat_ark('ark:copy-feats scp:{} ark:- |{}'.format(feature_lst_path, feature_opts))}
-        assert len(features_loaded[feature_name]) > 0
-
-    for label_name in label_dict:
-
-        label_folder = label_dict[label_name]['label_folder']
-        label_opts = label_dict[label_name]['label_opts']
+    with Timer("features_elapsed_time_load", [tensorboard_logger, logger]) as t:
 
         for feature_name in feature_dict:
-            # Note that I'm copying only the aligments of the loaded feature
-            labels_loaded[label_name] = \
-                {k: v for k, v in
-                 kaldi_io.read_vec_int_ark(
-                     'gunzip -c {}/ali*.gz | {} {}/final.mdl ark:- ark:-|'
-                         .format(label_folder, label_opts, label_folder))
-                 if k in features_loaded[feature_name]}
-            # This way I remove all the features without an aligment (see log file in alidir "Did not Succeded")
+            feature_lst_path = feature_dict[feature_name]['feature_lst_path']
+            feature_opts = feature_dict[feature_name]['feature_opts']
+
             features_loaded[feature_name] = \
-                {k: v for k, v in list(features_loaded[feature_name].items()) if
-                 k in labels_loaded[label_name]}
+                {k: m for k, m in
+                 kaldi_io.read_mat_ark('ark:copy-feats scp:{} ark:- |{}'.format(feature_lst_path, feature_opts))}
+            assert len(features_loaded[feature_name]) > 0
 
-            # check length of label_name and feat matching
-            for filename in features_loaded[feature_name]:
-                assert features_loaded[feature_name][filename].shape[0] == len(labels_loaded[label_name][filename])
+    with Timer("labels_elapsed_time_load", [tensorboard_logger, logger]) as t:
+        for label_name in label_dict:
 
-    # TODO remove with 1/4 of max length -> add to config
-    # TODO add option weather the context_size is applied to the minimum sequence length
-    min_sequence_length = max_sequence_length // 4 + context_size
+            label_folder = label_dict[label_name]['label_folder']
+            label_opts = label_dict[label_name]['label_opts']
 
-    features_loaded_chunked = {k: {} for k in features_loaded}
-    labels_loaded_chunked = {k: {} for k in labels_loaded}
+            for feature_name in feature_dict:
+                # Note that I'm copying only the aligments of the loaded feature
+                labels_loaded[label_name] = \
+                    {k: v for k, v in
+                     kaldi_io.read_vec_int_ark(
+                         'gunzip -c {}/ali*.gz | {} {}/final.mdl ark:- ark:-|'
+                             .format(label_folder, label_opts, label_folder))
+                     if k in features_loaded[feature_name]}
+                # This way I remove all the features without an aligment (see log file in alidir "Did not Succeded")
+                features_loaded[feature_name] = \
+                    {k: v for k, v in list(features_loaded[feature_name].items()) if
+                     k in labels_loaded[label_name]}
 
-    for feature_name in features_loaded:
-        for filename in sorted(features_loaded[feature_name],
-                               key=lambda _filename: len(features_loaded[feature_name][_filename])):
-            if len(features_loaded[feature_name][filename]) > max_sequence_length and max_sequence_length > 0:
-                for i in range((len(
-                        features_loaded[feature_name][filename]) + max_sequence_length - 1) // max_sequence_length):
-                    if (len(features_loaded[feature_name][filename][i * max_sequence_length:])
-                            > max_sequence_length + min_sequence_length):
-                        # we do not want to have sequences shorter than {min_sequence_length} but also do not want to discard sequences
-                        # so we allow a few sequeces with length {max_sequence_length + min_sequence_length} instead
-                        #####
-                        # If the sequence length is above the threshold, we split it with a minimal length max/4
-                        # If max length = 500, then the split will start at 500 + (500/4) = 625.
-                        # A seq of length 625 will be splitted in one of 500 and one of 125
+                # check length of label_name and feat matching
+                for filename in features_loaded[feature_name]:
+                    assert features_loaded[feature_name][filename].shape[0] == len(labels_loaded[label_name][filename])
 
-                        filename_new = filename + "_c" + str(i)
+    with Timer("chunking_by_seqlen_time_load", [tensorboard_logger, logger]) as t:
 
-                        features_loaded_chunked[feature_name][filename_new] = features_loaded[feature_name][filename][
-                                                                              i * max_sequence_length:
-                                                                              i * max_sequence_length + max_sequence_length]
-                        for label_name in labels_loaded:
-                            labels_loaded_chunked[label_name][filename_new] = labels_loaded[label_name][filename][
-                                                                              i * max_sequence_length:
-                                                                              i * max_sequence_length + max_sequence_length]
-                    else:
-                        filename_new = filename + "_c" + str(i)
+        # TODO remove with 1/4 of max length -> add to config
+        # TODO add option weather the context_size is applied to the minimum sequence length
+        min_sequence_length = max_sequence_length // 4 + context_size
 
-                        features_loaded_chunked[feature_name][filename_new] = features_loaded[feature_name][filename][
-                                                                              i * max_sequence_length:]
-                        for label_name in labels_loaded:
-                            labels_loaded_chunked[label_name][filename_new] = labels_loaded[label_name][filename][
-                                                                              i * max_sequence_length:]
+        features_loaded_chunked = {k: {} for k in features_loaded}
+        labels_loaded_chunked = {k: {} for k in labels_loaded}
 
-                        break
+        for feature_name in features_loaded:
+            for filename in sorted(features_loaded[feature_name],
+                                   key=lambda _filename: len(features_loaded[feature_name][_filename])):
+                if len(features_loaded[feature_name][filename]) > max_sequence_length and max_sequence_length > 0:
+                    for i in range((len(
+                            features_loaded[feature_name][filename]) + max_sequence_length - 1) // max_sequence_length):
+                        if (len(features_loaded[feature_name][filename][i * max_sequence_length:])
+                                > max_sequence_length + min_sequence_length):
+                            # we do not want to have sequences shorter than {min_sequence_length} but also do not want to discard sequences
+                            # so we allow a few sequeces with length {max_sequence_length + min_sequence_length} instead
+                            #####
+                            # If the sequence length is above the threshold, we split it with a minimal length max/4
+                            # If max length = 500, then the split will start at 500 + (500/4) = 625.
+                            # A seq of length 625 will be splitted in one of 500 and one of 125
 
-            else:
-                features_loaded_chunked[feature_name][filename] = features_loaded[feature_name][filename]
-                for label_name in labels_loaded:
-                    labels_loaded_chunked[label_name][filename] = labels_loaded[label_name][filename]
+                            filename_new = filename + "_c" + str(i)
+
+                            features_loaded_chunked[feature_name][filename_new] = features_loaded[feature_name][
+                                                                                      filename][
+                                                                                  i * max_sequence_length:
+                                                                                  i * max_sequence_length + max_sequence_length]
+                            for label_name in labels_loaded:
+                                labels_loaded_chunked[label_name][filename_new] = labels_loaded[label_name][filename][
+                                                                                  i * max_sequence_length:
+                                                                                  i * max_sequence_length + max_sequence_length]
+                        else:
+                            filename_new = filename + "_c" + str(i)
+
+                            features_loaded_chunked[feature_name][filename_new] = features_loaded[feature_name][
+                                                                                      filename][
+                                                                                  i * max_sequence_length:]
+                            for label_name in labels_loaded:
+                                labels_loaded_chunked[label_name][filename_new] = labels_loaded[label_name][filename][
+                                                                                  i * max_sequence_length:]
+
+                            break
+
+                else:
+                    features_loaded_chunked[feature_name][filename] = features_loaded[feature_name][filename]
+                    for label_name in labels_loaded:
+                        labels_loaded_chunked[label_name][filename] = labels_loaded[label_name][filename]
 
     return features_loaded_chunked, labels_loaded_chunked
 

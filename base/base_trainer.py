@@ -1,14 +1,13 @@
 import os
 import math
 import json
-import time
 import threading
 
 import torch
 
 from utils.logger_config import logger
 from utils.tensorboard_logger import WriterTensorboardX
-from utils.util import ensure_dir, folder_to_checkpoint, every
+from utils.util import ensure_dir, folder_to_checkpoint, every, Timer
 
 nvidia_smi_enabled = False
 try:
@@ -128,12 +127,9 @@ class BaseTrainer:
         for epoch in range(self.start_epoch, self.epochs):
             logger.info('----- Epoch {} / {} -----'.format(format(epoch, "03d"), format(self.epochs, "03d")))
 
-            start_time = time.time()
-            result_log, global_step = self._train_epoch(epoch)
-            elapsed_time_epoch = time.time() - start_time
+            with Timer("elapsed_time_epoch", [self.tensorboard_logger, logger], global_step) as t:
+                result_log, global_step = self._train_epoch(epoch)
             self.tensorboard_logger.set_step(global_step, 'train')
-
-            self.tensorboard_logger.add_scalar("elapsed_time_epoch", elapsed_time_epoch)
 
             for lr_scheduler_name in self.lr_schedulers:
                 self.tensorboard_logger.add_scalar("lr_{}".format(lr_scheduler_name),
@@ -148,7 +144,7 @@ class BaseTrainer:
 
             # save logged informations into log dict
             log = {'epoch': epoch}
-            log.update({'epoch_elapsed_time': elapsed_time_epoch})
+            log.update({'elapsed_time_epoch': t.interval})
             log.update(result_log)
 
             # print logged informations to the screen
@@ -188,7 +184,8 @@ class BaseTrainer:
 
         result_eval = self._eval_epoch(epoch, global_step)
         logger.info(result_eval)
-        self.stop_gpu_usage_logging.set()
+        if nvidia_smi_enabled:
+            self.stop_gpu_usage_logging.set()
 
     def _train_epoch(self, epoch):
         """
