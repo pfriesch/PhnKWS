@@ -66,18 +66,20 @@ class BaseTrainer:
 
         self.start_epoch = 0
 
+        self.out_dir = os.path.join(config['exp']['save_dir'], config['exp']['name'])
+
         # setup directory for checkpoint saving
-        self.checkpoint_dir = os.path.join(config['exp']['save_dir'], config['exp']['name'], 'checkpoints')
+        self.checkpoint_dir = os.path.join(self.out_dir, 'checkpoints')
         # setup visualization writer instance
         self.tensorboard_logger = WriterTensorboardX(
-            os.path.join(config['exp']['save_dir'], config['exp']['name'], "logs"))
+            os.path.join(self.out_dir, "logs"))
 
         # if hasattr(model, "get_sample_input"):
         #     self.tensorboard_logger.add_graph(model, model.get_sample_input(), True)
 
         # Save configuration file into checkpoint directory:
         ensure_dir(self.checkpoint_dir)
-        config_save_path = os.path.join(config['exp']['save_dir'], config['exp']['name'], 'config.json')
+        config_save_path = os.path.join(self.out_dir, 'config.json')
         with open(config_save_path, 'w') as f:
             json.dump(config, f, indent=4, sort_keys=False)
 

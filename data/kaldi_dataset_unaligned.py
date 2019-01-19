@@ -7,10 +7,15 @@ from data.data_util import make_big_chunk, get_order_by_length, load_data_unalig
 
 class KaldiDatasetUnaligned(object):
 
-    def __init__(self, feature_dict, label_dict, phn_mapping,
-                 context_left, context_right,
+    def __init__(self, feature_dict,
+                 label_dict,
+                 phn_mapping,
+                 context_left,
+                 context_right,
                  max_sequence_length,
-                 tensorboard_logger, debug=False, local=False):
+                 tensorboard_logger,
+                 debug=False,
+                 local=False):
         start_time = time.time()
         assert local == False
 

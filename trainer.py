@@ -11,7 +11,7 @@ from base.base_trainer import BaseTrainer
 from data import kaldi_io
 from data.data_util import load_counts
 from data.dataset_registry import get_dataset
-from data.kaldi_data_loader import KaldiDataLoader
+from data.kaldi_data_loader import KaldiDataLoader, KaldiChunkedDataLoader
 from utils.logger_config import logger
 from utils.utils import run_shell
 
@@ -57,18 +57,23 @@ class Trainer(BaseTrainer):
         train_loss = 0
         train_metrics = {metric: 0 for metric in self.metrics}
 
-        dataset = get_dataset(self.config['datasets'][tr_data]['features'], self.config['datasets'][tr_data]['labels'],
-                              self.config['arch']['args']['phn_mapping'],
-                              self.model.context_left, self.model.context_right,
-                              self.max_seq_length_train_curr, self.config['arch']['framewise_labels'],
-                              self.tensorboard_logger, self.debug, self.local)
-        data_loader = KaldiDataLoader(dataset,
-                                      self.config['training']['batch_size_train'],
-                                      use_gpu=self.config["exp"]["n_gpu"] > 0,
-                                      prefetch_to_gpu=self.config['exp']['prefetch_to_gpu'],
-                                      device=self.device,
-                                      num_workers=0,
-                                      sort_by_feat=self.config['training']['sort_by_feat'])
+        data_loader = KaldiChunkedDataLoader(self.config['datasets'][tr_data]['features'],
+                                             self.config['datasets'][tr_data]['labels'],
+                                             self.config['arch']['args']['phn_mapping'],
+                                             self.out_dir,
+                                             self.model.context_left,
+                                             self.model.context_right,
+                                             self.max_seq_length_train_curr,
+                                             self.config['arch']['framewise_labels'],
+                                             self.tensorboard_logger,
+
+                                             self.config['training']['batch_size_train'],
+                                             self.config["exp"]["n_gpu"] > 0,
+                                             self.config['exp']['prefetch_to_gpu'],
+                                             self.device,
+                                             self.config['training']['sort_by_feat'],
+                                             debug=self.debug,
+                                             local=self.local)
 
         with tqdm(total=len(data_loader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
             pbar.set_description('T e:{} l: {} a: {}'.format(epoch, '-', '-'))
@@ -144,21 +149,22 @@ class Trainer(BaseTrainer):
         valid_loss = 0
         valid_metrics = {metric: 0 for metric in self.metrics}
 
-        dataset = get_dataset(self.config['datasets'][valid_data]['features'],
-                              self.config['datasets'][valid_data]['labels'],
-                              self.config['arch']['args']['phn_mapping'],
-                              self.model.context_left, self.model.context_right,
-                              self.config['training']['max_seq_length_valid'],
-                              self.config['arch']['framewise_labels'],
-                              self.tensorboard_logger,
-                              self.debug, self.local)
+        valid_data_loader = KaldiChunkedDataLoader(self.config['datasets'][valid_data]['features'],
+                                                   self.config['datasets'][valid_data]['labels'],
+                                                   self.config['arch']['args']['phn_mapping'],
+                                                   self.out_dir,
+                                                   self.model.context_left,
+                                                   self.model.context_right,
+                                                   self.config['training']['max_seq_length_valid'],
+                                                   self.config['arch']['framewise_labels'],
+                                                   self.tensorboard_logger,
 
-        valid_data_loader = KaldiDataLoader(dataset,
-                                            self.config['training']['batch_size_valid'],
-                                            use_gpu=self.config["exp"]["n_gpu"] > 0,
-                                            prefetch_to_gpu=self.config['exp']['prefetch_to_gpu'] is not None,
-                                            device=self.device,
-                                            num_workers=0)
+                                                   self.config['training']['batch_size_valid'],
+                                                   self.config["exp"]["n_gpu"] > 0,
+                                                   self.config['exp']['prefetch_to_gpu'],
+                                                   self.device,
+                                                   debug=self.debug,
+                                                   local=self.local)
 
         with tqdm(total=len(valid_data_loader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
             pbar.set_description('V e:{} l: {} '.format(epoch, '-'))
@@ -202,21 +208,22 @@ class Trainer(BaseTrainer):
         test_data = self.config['data_use']['test_with']
         out_folder = os.path.join(self.config['exp']['save_dir'], self.config['exp']['name'])
 
-        dataset = get_dataset(self.config['datasets'][test_data]['features'],
-                              self.config['datasets'][test_data]['labels'],
-                              self.config['arch']['args']['phn_mapping'],
-                              self.model.context_left, self.model.context_right,
-                              max_sequence_length=max_seq_length,
-                              framewise_labels=self.config['arch']['framewise_labels'],
-                              tensorboard_logger=self.tensorboard_logger,
-                              debug=self.debug)
+        test_data_loader = KaldiChunkedDataLoader(self.config['datasets'][test_data]['features'],
+                                                  self.config['datasets'][test_data]['labels'],
+                                                  self.config['arch']['args']['phn_mapping'],
+                                                  self.out_dir,
+                                                  self.model.context_left,
+                                                  self.model.context_right,
+                                                  max_seq_length,
+                                                  self.config['arch']['framewise_labels'],
+                                                  self.tensorboard_logger,
 
-        test_data_loader = KaldiDataLoader(dataset,
-                                           batch_size,
-                                           use_gpu=self.config["exp"]["n_gpu"] > 0,
-                                           prefetch_to_gpu=self.config['exp']['prefetch_to_gpu'] is not None,
-                                           device=self.device,
-                                           num_workers=0)
+                                                  batch_size,
+                                                  self.config["exp"]["n_gpu"] > 0,
+                                                  self.config['exp']['prefetch_to_gpu'],
+                                                  self.device,
+                                                  debug=self.debug,
+                                                  local=self.local)
 
         test_metrics = {metric: 0 for metric in self.metrics}
 

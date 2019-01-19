@@ -1,5 +1,6 @@
 import os
-from collections import OrderedDict, Counter, namedtuple
+import random
+from collections import OrderedDict, Counter
 
 import numpy as np
 
@@ -14,39 +15,29 @@ def load_counts(class_counts_file):
     return counts
 
 
-# def load_data_unaligned(feature_dict, label_dict, max_sequence_length):
-#     features_loaded = {}
-#     labels_loaded = {}
-#
-#     for feature_name in feature_dict:
-#         feature_lst_path = feature_dict[feature_name]['feature_lst_path']
-#         feature_opts = feature_dict[feature_name]['feature_opts']
-#
-#         num_ignored = 0
-#
-#         def short_enough(_m):
-#             nonlocal num_ignored
-#             _short_enough = max_sequence_length < 0 or len(_m) < max_sequence_length
-#             num_ignored += int(not _short_enough)
-#             return _short_enough
-#
-#         features_loaded[feature_name] = \
-#             {k: m for k, m in
-#              kaldi_io.read_mat_ark('ark:copy-feats scp:{} ark:- |{}'.format(feature_lst_path, feature_opts))
-#              if short_enough(m)}
-#         logger.info("Ignored {} features in data loading since they where too long".format(num_ignored))
-#         assert len(features_loaded[feature_name]) > 0
-#
-#     phn_mapping = raw_mapping
-#     for label_name in label_dict:
-#         # TODO remove starting space
-#         phn_transcripts = json.load(open(label_dict[label_name]['phn_transcripts']))
-#         labels_loaded[label_name] = {t['id']: np.array([phn_mapping[p] for p in t['phn']])
-#                                      for t in phn_transcripts if
-#                                      t['id'] in features_loaded[feature_name]}
-#         # total_phn_count = json.load(open(label_dict[label_name]['total_phn_count']))
-#
-#     return features_loaded, labels_loaded
+def split_chunks(seq, size):
+    newseq = []
+    splitsize = 1.0 / size * len(seq)
+    for i in range(size):
+        newseq.append(seq[int(round(i * splitsize)):int(round((i + 1) * splitsize))])
+    return newseq
+
+
+def chunk_scp(feature_lst_path, N_chunks, out_dir):
+    with open(feature_lst_path, "r") as f:
+        lines = f.readlines()
+
+    random.shuffle(lines)
+    chunks = list(split_chunks(lines, N_chunks))
+
+    chunk_paths = []
+    for _id, chunk in enumerate(chunks):
+        chunk_paths.append(os.path.join(out_dir, "exp_files",
+                                        "chunk_{}".format(_id)))
+        with open(chunk_paths[_id], "w") as f:
+            f.writelines(chunk)
+
+    return chunk_paths, len(lines)
 
 
 def load_data_unaligned(feature_dict, label_dict, phn_mapping, max_sequence_length):
@@ -90,8 +81,7 @@ def load_data_unaligned(feature_dict, label_dict, phn_mapping, max_sequence_leng
 
             labels_new = [_phn_mapping.id_mapping[_lab_id] for _lab_id in label if _lab_id in _phn_mapping.id_mapping]
 
-            if 0 in labels_new:
-                print("shit")
+            assert 0 not in labels_new
 
             # We probably do not want to remove repeating phonemes since we do not know if there is a silence between them. Also it can't hurt too much to detect the same phoneneme twice?!...
             ## Remove repeating characters
@@ -312,4 +302,3 @@ def make_big_chunk(feature_dict, label_dict, normalize_feat=True, label_start_ze
                 feature_chunks[feature_name], axis=0)
 
     return sample_name, feature_chunks, label_chunks
-

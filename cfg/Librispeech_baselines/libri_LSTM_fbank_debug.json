@@ -21,7 +21,8 @@
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/train_clean_100/feats_fbank_debug.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/librispeech/s5/data/train_clean_100/utt2spk  ark:/mnt/data/libs/kaldi/egs/librispeech/s5/fbank/cmvn_train_clean_100.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
           "cw_left": 0,
-          "cw_right": 0
+          "cw_right": 0,
+          "n_chunks": 2
         }
       },
       "labels": {
@@ -40,7 +41,8 @@
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/dev_clean/feats_fbank_debug.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/librispeech/s5/data/dev_clean/utt2spk  ark:/mnt/data/libs/kaldi/egs/librispeech/s5/fbank/cmvn_dev_clean.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
           "cw_left": 0,
-          "cw_right": 0
+          "cw_right": 0,
+          "n_chunks": 2
         }
       },
       "labels": {
@@ -59,7 +61,8 @@
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/test_clean/feats_fbank_debug.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/librispeech/s5/data/test_clean/utt2spk  ark:/mnt/data/libs/kaldi/egs/librispeech/s5/fbank/cmvn_test_clean.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
           "cw_left": 0,
-          "cw_right": 0
+          "cw_right": 0,
+          "n_chunks": 2
         }
       },
       "labels": {
@@ -116,8 +119,6 @@
     "args": {
       "input_feat_length": 40,
       "input_feat_name": "fbank",
-      "lab_phn_num": 90
-      // TODO get from mapping + add one for blank
     },
     "loss": {
       "name": "ctc_phn",

@@ -1,10 +1,13 @@
 import random
+import copy
 
 import torch
 from torch.nn.utils.rnn import pack_sequence
 from torch.utils.data import DataLoader, Sampler
 import numpy as np
 
+from data.data_util import chunk_scp
+from data.dataset_registry import get_dataset
 from data.kaldi_dataset_framewise import KaldiDatasetFramewise
 from data.kaldi_dataset_unaligned import KaldiDatasetUnaligned
 
@@ -85,6 +88,7 @@ class KaldiDataLoader(DataLoader):
         self.n_samples = len(self.dataset)
         if prefetch_to_gpu:
             self.dataset.move_to(device)
+            assert num_workers == 0
 
         # pin_memory = use_gpu and not prefetch_to_gpu
         # TODO packed sequence from collate_fn does not work with pin_memory but we prefetch to gpu anyway
@@ -110,3 +114,84 @@ class KaldiDataLoader(DataLoader):
                                               pin_memory=pin_memory,
                                               num_workers=num_workers,
                                               drop_last=False)
+
+
+class KaldiChunkedDataLoader:
+
+    def __init__(self, feature_dict, label_dict, phn_mapping, out_dir,
+                 context_left, context_right,
+                 max_sequence_length,
+                 framewise_labels,
+                 tensorboard_logger,
+
+                 batch_size, use_gpu, prefetch_to_gpu,
+                 device, sort_by_feat=None, debug=False, local=False):
+
+        #### DATASET
+        self.feature_dict = feature_dict
+        self.label_dict = label_dict
+        self.phn_mapping = phn_mapping
+        self.out_dir = out_dir
+        self.context_left = context_left
+        self.context_right = context_right
+        self.max_sequence_length = max_sequence_length
+        self.framewise_labels = framewise_labels
+        self.tensorboard_logger = tensorboard_logger
+        self.debug = debug
+        self.local = local
+
+        #### DATALOADER
+
+        self.batch_size = batch_size
+        self.use_gpu = use_gpu
+        self.prefetch_to_gpu = prefetch_to_gpu
+        self.device = device
+        self.sort_by_feat = sort_by_feat
+
+        #### Chunking
+
+        self.chunk_paths = {}
+        self.n_samples_per_feat = {}
+
+        # all featers have same amount of chunks
+        assert len(set([feature_dict[feature_name]['n_chunks'] for feature_name in feature_dict])) == 1
+
+        for feature_name in feature_dict:
+            feature_lst_path = feature_dict[feature_name]['feature_lst_path']
+            self.n_chunks = feature_dict[feature_name]['n_chunks']
+            self.chunk_paths[feature_name], self.n_samples_per_feat[feature_name] = chunk_scp(feature_lst_path,
+                                                                                              self.n_chunks,
+                                                                                              out_dir)
+
+        self.n_samples = sum(self.n_samples_per_feat.values())
+
+    def __len__(self):
+        return self.n_samples
+
+    def __iter__(self):
+        for _chunk_id in range(self.n_chunks):
+            for feature_name in self.chunk_paths:
+                _feature_dict = copy.deepcopy(self.feature_dict)
+
+                _feature_dict[feature_name]['feature_lst_path'] = self.chunk_paths[feature_name][_chunk_id]
+
+                dataset = get_dataset(_feature_dict,
+                                      self.label_dict,
+                                      self.phn_mapping,
+                                      self.context_left,
+                                      self.context_right,
+                                      self.max_sequence_length,
+                                      self.framewise_labels,
+                                      self.tensorboard_logger,
+                                      self.debug,
+                                      self.local)
+
+                data_loader = KaldiDataLoader(dataset,
+                                              self.batch_size,
+                                              self.use_gpu,
+                                              self.prefetch_to_gpu,
+                                              self.device,
+                                              0,
+                                              self.sort_by_feat)
+                for x in iter(data_loader):
+                    yield x
