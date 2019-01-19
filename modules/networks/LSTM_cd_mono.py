@@ -1,8 +1,8 @@
 from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence
 
 from base.base_model import BaseModel
-from nets.modules.LSTM_cudnn import LSTM
-from nets.modules.MLP import MLP
+from modules.net_modules.LSTM_cudnn import LSTM
+from modules.net_modules.MLP import MLP
 
 
 class LSTM_cd_mono(BaseModel):

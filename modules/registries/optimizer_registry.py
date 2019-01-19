@@ -39,6 +39,6 @@ def optimizer_init(config, model):
         trainable_params = filter(lambda p: p.requires_grad, model.cnn.parameters())
         optimizers['all'] = optim.SGD(trainable_params, **config['training']['optimizer']["args"])
     else:
-        raise ValueError
+        raise ValueError("Can't find the optimizer {}".format(optimizers))
 
     return optimizers

@@ -3,11 +3,13 @@ import random
 import torch
 from torch.nn.utils.rnn import pack_sequence
 from torch.utils.data import DataLoader, Sampler
+import numpy as np
 
-from data.kaldi_dataset import KaldiDataset
+from data.kaldi_dataset_framewise import KaldiDatasetFramewise
+from data.kaldi_dataset_unaligned import KaldiDatasetUnaligned
 
 
-def collate_fn_zero_pad(sample_list):
+def collate_fn_rnd_zero_pad(sample_list):
     fea_keys = list(sample_list[0][1].keys())
     lab_keys = list(sample_list[0][2].keys())
 
@@ -44,6 +46,7 @@ def collate_fn(sample_list):
     sample_names = []
     fea_dict = {k: list() for k in fea_keys}
     lab_dict = {k: list() for k in lab_keys}
+
     for sample in sample_list:
         sample_names.append(sample[0])
         for fea in fea_dict:
@@ -55,7 +58,9 @@ def collate_fn(sample_list):
         fea_dict[fea] = pack_sequence(sorted(fea_dict[fea], key=lambda x: x.shape[0], reverse=True))
 
     for lab in lab_dict:
-        lab_dict[lab] = pack_sequence(sorted(lab_dict[lab], key=lambda x: x.shape[0], reverse=True))
+        lab_dict[lab] = sorted(lab_dict[lab], key=lambda x: x.shape[0], reverse=True)
+        sequence_length = torch.from_numpy(np.array([len(l) for l in lab_dict[lab]]))
+        lab_dict[lab] = {"label": pack_sequence(lab_dict[lab]), "sequence_lengths": sequence_length}
 
     return sample_names, fea_dict, lab_dict
 
@@ -74,7 +79,7 @@ class SortedSampler(Sampler):
 
 class KaldiDataLoader(DataLoader):
 
-    def __init__(self, dataset: KaldiDataset, batch_size, use_gpu, prefetch_to_gpu,
+    def __init__(self, dataset, batch_size, use_gpu, prefetch_to_gpu,
                  device, num_workers, sort_by_feat=None):
         self.dataset = dataset
         self.n_samples = len(self.dataset)
@@ -82,8 +87,15 @@ class KaldiDataLoader(DataLoader):
             self.dataset.move_to(device)
 
         # pin_memory = use_gpu and not prefetch_to_gpu
-        # TODO packed sequence from collate_fn does not work with pin_memory
+        # TODO packed sequence from collate_fn does not work with pin_memory but we prefetch to gpu anyway
         pin_memory = False
+
+        if isinstance(dataset, KaldiDatasetUnaligned):
+            _collate_fn = collate_fn
+        elif isinstance(dataset, KaldiDatasetFramewise):
+            _collate_fn = collate_fn_rnd_zero_pad
+        else:
+            raise ValueError
 
         assert (prefetch_to_gpu and num_workers == 0) or not prefetch_to_gpu
 
@@ -94,7 +106,7 @@ class KaldiDataLoader(DataLoader):
                                                   self.dataset.ordering_length,
                                                   sort_by_feat=sort_by_feat) if sort_by_feat is not None
                                               else None,
-                                              collate_fn=collate_fn_zero_pad,
+                                              collate_fn=_collate_fn,
                                               pin_memory=pin_memory,
                                               num_workers=num_workers,
                                               drop_last=False)

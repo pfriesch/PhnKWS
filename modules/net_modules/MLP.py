@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from nets.modules.utils import act_fun, LayerNorm
+from modules.net_modules.utils import act_fun, LayerNorm
 
 
 class MLP(nn.Module):

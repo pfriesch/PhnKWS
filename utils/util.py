@@ -4,7 +4,7 @@ import re
 import subprocess
 
 import collections
-import time
+import threading
 
 
 def recursive_update(_dict, _update_dict):
@@ -44,16 +44,15 @@ def code_versioning():
     return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode("utf-8").strip()
 
 
-def every(delay, task, logger):
-    # https://stackoverflow.com/questions/474528/what-is-the-best-way-to-repeatedly-execute-a-function-every-x-seconds-in-python
-    next_time = time.time() + delay
+def every(delay, task, logger, stop_switch: threading.Event):
     while True:
-        time.sleep(max(0, next_time - time.time()))
-        try:
-            task()
-        except Exception as e:
-            # traceback.print_exc()
-            # in production code you might want to have this instead of course:
-            logger.exception("Problem while executing repetitive task. traceback: {}".format(e))
-        # skip tasks if we are behind schedule:
-        next_time += (time.time() - next_time) // delay * delay + delay
+        stop = stop_switch.wait(delay)
+        if stop:
+            return 0
+        else:
+            try:
+                task()
+            except Exception as e:
+                # traceback.print_exc()
+                # in production code you might want to have this instead of course:
+                logger.exception("Problem while executing repetitive task. traceback: {}".format(e))

@@ -1,7 +1,7 @@
 import torch.nn.functional as F
 import torch.nn as nn
 
-from nets.modules.utils import act_fun, LayerNorm
+from modules.net_modules.utils import act_fun, LayerNorm
 
 
 class CNN(nn.Module):

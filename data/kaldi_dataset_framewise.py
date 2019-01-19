@@ -6,7 +6,7 @@ import torch
 from data.data_util import load_data, apply_context, make_big_chunk, get_order_by_length
 
 
-class KaldiDataset(object):
+class KaldiDatasetFramewise(object):
 
     def __init__(self, feature_dict, label_dict, context_left, context_right, max_sequence_length, tensorboard_logger,
                  debug=False, local=False):
@@ -29,7 +29,6 @@ class KaldiDataset(object):
                     _feature_dict[feat_name] = dict(
                         sorted(list(_feature_dict[feat_name].items()), key=lambda x: x[0])[:30])
 
-            # TODO split files that are too long
             _label_dict = apply_context(_label_dict, context_left, context_right)
 
             # TODO make multiple chunks if too big

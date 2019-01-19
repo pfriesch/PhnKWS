@@ -28,23 +28,28 @@ def act_fun(act_type):
     if act_type == "relu":
         return nn.ReLU()
 
-    if act_type == "tanh":
+    elif act_type == "tanh":
         return nn.Tanh()
 
-    if act_type == "sigmoid":
+    elif act_type == "sigmoid":
         return nn.Sigmoid()
 
-    if act_type == "leaky_relu":
+    elif act_type == "leaky_relu":
         return nn.LeakyReLU(0.2)
 
-    if act_type == "elu":
+    elif act_type == "elu":
         return nn.ELU()
 
-    if act_type == "softmax":
+    elif act_type == "softmax":
+        return nn.LogSoftmax(dim=1)  # TODO fix this ambiguity
+
+    elif act_type == "log_softmax":
         return nn.LogSoftmax(dim=1)
 
-    if act_type == "linear":
+    elif act_type == "linear":
         return nn.LeakyReLU(1)  # initializzed like this, but not used in forward!
+    else:
+        raise ValueError("Activation function {} not found!".format(act_type))
 
 
 def flip(x, dim):

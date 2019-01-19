@@ -1,4 +1,6 @@
-from nets.metrics.metrics import LabCDAccuracy, LabMonoAccuracy, LabCDError, LabMonoError
+from modules.metrics.metrics import LabCDAccuracy, LabMonoAccuracy, LabCDError, LabMonoError
+
+from modules.metrics.ctc_metrics import PhnErrorRate
 
 
 def metrics_init(config):
@@ -12,6 +14,8 @@ def metrics_init(config):
             metrics[metric] = LabMonoError()
         elif metric == 'err_lab_cd':
             metrics[metric] = LabCDError()
+        elif metric == 'phone_error_rate':
+            metrics[metric] = PhnErrorRate(config['arch']['args']['lab_phn_num'])
         else:
             raise ValueError("Can't find the metric {}".format(metric))
     return metrics

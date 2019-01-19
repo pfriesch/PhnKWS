@@ -1,8 +1,10 @@
-from collections import OrderedDict
+import os
+from collections import OrderedDict, Counter, namedtuple
 
 import numpy as np
 
 from data import kaldi_io
+from utils.logger_config import logger
 
 
 def load_counts(class_counts_file):
@@ -10,6 +12,118 @@ def load_counts(class_counts_file):
         row = next(f).strip().strip('[]').strip()
         counts = np.array([np.float32(v) for v in row.split()])
     return counts
+
+
+# def load_data_unaligned(feature_dict, label_dict, max_sequence_length):
+#     features_loaded = {}
+#     labels_loaded = {}
+#
+#     for feature_name in feature_dict:
+#         feature_lst_path = feature_dict[feature_name]['feature_lst_path']
+#         feature_opts = feature_dict[feature_name]['feature_opts']
+#
+#         num_ignored = 0
+#
+#         def short_enough(_m):
+#             nonlocal num_ignored
+#             _short_enough = max_sequence_length < 0 or len(_m) < max_sequence_length
+#             num_ignored += int(not _short_enough)
+#             return _short_enough
+#
+#         features_loaded[feature_name] = \
+#             {k: m for k, m in
+#              kaldi_io.read_mat_ark('ark:copy-feats scp:{} ark:- |{}'.format(feature_lst_path, feature_opts))
+#              if short_enough(m)}
+#         logger.info("Ignored {} features in data loading since they where too long".format(num_ignored))
+#         assert len(features_loaded[feature_name]) > 0
+#
+#     phn_mapping = raw_mapping
+#     for label_name in label_dict:
+#         # TODO remove starting space
+#         phn_transcripts = json.load(open(label_dict[label_name]['phn_transcripts']))
+#         labels_loaded[label_name] = {t['id']: np.array([phn_mapping[p] for p in t['phn']])
+#                                      for t in phn_transcripts if
+#                                      t['id'] in features_loaded[feature_name]}
+#         # total_phn_count = json.load(open(label_dict[label_name]['total_phn_count']))
+#
+#     return features_loaded, labels_loaded
+
+
+def load_data_unaligned(feature_dict, label_dict, phn_mapping, max_sequence_length):
+    features_loaded = {}
+    labels_loaded = {}
+
+    for feature_name in feature_dict:
+        feature_lst_path = feature_dict[feature_name]['feature_lst_path']
+        feature_opts = feature_dict[feature_name]['feature_opts']
+
+        num_ignored = 0
+
+        def short_enough(_m):
+            nonlocal num_ignored
+            _short_enough = max_sequence_length < 0 or len(_m) < max_sequence_length
+            num_ignored += int(not _short_enough)
+            return _short_enough
+
+        features_loaded[feature_name] = \
+            {k: m for k, m in
+             kaldi_io.read_mat_ark('ark:copy-feats scp:{} ark:- |{}'.format(feature_lst_path, feature_opts))
+             if short_enough(m)}
+        logger.info("Ignored {} features in data loading since they where too long".format(num_ignored))
+        assert len(features_loaded[feature_name]) > 0
+
+    for label_name in label_dict:
+
+        label_folder = label_dict[label_name]['label_folder']
+        label_opts = label_dict[label_name]['label_opts']
+
+        _phn_mapping = phn_mapping[label_name]
+        debug_removed_ids = Counter()
+
+        def map_label(label):
+            nonlocal _phn_mapping
+            #### Debugging
+            for _lab_id in label:
+                if _lab_id not in _phn_mapping.id_mapping:
+                    debug_removed_ids[_lab_id] += 1
+            #### /Debugging
+
+            labels_new = [_phn_mapping.id_mapping[_lab_id] for _lab_id in label if _lab_id in _phn_mapping.id_mapping]
+
+            if 0 in labels_new:
+                print("shit")
+
+            # We probably do not want to remove repeating phonemes since we do not know if there is a silence between them. Also it can't hurt too much to detect the same phoneneme twice?!...
+            ## Remove repeating characters
+            ## labels_new = [i for i, _ in itertools.groupby(labels_new)]
+            return np.array(labels_new)
+
+        for feature_name in feature_dict:
+            # Note that I'm copying only the aligments of the loaded feature
+            labels_loaded[label_name] = \
+                {k: map_label(v) for k, v in
+                 kaldi_io.read_vec_int_ark(
+                     'gunzip -c {}/ali*.gz | {} {}/final.mdl ark:- ark:-|'
+                         .format(label_folder, label_opts, label_folder))
+                 if k in features_loaded[feature_name]}
+
+            logger.info("removed these indices: {}".format(
+                {next(t[0] for t in _phn_mapping.all_phone_info if _id == t[1]): count
+                 for _id, count in debug_removed_ids.items()}))
+
+            # This way I remove all the features without an aligment (see log file in alidir "Did not Succeded")
+            features_loaded[feature_name] = \
+                {k: v for k, v in list(features_loaded[feature_name].items()) if
+                 k in labels_loaded[label_name]}
+
+            # check length of label_name and feat
+            for filename in features_loaded[feature_name]:
+                if not features_loaded[feature_name][filename].shape[0] > 0:
+                    logger.warn("file {} has 0 length feature".format(filename))
+                if not len(labels_loaded[label_name][filename]) > 0:
+                    logger.warn("file {} has 0 length label".format(filename))
+
+    return features_loaded, labels_loaded
 
 
 def load_features(feature_dict):
@@ -124,8 +238,6 @@ def get_order_by_length(feature_dict):
                                                      for _idx, filename in ordering_length[feature_name]])
     return ordering_length
 
-def collapse_alignment(label_dict):
-    raise NotImplementedError
 
 def apply_context(label_dict, context_left, context_right):
     for label_name in label_dict:
@@ -135,7 +247,7 @@ def apply_context(label_dict, context_left, context_right):
     return label_dict
 
 
-def make_big_chunk(feature_dict, label_dict, normalize_feat=True, normalize_label=True):
+def make_big_chunk(feature_dict, label_dict, normalize_feat=True, label_start_zero=True):
     sample_name = {k: {'features': {}, 'labels': {}} for k in feature_dict[list(feature_dict.keys())[0]].keys()}
     feature_chunks = {}
     label_chunks = {}
@@ -184,9 +296,14 @@ def make_big_chunk(feature_dict, label_dict, normalize_feat=True, normalize_labe
             #                           lab_dict[lab][filename])
 
     if label_dict is not None:
-        if normalize_label:
+        if label_start_zero:
             for label_name in label_dict:
                 label_chunks[label_name] = label_chunks[label_name] - label_chunks[label_name].min()
+        else:
+            for label_name in label_dict:
+                # No zero label e.g. for ctc loss with blank label at 0
+                if label_chunks[label_name].min() == 0:
+                    label_chunks[label_name] = label_chunks[label_name] + 1
 
     if normalize_feat:
         for feature_name in feature_dict:
@@ -195,3 +312,4 @@ def make_big_chunk(feature_dict, label_dict, normalize_feat=True, normalize_labe
                 feature_chunks[feature_name], axis=0)
 
     return sample_name, feature_chunks, label_chunks
+

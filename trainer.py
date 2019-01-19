@@ -4,13 +4,14 @@ import os
 
 import numpy as np
 import torch
+from torch.nn.utils.rnn import PackedSequence
 from tqdm import tqdm
 
 from base.base_trainer import BaseTrainer
 from data import kaldi_io
 from data.data_util import load_counts
+from data.dataset_registry import get_dataset
 from data.kaldi_data_loader import KaldiDataLoader
-from data.kaldi_dataset import KaldiDataset
 from utils.logger_config import logger
 from utils.utils import run_shell
 
@@ -56,10 +57,11 @@ class Trainer(BaseTrainer):
         train_loss = 0
         train_metrics = {metric: 0 for metric in self.metrics}
 
-        dataset = KaldiDataset(self.config['datasets'][tr_data]['features'], self.config['datasets'][tr_data]['labels'],
-                               self.model.context_left, self.model.context_right,
-                               self.max_seq_length_train_curr,
-                               self.tensorboard_logger, self.debug, self.local)
+        dataset = get_dataset(self.config['datasets'][tr_data]['features'], self.config['datasets'][tr_data]['labels'],
+                              self.config['arch']['args']['phn_mapping'],
+                              self.model.context_left, self.model.context_right,
+                              self.max_seq_length_train_curr, self.config['arch']['framewise_labels'],
+                              self.tensorboard_logger, self.debug, self.local)
         data_loader = KaldiDataLoader(dataset,
                                       self.config['training']['batch_size_train'],
                                       use_gpu=self.config["exp"]["n_gpu"] > 0,
@@ -72,18 +74,18 @@ class Trainer(BaseTrainer):
             pbar.set_description('T e:{} l: {} a: {}'.format(epoch, '-', '-'))
             for batch_idx, (sample_names, inputs, targets) in enumerate(data_loader):
 
-                inputs = {k: v.to(self.device) for k, v in inputs.items()}
-                targets = {k: v.to(self.device) for k, v in targets.items()}
+                # TODO assert out.shape[1] >= lab_dnn.max() and lab_dnn.min() >= 0, \
+                #     "lab_dnn max of {} is bigger than shape of output {} or min {} is smaller than 0" \
+                #         .format(lab_dnn.max().cpu().numpy(), out.shape[1], lab_dnn.min().cpu().numpy())
+
+                inputs = self.to_device(inputs)
+                targets = self.to_device(targets)
 
                 for opti in self.optimizers.values():
                     opti.zero_grad()
                 output = self.model(inputs)
                 loss = self.loss(output, targets)
                 loss["loss_final"].backward()
-
-                # TODO assert out.shape[1] >= lab_dnn.max() and lab_dnn.min() >= 0, \
-                #     "lab_dnn max of {} is bigger than shape of output {} or min {} is smaller than 0" \
-                #         .format(lab_dnn.max().cpu().numpy(), out.shape[1], lab_dnn.min().cpu().numpy())
 
                 if self.config['training']['clip_grad_norm'] > 0:
                     trainable_params = filter(lambda p: p.requires_grad, self.model.parameters())
@@ -97,20 +99,24 @@ class Trainer(BaseTrainer):
                     self.tensorboard_logger.add_scalar(_loss, loss_value.item())
                 train_loss += loss["loss_final"].item()
                 _train_metrics = self._eval_metrics(output, targets)
-                train_metrics = {metric: train_metrics[metric] + metric_value.item() for
+                train_metrics = {metric: train_metrics[metric] + metric_value for
                                  metric, metric_value
                                  in _train_metrics.items()}
                 for metric, metric_value in _train_metrics.items():
-                    self.tensorboard_logger.add_scalar(metric, metric_value.item())
+                    self.tensorboard_logger.add_scalar(metric, metric_value)
 
                 for feat_name in inputs:
-                    total_padding = torch.sum(
-                        (torch.ones_like(inputs[feat_name][1]) * inputs[feat_name][1][0]) - inputs[feat_name][1])
-                    self.tensorboard_logger.add_scalar('total_padding_{}'.format(feat_name), total_padding.item())
+                    if isinstance(inputs[feat_name], PackedSequence):
+                        total_padding = torch.sum(
+                            (torch.ones_like(inputs[feat_name][1]) * inputs[feat_name][1][0]) - inputs[feat_name][1])
+                        self.tensorboard_logger.add_scalar('total_padding_{}'.format(feat_name), total_padding.item())
+                    else:
+                        raise NotImplementedError
 
                 pbar.set_description('T e:{} l: {:.4f} a: {:.3f}'.format(epoch,
                                                                          loss["loss_final"].item(),
-                                                                         _train_metrics['acc_lab_cd'].item()))
+                                                                         _train_metrics[
+                                                                             self.config['arch']['metrics'][0]]))
                 pbar.update()
                 #### /Logging ####
 
@@ -138,12 +144,14 @@ class Trainer(BaseTrainer):
         valid_loss = 0
         valid_metrics = {metric: 0 for metric in self.metrics}
 
-        dataset = KaldiDataset(self.config['datasets'][valid_data]['features'],
-                               self.config['datasets'][valid_data]['labels'],
-                               self.model.context_left, self.model.context_right,
-                               self.config['training']['max_seq_length_valid'],
-                               self.tensorboard_logger,
-                               self.debug, self.local)
+        dataset = get_dataset(self.config['datasets'][valid_data]['features'],
+                              self.config['datasets'][valid_data]['labels'],
+                              self.config['arch']['args']['phn_mapping'],
+                              self.model.context_left, self.model.context_right,
+                              self.config['training']['max_seq_length_valid'],
+                              self.config['arch']['framewise_labels'],
+                              self.tensorboard_logger,
+                              self.debug, self.local)
 
         valid_data_loader = KaldiDataLoader(dataset,
                                             self.config['training']['batch_size_valid'],
@@ -155,8 +163,8 @@ class Trainer(BaseTrainer):
         with tqdm(total=len(valid_data_loader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
             pbar.set_description('V e:{} l: {} '.format(epoch, '-'))
             for batch_idx, (sample_names, inputs, targets) in enumerate(valid_data_loader):
-                inputs = {k: v.to(self.device) for k, v in inputs.items()}
-                targets = {k: v.to(self.device) for k, v in targets.items()}
+                inputs = self.to_device(inputs)
+                targets = self.to_device(targets)
 
                 output = self.model(inputs)
                 loss = self.loss(output, targets)
@@ -164,7 +172,7 @@ class Trainer(BaseTrainer):
                 #### Logging ####
                 valid_loss += loss["loss_final"].item()
                 _eval_metrics = self._eval_metrics(output, targets)
-                valid_metrics = {metric: valid_metrics[metric] + metric_value.item() for
+                valid_metrics = {metric: valid_metrics[metric] + metric_value for
                                  metric, metric_value
                                  in _eval_metrics.items()}
                 pbar.set_description('V e:{} l: {:.4f} '.format(epoch, loss["loss_final"].item()))
@@ -181,6 +189,65 @@ class Trainer(BaseTrainer):
                                   valid_metrics}}
 
     def _eval_epoch(self, epoch, global_step):
+        if 'test' in self.config:
+            return self._eval_epoch_kaldi_decode(epoch, global_step)
+        else:
+            return self._eval_epoch_ctc_decode(epoch, global_step)
+
+    def _eval_epoch_ctc_decode(self, epoch, global_step):
+        self.model.eval()
+        batch_size = 1
+        max_seq_length = -1
+
+        test_data = self.config['data_use']['test_with']
+        out_folder = os.path.join(self.config['exp']['save_dir'], self.config['exp']['name'])
+
+        dataset = get_dataset(self.config['datasets'][test_data]['features'],
+                              self.config['datasets'][test_data]['labels'],
+                              self.config['arch']['args']['phn_mapping'],
+                              self.model.context_left, self.model.context_right,
+                              max_sequence_length=max_seq_length,
+                              framewise_labels=self.config['arch']['framewise_labels'],
+                              tensorboard_logger=self.tensorboard_logger,
+                              debug=self.debug)
+
+        test_data_loader = KaldiDataLoader(dataset,
+                                           batch_size,
+                                           use_gpu=self.config["exp"]["n_gpu"] > 0,
+                                           prefetch_to_gpu=self.config['exp']['prefetch_to_gpu'] is not None,
+                                           device=self.device,
+                                           num_workers=0)
+
+        test_metrics = {metric: 0 for metric in self.metrics}
+
+        with tqdm(total=len(test_data_loader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
+            pbar.set_description('E e:{}    '.format(epoch))
+            for batch_idx, (sample_names, inputs, targets) in tqdm(enumerate(test_data_loader)):
+                inputs = self.to_device(inputs)
+                targets = self.to_device(targets)
+
+                output = self.model(inputs)
+
+                #### Logging ####
+                _eval_metrics = self._eval_metrics(output, targets)
+                test_metrics = {metric: test_metrics[metric] + metric_value for
+                                metric, metric_value
+                                in _eval_metrics.items()}
+                pbar.set_description(
+                    'E e:{} a: {:.4f} '.format(epoch, test_metrics[self.config['arch']['metrics'][0]]))
+                pbar.update()
+                #### /Logging ####
+
+        logger.critical("Done decoding... TODO implement with lm decoding")
+
+        self.tensorboard_logger.set_step(global_step, 'test')
+        for metric in test_metrics:
+            self.tensorboard_logger.add_scalar(metric, test_metrics[metric] / len(test_data_loader))
+
+        return {'test_metrics': {metric: test_metrics[metric] / len(test_data_loader) for metric in
+                                 test_metrics}}
+
+    def _eval_epoch_kaldi_decode(self, epoch, global_step):
         self.model.eval()
         batch_size = 1
         max_seq_length = -1
@@ -190,12 +257,14 @@ class Trainer(BaseTrainer):
 
         test_metrics = {metric: 0 for metric in self.metrics}
 
-        dataset = KaldiDataset(self.config['datasets'][test_data]['features'],
-                               self.config['datasets'][test_data]['labels'],
-                               self.model.context_left, self.model.context_right,
-                               max_sequence_length=max_seq_length,
-                               tensorboard_logger=self.tensorboard_logger,
-                               debug=self.debug)
+        dataset = get_dataset(self.config['datasets'][test_data]['features'],
+                              self.config['datasets'][test_data]['labels'],
+                              self.config['arch']['args']['phn_mapping'],
+                              self.model.context_left, self.model.context_right,
+                              max_sequence_length=max_seq_length,
+                              framewise_labels=self.config['arch']['framewise_labels'],
+                              tensorboard_logger=self.tensorboard_logger,
+                              debug=self.debug)
 
         test_data_loader = KaldiDataLoader(dataset,
                                            batch_size,
@@ -221,8 +290,8 @@ class Trainer(BaseTrainer):
         with tqdm(total=len(test_data_loader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
             pbar.set_description('E e:{}    '.format(epoch))
             for batch_idx, (sample_names, inputs, targets) in tqdm(enumerate(test_data_loader)):
-                inputs = {k: v.to(self.device) for k, v in inputs.items()}
-                targets = {k: v.to(self.device) for k, v in targets.items()}
+                inputs = self.to_device(inputs)
+                targets = self.to_device(targets)
 
                 output = self.model(inputs)
 
@@ -235,7 +304,8 @@ class Trainer(BaseTrainer):
                         if output_label in self.config['test'] and \
                                 self.config['test'][output_label]['normalize_posteriors']:
                             # read the config file
-                            counts = load_counts(self.config['test'][output_label]['normalize_with_counts_from_file'])
+                            counts = load_counts(
+                                self.config['test'][output_label]['normalize_with_counts_from_file'])
                             out_save = out_save - np.log(counts / np.sum(counts))
 
                             # save the output
@@ -248,7 +318,7 @@ class Trainer(BaseTrainer):
 
                         #### Logging ####
                         _test_metrics = self._eval_metrics(output, targets)
-                        test_metrics = {metric: test_metrics[metric] + metric_value.item() for
+                        test_metrics = {metric: test_metrics[metric] + metric_value for
                                         metric, metric_value
                                         in _test_metrics.items()}
 
@@ -341,3 +411,9 @@ class Trainer(BaseTrainer):
             # TODO plotting curves
 
         return {'test_metrics': test_metrics, "decoding_results": decoding_results}
+
+    def to_device(self, data):
+        if isinstance(data, dict):
+            return {k: self.to_device(v) for k, v in data.items()}
+        else:
+            return data.to(self.device)

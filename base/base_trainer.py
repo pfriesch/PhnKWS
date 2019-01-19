@@ -78,15 +78,18 @@ class BaseTrainer:
         # Save configuration file into checkpoint directory:
         ensure_dir(self.checkpoint_dir)
         config_save_path = os.path.join(config['exp']['save_dir'], config['exp']['name'], 'config.json')
-        with open(config_save_path, 'w') as handle:
-            json.dump(config, handle, indent=4, sort_keys=False)
+        with open(config_save_path, 'w') as f:
+            json.dump(config, f, indent=4, sort_keys=False)
 
         if resume_path:
             self._resume_checkpoint(resume_path)
 
-        self.log_gpu_usage()
+        if nvidia_smi_enabled:
+            self.log_gpu_usage()
 
-        threading.Thread(target=lambda: every(1, self.log_gpu_usage, logger)).start()
+            self.stop_gpu_usage_logging = threading.Event()
+
+            threading.Thread(target=lambda: every(1, self.log_gpu_usage, logger, self.stop_gpu_usage_logging)).start()
 
     def log_gpu_usage(self):
         if nvidia_smi_enabled:
@@ -183,6 +186,7 @@ class BaseTrainer:
 
         result_eval = self._eval_epoch(epoch, global_step)
         logger.info(result_eval)
+        self.stop_gpu_usage_logging.set()
 
     def _train_epoch(self, epoch):
         """

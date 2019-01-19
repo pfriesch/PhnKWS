@@ -1,8 +1,8 @@
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence
 
-from nets.modules.CNN import CNN
-from nets.modules.MLP import MLP
+from modules.net_modules.CNN import CNN
+from modules.net_modules.MLP import MLP
 
 
 class TIMIT_CNN(nn.Module):

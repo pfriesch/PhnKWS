@@ -2,18 +2,17 @@ import time
 
 import torch
 
-from data.data_util import load_data, apply_context, make_big_chunk, get_order_by_length, collapse_alignment
+from data.data_util import get_order_by_length, load_data_unaligned, make_big_chunk
 
 
-class KaldiDatasetRemovedAlignment(object):
+class KaldiDatasetNoAlignment(object):
 
     def __init__(self, feature_dict, label_dict, context_left, context_right, max_sequence_length, tensorboard_logger,
                  debug=False, local=False):
         start_time = time.time()
         assert local == False
 
-        _feature_dict, _label_dict = load_data(feature_dict, label_dict, max_sequence_length,
-                                               context_left + context_right)
+        _feature_dict, _label_dict = load_data_unaligned(feature_dict, label_dict, max_sequence_length)
 
         if debug:
             for label_name in _label_dict:
@@ -23,14 +22,10 @@ class KaldiDatasetRemovedAlignment(object):
                 _feature_dict[feat_name] = dict(
                     sorted(list(_feature_dict[feat_name].items()), key=lambda x: x[0])[:30])
 
-        # TODO split files that are too long
-        _label_dict = apply_context(_label_dict, context_left, context_right)
-
-        #TODO collaps alignment
-        _label_dict = collapse_alignment(_label_dict)
+        # TODO handle context for ctc (padding) ?
 
         # TODO make multiple chunks if too big
-        sample_name, feature_chunks, label_chunks = make_big_chunk(_feature_dict, _label_dict)
+        sample_name, feature_chunks, label_chunks = make_big_chunk(_feature_dict, _label_dict, label_start_zero=False)
 
         self.ordering_length = get_order_by_length(_feature_dict)
 

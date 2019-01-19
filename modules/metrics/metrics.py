@@ -21,7 +21,7 @@ class LabMonoAccuracy(Module):
 
         accuracy = torch.mean((pred == lab).to(dtype=torch.float32))
 
-        return accuracy
+        return accuracy.item()
 
 
 class LabMonoError(Module):
@@ -42,7 +42,7 @@ class LabMonoError(Module):
 
         error = torch.mean((pred != lab).to(dtype=torch.float32))
 
-        return error
+        return error.item()
 
 
 class LabCDAccuracy(Module):
@@ -63,7 +63,7 @@ class LabCDAccuracy(Module):
 
         accuracy = torch.mean((pred == lab).to(dtype=torch.float32))
 
-        return accuracy
+        return accuracy.item()
 
 
 class LabCDError(Module):
@@ -84,4 +84,4 @@ class LabCDError(Module):
 
         error = torch.mean((pred != lab).to(dtype=torch.float32))
 
-        return error
+        return error.item()

@@ -2,8 +2,9 @@ import configparser
 import os.path
 import random
 import json
-
 import subprocess
+from collections import namedtuple
+
 import numpy as np
 import torch
 import matplotlib
@@ -111,26 +112,79 @@ def compute_avg_performance(info_lst):
     return [loss, error, time]
 
 
-def get_dataset_metadata(config):
-    train_dataset_lab = config['datasets'][config['data_use']['train_with']]['labels']
-    N_out_lab = {}
+PhoneMapping = namedtuple('PhoneMapping', ['all_phone_info', 'used_dict', 'id_mapping'])
 
-    for forward_out in config['test']:
-        normalize_with_counts_from = config['test'][forward_out]['normalize_with_counts_from']
-        assert 'label_opts' in train_dataset_lab[normalize_with_counts_from]
-        if config['test'][forward_out]['normalize_posteriors']:
-            # Try to automatically retrieve the config file
-            assert "ali-to-pdf" in train_dataset_lab[normalize_with_counts_from]['label_opts']
-            folder_lab_count = train_dataset_lab[normalize_with_counts_from]['label_folder']
-            cmd = "hmm-info " + folder_lab_count + "/final.mdl | awk '/pdfs/{print $4}'"
-            output = run_shell(cmd)
-            N_out = int(output.decode().rstrip())
-            N_out_lab[normalize_with_counts_from] = N_out
-            count_file_path = os.path.join(config['exp']['save_dir'], config['exp']['name'],
-                                           'exp_files/forward_' + forward_out + '_' + \
-                                           normalize_with_counts_from + '.count')
-            cmd = "analyze-counts --print-args=False --verbose=0 --binary=false --counts-dim=" + str(
-                N_out) + " \"ark:ali-to-pdf " + folder_lab_count + "/final.mdl \\\"ark:gunzip -c " + folder_lab_count + "/ali.*.gz |\\\" ark:- |\" " + count_file_path
-            run_shell(cmd)
-            config['test'][forward_out]['normalize_with_counts_from_file'] = count_file_path
-            config['arch']['args']['lab_cd_num'] = N_out
+
+def phn_mapping(phone_path, no_triphone=True, no_spoken_noise=True, no_silence=True, no_eps=True, start_idx=1):
+    phone_path = os.path.join(phone_path, "phones.txt")
+    with open(phone_path, "r") as f:
+        phones = f.readlines()
+
+    def map_phone(phn, _id):
+        if "#" in phn:
+            phn_used = None
+        elif no_silence and "SIL" in phn:
+            phn_used = None
+        elif no_spoken_noise and "SPN" in phn:
+            phn_used = None
+        elif no_eps and "<eps>" in phn:
+            phn_used = None
+        elif no_triphone:
+            phn_used = phn.split("_")[0]
+        else:
+            phn_used = phn
+        return phn, _id, phn_used
+
+    def convert_phn(p):
+        phn_str, phn_id = p.strip().split(" ")
+        return map_phone(phn_str, int(phn_id))
+
+    phn_all = [convert_phn(p) for p in phones]
+
+    seen = set()
+    seen_add = seen.add
+    phn_all_ordered_set = [phn_used for phn, _id, phn_used in phn_all
+                           if phn_used is not None and not (phn_used in seen or seen_add(phn_used))]
+
+    phn_used_dict = {phn: _id for _id, phn in enumerate(phn_all_ordered_set, start=start_idx)}
+
+    id_mapping = {id_true: phn_used_dict[phn_new] for phn_true, id_true, phn_new in phn_all if phn_new is not None}
+
+    return PhoneMapping(phn_all, phn_used_dict, id_mapping)
+
+
+def get_dataset_metadata(config):
+    if 'test' in config:
+        train_dataset_lab = config['datasets'][config['data_use']['train_with']]['labels']
+        N_out_lab = {}
+        for forward_out in config['test']:
+            normalize_with_counts_from = config['test'][forward_out]['normalize_with_counts_from']
+            assert 'label_opts' in train_dataset_lab[normalize_with_counts_from]
+            if config['test'][forward_out]['normalize_posteriors']:
+                # Try to automatically retrieve the config file
+                assert "ali-to-pdf" in train_dataset_lab[normalize_with_counts_from]['label_opts']
+                folder_lab_count = train_dataset_lab[normalize_with_counts_from]['label_folder']
+                cmd = "hmm-info " + folder_lab_count + "/final.mdl | awk '/pdfs/{print $4}'"
+                output = run_shell(cmd)
+                N_out = int(output.decode().rstrip())
+                N_out_lab[normalize_with_counts_from] = N_out
+                count_file_path = os.path.join(config['exp']['save_dir'], config['exp']['name'],
+                                               'exp_files/forward_' + forward_out + '_' + \
+                                               normalize_with_counts_from + '.count')
+                cmd = "analyze-counts --print-args=False --verbose=0 --binary=false --counts-dim=" + str(
+                    N_out) + " \"ark:ali-to-pdf " + folder_lab_count + "/final.mdl \\\"ark:gunzip -c " + folder_lab_count + "/ali.*.gz |\\\" ark:- |\" " + count_file_path
+                run_shell(cmd)
+                config['test'][forward_out]['normalize_with_counts_from_file'] = count_file_path
+                config['arch']['args']['lab_cd_num'] = N_out
+
+    _phn_mapping = {}
+    label_dict = config['datasets'][config['data_use']['train_with']]['labels']
+    for label_name in label_dict:
+        _phn_mapping[label_name] = phn_mapping(label_dict[label_name]['label_folder'],
+                                               no_triphone=True,
+                                               no_spoken_noise=True,
+                                               no_silence=True,
+                                               no_eps=True)
+    config['arch']['args']['phn_mapping'] = _phn_mapping
+    if config['arch']['framewise_labels']:
+        config['arch']['args']['lab_phn_num'] = len(_phn_mapping['lab_phn'].used_dict) + 1  # one for ctc blank symbol
