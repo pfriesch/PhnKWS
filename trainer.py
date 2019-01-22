@@ -12,6 +12,8 @@ from data import kaldi_io
 from data.data_util import load_counts
 from data.dataset_registry import get_dataset
 from data.kaldi_data_loader import KaldiDataLoader, KaldiChunkedDataLoader
+from data.speech_commands_dataset import SpeechCommandsDataset
+from kws_decoder import kws_decoder
 from utils.logger_config import logger
 from utils.utils import run_shell
 
@@ -34,7 +36,7 @@ class Trainer(BaseTrainer):
             self.tensorboard_logger.add_scalar(metric, acc_metrics[metric])
         return acc_metrics
 
-    def _train_epoch(self, epoch):
+    def _train_epoch(self, epoch, global_step):
         """
         Training logic for an epoch
 
@@ -199,10 +201,13 @@ class Trainer(BaseTrainer):
                                   valid_metrics}}
 
     def _eval_epoch(self, epoch, global_step):
+
         if 'test' in self.config:
-            return self._eval_epoch_kaldi_decode(epoch, global_step)
+            result_decode = self._eval_epoch_kaldi_decode(epoch, global_step)
         else:
-            return self._eval_epoch_ctc_decode(epoch, global_step)
+            result_decode = self._eval_epoch_ctc_decode(epoch, global_step)
+        result_kws = self._eval_kws(epoch, global_step)
+        return {"result_decode": result_decode, "result_kws": result_kws}
 
     def _eval_epoch_ctc_decode(self, epoch, global_step):
         self.model.eval()
@@ -428,3 +433,57 @@ class Trainer(BaseTrainer):
             return {k: self.to_device(v) for k, v in data.items()}
         else:
             return data.to(self.device)
+
+    def _eval_kws(self, epoch, global_step):
+        self.model.eval()
+        batch_size = 1  # TODO make bigger
+        max_seq_length = -1
+
+        kws_data = self.config['data_use']['kws_eval_with']
+        out_folder = os.path.join(self.config['exp']['save_dir'], self.config['exp']['name'])
+
+        kws_dataset = SpeechCommandsDataset(self.config['datasets'][kws_data]['features'],
+                                            self.config['datasets'][kws_data]['labels'],
+                                            self.config["kws_decoding"]["kw2phn_mapping"],
+                                            self.model.context_left,
+                                            self.model.context_right,
+                                            max_sequence_length=max_seq_length,
+                                            tensorboard_logger=self.tensorboard_logger,
+                                            debug=self.debug)
+
+        kws_data_loader = KaldiDataLoader(kws_dataset,
+                                          batch_size,
+                                          use_gpu=self.config["exp"]["n_gpu"] > 0,
+                                          prefetch_to_gpu=self.config['exp']['prefetch_to_gpu'] is not None,
+                                          device=self.device,
+                                          num_workers=0)
+
+        kws_metrics = {metric: 0 for metric in self.metrics}
+
+        with tqdm(total=len(kws_data_loader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
+            pbar.set_description('KWS e:{}  '.format(epoch))
+            for batch_idx, (sample_names, inputs, targets) in tqdm(enumerate(kws_data_loader)):
+                inputs = self.to_device(inputs)
+                targets = self.to_device(targets)
+
+                output = self.model(inputs)
+
+                kw = kws_decoder.decode_loggits(output, self.config["kws_decoding"]["kw2phn_mapping"])
+
+                #### Logging ####
+                test_metrics = {metric: test_metrics[metric] + metric_value for
+                                metric, metric_value
+                                in _eval_metrics.items()}
+                pbar.set_description(
+                    'E e:{} a: {:.4f} '.format(epoch, test_metrics[self.config['arch']['metrics'][0]]))
+                pbar.update()
+                #### /Logging ####
+
+        logger.critical("Done decoding... TODO implement with lm decoding")
+
+        self.tensorboard_logger.set_step(global_step, 'test')
+        for metric in test_metrics:
+            self.tensorboard_logger.add_scalar(metric, test_metrics[metric] / len(test_data_loader))
+
+        return {'test_metrics': {metric: test_metrics[metric] / len(test_data_loader) for metric in
+                                 test_metrics}}

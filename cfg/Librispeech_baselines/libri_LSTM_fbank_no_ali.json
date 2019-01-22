@@ -12,7 +12,8 @@
     //todo allow multiple inputs
     "train_with": "train_clean_100",
     "valid_with": "dev_clean",
-    "test_with": "test_clean"
+    "test_with": "test_clean",
+    "kws_eval_with": "google_speech_commands_dev"
   },
   "datasets": {
     "train_clean_100": {
@@ -22,7 +23,7 @@
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/librispeech/s5/data/train_clean_100/utt2spk  ark:/mnt/data/libs/kaldi/egs/librispeech/s5/fbank/cmvn_train_clean_100.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
           "cw_left": 0,
           "cw_right": 0,
-          "n_chunks": 10
+          "n_chunks": 5
         }
       },
       "labels": {
@@ -43,7 +44,7 @@
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/librispeech/s5/data/dev_clean/utt2spk  ark:/mnt/data/libs/kaldi/egs/librispeech/s5/fbank/cmvn_dev_clean.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
           "cw_left": 0,
           "cw_right": 0,
-          "n_chunks": 2
+          "n_chunks": 1
         }
       },
       "labels": {
@@ -64,7 +65,7 @@
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/librispeech/s5/data/test_clean/utt2spk  ark:/mnt/data/libs/kaldi/egs/librispeech/s5/fbank/cmvn_test_clean.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
           "cw_left": 0,
           "cw_right": 0,
-          "n_chunks": 2
+          "n_chunks": 1
         }
       },
       "labels": {
@@ -79,22 +80,36 @@
       }
     }
   },
-  //    "google_speech_commands_test": {
-  //      "features": {
-  //        "fbank": {
-  //          "feature_lst_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/feats_fbank.scp",
-  //          "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/fbank_kws/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-  //          "cw_left": 0,
-  //          "cw_right": 0
-  //        }
-  //      },
-  //      "labels": {
-  //        "lab_text": {
-  //          "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
-  //        }
-  //      }
-  //    }
-  //  },
+  "google_speech_commands_dev": {
+    "features": {
+      "fbank": {
+        "feature_lst_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/dev/feats.scp",
+        "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/fbank/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
+        "cw_left": 0,
+        "cw_right": 0
+      }
+    },
+    "labels": {
+      "lab_text": {
+        "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
+      }
+    }
+  },
+  "google_speech_commands_test": {
+    "features": {
+      "fbank": {
+        "feature_lst_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/feats.scp",
+        "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/fbank/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
+        "cw_left": 0,
+        "cw_right": 0
+      }
+    },
+    "labels": {
+      "lab_text": {
+        "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
+      }
+    }
+  },
   "training": {
     "batch_size_train": 8,
     "max_seq_length_train": 10000,

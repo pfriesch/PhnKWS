@@ -80,3 +80,4 @@ class Timer:
                 logger.add_scalar(self.name, self.interval, global_step=self.global_step)
             elif isinstance(logger, Logger):
                 logger.debug("{} took {:.5f}s".format(self.name, self.interval))
+

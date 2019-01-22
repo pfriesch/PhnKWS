@@ -31,12 +31,12 @@ class KaldiDatasetFramewise(object):
                         _feature_dict[feat_name] = dict(
                             sorted(list(_feature_dict[feat_name].items()), key=lambda x: x[0])[:30])
 
-                _label_dict = apply_context(_label_dict, context_left, context_right)
+                _feature_dict, _label_dict = apply_context(_feature_dict, _label_dict, context_left, context_right)
 
                 # TODO make multiple chunks if too big
                 sample_name, feature_chunks, label_chunks = make_big_chunk(_feature_dict, _label_dict)
 
-                self.ordering_length = get_order_by_length(_feature_dict)
+                # self.ordering_length = get_order_by_length(_feature_dict)
 
                 self.feature_chunks = {feat_name: torch.from_numpy(feature_chunks[feat_name]).float()
                                        for feat_name, v in feature_chunks.items()}

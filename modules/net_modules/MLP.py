@@ -19,6 +19,7 @@ class MLP(nn.Module):
         self.dnn_use_batchnorm_inp = dnn_use_batchnorm_inp
         self.dnn_act = dnn_act
 
+        assert isinstance(self.input_dim, int)
         assert [isinstance(elem, int) for elem in self.dnn_lay]
         assert [isinstance(elem, float) for elem in self.dnn_drop]
         assert [isinstance(elem, bool) for elem in self.dnn_use_batchnorm]

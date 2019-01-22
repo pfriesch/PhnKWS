@@ -1,18 +1,19 @@
 {
   "exp": {
     "save_dir": "exp",
-    "out_folder": "TIMIT_CNN_fbank",
+    "name": "TIMIT_CNN_fbank",
     "seed": 2234,
     "n_gpu": 0,
     "prefetch_to_gpu": false,
-    "n_epochs_tr": 24,
+    "n_epochs_tr": 1,
     "save_period": 1
   },
   "data_use": {
     //todo allow multiple inputs
     "train_with": "TIMIT_tr",
     "valid_with": "TIMIT_dev",
-    "test_with": "TIMIT_test"
+    "test_with": "TIMIT_test",
+    "kws_eval_with": "google_speech_commands_dev"
   },
   "datasets": {
     "TIMIT_tr": {
@@ -20,8 +21,7 @@
         "fbank": {
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/feats_fbank.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/train/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_train.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-          "cw_left": 5,
-          "cw_right": 5
+          "n_chunks": 5
         }
       },
       "labels": {
@@ -29,6 +29,13 @@
           "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
           "label_opts": "ali-to-pdf",
           "lab_count_file": "auto",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        },
+        "lab_mono": {
+          "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
+          "label_opts": "ali-to-phones --per-frame=true",
+          "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
@@ -39,8 +46,7 @@
         "fbank": {
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/feats_fbank.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-          "cw_left": 5,
-          "cw_right": 5
+          "n_chunks": 1
         }
       },
       "labels": {
@@ -48,6 +54,13 @@
           "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
           "label_opts": "ali-to-pdf",
           "lab_count_file": "auto",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        },
+        "lab_mono": {
+          "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
+          "label_opts": "ali-to-phones --per-frame=true",
+          "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
@@ -58,8 +71,7 @@
         "fbank": {
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/feats_fbank.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-          "cw_left": 5,
-          "cw_right": 5
+          "n_chunks": 1
         }
       },
       "labels": {
@@ -69,26 +81,43 @@
           "lab_count_file": "auto",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        },
+        "lab_mono": {
+          "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
+          "label_opts": "ali-to-phones --per-frame=true",
+          "lab_count_file": "none",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
       }
     }
   },
-  //    "google_speech_commands_test": {
-  //      "features": {
-  //        "mfcc": {
-  //          "feature_lst_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/feats.scp",
-  //          "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/mfcc_kws/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=2 ark:- ark:- |",
-  //          "cw_left": 0,
-  //          "cw_right": 0
-  //        }
-  //      },
-  //      "labels": {
-  //        "lab_text": {
-  //          "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
-  //        }
-  //      }
-  //    }
-  //  },
+  "google_speech_commands_dev": {
+    "features": {
+      "fbank": {
+        "feature_lst_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/dev/feats.scp",
+        "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/fbank/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |"
+      }
+    },
+    "labels": {
+      "lab_text": {
+        "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
+      }
+    }
+  },
+  "google_speech_commands_test": {
+    "features": {
+      "fbank": {
+        "feature_lst_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/feats.scp",
+        "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/fbank/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |"
+      }
+    },
+    "labels": {
+      "lab_text": {
+        "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
+      }
+    }
+  },
   "training": {
     "batch_size_train": 128,
     "max_seq_length_train": 1000,
@@ -97,11 +126,12 @@
     "multply_factor_seq_len_train": 2,
     "batch_size_valid": 128,
     "max_seq_length_valid": 1000,
+    "sort_by_feat": "fbank",
     "clip_grad_norm": -1,
     "optimizer": {
-      "type": "sgd",
+      "type": "adam",
       "args": {
-        "lr": 0.08
+        "lr": 0.0008
       }
     },
     "lr_scheduler": {
@@ -110,16 +140,26 @@
     }
   },
   "arch": {
-    "name": "TIMIT_CNN",
+    "name": "CNN_cd_mono",
+    "framewise_labels": true,
     "args": {
-      "fea_index_length": 39
+      "input_feat_length": 40,
+      "input_feat_name": "fbank",
+      "lab_mono_num": 48,
+      "cw_left": 5,
+      "cw_right": 5
     },
     "loss": {
-      "name": "lab_cd"
+      "name": "mtl_mono_cd",
+      "args": {
+        "weight_mono": 1.0
+      }
     },
     "metrics": [
       "acc_lab_cd",
-      "err_lab_cd"
+      "err_lab_cd",
+      "acc_lab_mono",
+      "err_lab_mono"
     ]
   },
   "test": {
@@ -145,5 +185,7 @@
     "scoring_script": "local/score.sh",
     "scoring_opts": "\"--min-lmwt 1 --max-lmwt 10\"",
     "norm_vars": false
+  },
+  "kws_decoding": {
   }
 }

@@ -179,6 +179,10 @@ def get_dataset_metadata(config):
                 config['test'][forward_out]['normalize_with_counts_from_file'] = count_file_path
                 config['arch']['args']['lab_cd_num'] = N_out
 
+    kw2phn_mapping = make_timit_kws_labels()
+
+    config["kws_decoding"]["kw2phn_mapping"] = kw2phn_mapping
+
     _phn_mapping = {}
     label_dict = config['datasets'][config['data_use']['train_with']]['labels']
     for label_name in label_dict:
@@ -193,3 +197,115 @@ def get_dataset_metadata(config):
         config['arch']['args']['lab_phn_num'] = len(_phn_mapping['lab_phn']['used_dict']) + 1
 
     return config
+
+
+timit_kw2phn_mapping = \
+    {'follow': "f aa1 l ow2",
+     'eight': "ey1 t",
+     'zero': None,
+     'three': "th r iy1",
+     'five': " f ay1 v",
+     'right': "r ay1 t",
+     'marvin': "m aa1 r v ix n",  # added by hand not in dict
+     'no': "n ow1",
+     'forward': "f ao1 r w axr d",
+     'four': "f ao1 r",
+     'learn': "l er1 n",
+     'on': " ao1 n",
+     'six': "s ih1 k s",
+     'seven': "s eh1 v ax n",
+     'happy': "hh ae1 p iy",
+     'house': "hh aw1 s",
+     'left': "l eh1 f t",
+     'bird': "b er1 d",
+     'up': "ah1 p",
+     'one': "w ah1 n",
+     'backward': "b ae1 k w er d z",
+     'tree': "t r iy1",
+     'stop': "s t aa1 p",
+     'sheila': "sh iy1 l ax",
+     'down': "d aw1 n",
+     'yes': " y eh1 s",
+     'off': "ao1 f",
+     'wow': None,
+     'bed': "b eh1 d",
+     'cat': "k ae1 t",
+     'visual': "v ih1 zh uw el",
+     'two': "t uw1",
+     'go': "g ow1",
+     'dog': "d ao1 g",
+     'nine': "n ay1 n"}
+
+timit_phones = {
+    # "<eps>": 0,
+    "sil": 1,
+    "aa": 2,
+    "ae": 3,
+    "ah": 4,
+    "ao": 5,
+    "aw": 6,
+    "ax": 7,
+    "ay": 8,
+    "b": 9,
+    "ch": 10,
+    "cl": 11,
+    "d": 12,
+    "dh": 13,
+    "dx": 14,
+    "eh": 15,
+    "el": 16,
+    "en": 17,
+    "epi": 18,
+    "er": 19,
+    "ey": 20,
+    "f": 21,
+    "g": 22,
+    "hh": 23,
+    "ih": 24,
+    "ix": 25,
+    "iy": 26,
+    "jh": 27,
+    "k": 28,
+    "l": 29,
+    "m": 30,
+    "n": 31,
+    "ng": 32,
+    "ow": 33,
+    "oy": 34,
+    "p": 35,
+    "r": 36,
+    "s": 37,
+    "sh": 38,
+    "t": 39,
+    "th": 40,
+    "uh": 41,
+    "uw": 42,
+    "v": 43,
+    "vcl": 44,
+    "w": 45,
+    "y": 46,
+    "z": 47,
+    "zh": 48,
+    # "#0": 49,
+    # "#1": 50,
+}
+
+
+def make_timit_kws_labels():
+    res = {}
+
+    def filter_phn(phn):
+        phn = ''.join(i for i in phn if not i.isdigit())
+        if phn == "axr":
+            return "ax"
+        else:
+            return phn
+
+    for text, phn in timit_kw2phn_mapping.items():
+        if phn is not None:
+            phn_no_num = [filter_phn(p) for p in phn.split(" ") if p is not '']
+            phn_ids = [timit_phones[p] for p in phn_no_num]
+            res[text] = {"phn_raw": phn, "phn_no_num": phn_no_num, "phn_ids": phn_ids}
+        else:
+            print("missing phones for {}, skipping...".format(text))
+    return res

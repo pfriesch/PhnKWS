@@ -25,19 +25,20 @@ def collate_fn_rnd_zero_pad(sample_list):
 
     sample_names = []
 
-    fea_dict = {k: torch.zeros(max_length, batch_size, sample_list[0][1][k].shape[1]) for k in fea_keys}
+    fea_dict = {k: torch.zeros([max_length, batch_size] + list(sample_list[0][1][k].shape[1:])) for k in fea_keys}
     lab_dict = {k: torch.zeros(max_length, batch_size, dtype=torch.int64) for k in lab_keys}
     for _idx, sample in enumerate(sample_list):
-        _len = sample[1][fea_keys[0]].shape[0]
+        _len_feat = sample[1][fea_keys[0]].shape[0]
+        _len_lab = sample[2][lab_keys[0]].shape[0]
 
-        padding_zeros = max_length - _len
+        padding_zeros = max_length - _len_feat
         padding_zeros_left = random.randint(0, padding_zeros)
 
         sample_names.append(sample[0])
         for fea in fea_dict:
-            fea_dict[fea][padding_zeros_left: padding_zeros_left + _len, _idx, :] = sample[1][fea]
+            fea_dict[fea][padding_zeros_left: padding_zeros_left + _len_feat, _idx, :, :] = sample[1][fea]
         for lab in lab_dict:
-            lab_dict[lab][padding_zeros_left: padding_zeros_left + _len, _idx] = sample[2][lab]
+            lab_dict[lab][padding_zeros_left: padding_zeros_left + _len_lab, _idx] = sample[2][lab]
 
     return sample_names, fea_dict, lab_dict
 

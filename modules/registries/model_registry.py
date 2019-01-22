@@ -1,3 +1,4 @@
+from modules.networks.CNN_cd_mono import CNN_cd_mono
 from modules.networks.LSTM_cd_mono import LSTM_cd_mono
 from modules.networks.LSTM_phn import LSTM_phn
 
@@ -15,6 +16,14 @@ def model_init(config):
         net = LSTM_phn(input_feat_length=config['arch']['args']['input_feat_length'],
                        input_feat_name=config['arch']['args']['input_feat_name'],
                        lab_phn_num=config['arch']['args']['lab_phn_num'])
+
+    elif arch_name == "CNN_cd_mono":
+        net = CNN_cd_mono(input_feat_length=config['arch']['args']['input_feat_length'],
+                          context_left=config['arch']['args']['cw_left'],
+                          context_right=config['arch']['args']['cw_right'],
+                          input_feat_name=config['arch']['args']['input_feat_name'],
+                          lab_cd_num=config['arch']['args']['lab_cd_num'],
+                          lab_mono_num=config['arch']['args']['lab_mono_num'])
     else:
         raise ValueError("Can't find the arch {}".format(arch_name))
 

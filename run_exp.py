@@ -16,6 +16,12 @@ from utils.utils import check_environment, read_json
 from utils.utils import get_dataset_metadata
 
 
+def check_config():
+    # TODO  check   "sort_by_feat": "fbank", is actual feat
+
+    pass
+
+
 def setup_run(config):
     set_seed(config['exp']['seed'])
     config = get_dataset_metadata(config)
@@ -39,6 +45,7 @@ def setup_run(config):
 
 def main(config_path, resume_path, debug, local):
     config = read_json(config_path)
+    check_config()
 
     if not local:
         check_environment()

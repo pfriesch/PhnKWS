@@ -1,3 +1,4 @@
+import itertools
 import json
 import os
 import random
@@ -211,8 +212,9 @@ def load_data_unaligned(feature_dict, label_dict, phn_mapping, max_sequence_leng
     return features_loaded, labels_loaded
 
 
-def load_features(feature_dict):
+def load_kws(feature_dict, label_dict, kw2phn_mapping):
     features_loaded = {}
+    labels_loaded = {}
 
     for feature_name in feature_dict:
         feature_lst_path = feature_dict[feature_name]['feature_lst_path']
@@ -223,7 +225,31 @@ def load_features(feature_dict):
              kaldi_io.read_mat_ark('ark:copy-feats scp:{} ark:- |{}'.format(feature_lst_path, feature_opts))}
         assert len(features_loaded[feature_name]) > 0
 
-    return features_loaded
+    for label_name in label_dict:
+        text_file = label_dict[label_name]['text_file']
+        with open(text_file, "r") as f:
+            lines = f.readlines()
+
+        labels_loaded[label_name] = \
+            {filenames: kw2phn_mapping[text]['phn_ids']
+             for filenames, text in
+             [l.strip().split(" ") for l in lines] if text in kw2phn_mapping}
+
+    all_files = set(itertools.chain.from_iterable(
+        [set(labels_loaded[l]) for l in labels_loaded] + [set(features_loaded[f]) for f in features_loaded]))
+    all_files_intersect = set.intersection(
+        *[set(labels_loaded[l]) for l in labels_loaded] + [set(features_loaded[f]) for f in features_loaded])
+    print("removed {} files because of missing labels".format(len(all_files) - len(all_files_intersect)))
+    for feature_name in feature_dict:
+        features_loaded[feature_name] = {filename: features_loaded[feature_name][filename]
+                                         for filename in features_loaded[feature_name]
+                                         if filename in all_files_intersect}
+    for label_name in label_dict:
+        labels_loaded[label_name] = {filename: labels_loaded[label_name][filename]
+                                     for filename in labels_loaded[label_name]
+                                     if filename in all_files_intersect}
+
+    return features_loaded, labels_loaded
 
 
 def load_data(feature_dict, label_dict, max_sequence_length, context_size, tensorboard_logger=None):
@@ -331,12 +357,48 @@ def get_order_by_length(feature_dict):
     return ordering_length
 
 
-def apply_context(label_dict, context_left, context_right):
+def apply_context(feature_dict, label_dict, context_left, context_right):
+    """
+    Remove labels left and right to account for the needed context.
+    """
     for label_name in label_dict:
         for filename in label_dict[label_name]:
             label_dict[label_name][filename] = label_dict[label_name][filename][
                                                context_left:len(label_dict[label_name][filename]) - context_right]
-    return label_dict
+
+    with Timer("naive", [logger]):
+
+        feature_dict_context = {}
+        for feature_name in feature_dict:
+            feature_dict_context[feature_name] = {}
+            for filename in feature_dict[feature_name]:
+                file_tensor = feature_dict[feature_name][filename]
+                length, num_feats = file_tensor.shape
+                feature_dict_context[feature_name][filename] = \
+                    np.empty((length - context_left - context_right, context_left + context_right + 1, num_feats))
+                for i in range(context_left, length - context_right):
+                    feature_dict_context[feature_name][filename][i - context_left, :, :] = \
+                        file_tensor[i - context_left:i + context_right + 1, :]
+
+    # with Timer("roll", [logger]): # 30% faster but harder to reason about
+    #
+    #     feature_dict_context = {}
+    #     for feature_name in feature_dict:
+    #         feature_dict_context[feature_name] = {}
+    #         for filename in feature_dict[feature_name]:
+    #             file_tensor = feature_dict[feature_name][filename]
+    #             length, num_feats = file_tensor.shape
+    #
+    #             fea_conc = np.empty([length, num_feats * (context_left + context_right + 1)])
+    #
+    #             index_fea = 0
+    #             for lag in range(-context_left, context_right + 1):
+    #                 fea_conc[:, index_fea:index_fea + num_feats] = np.roll(file_tensor, lag, axis=0)
+    #                 index_fea = index_fea + num_feats
+    #
+    #             fea_conc = fea_conc[context_left:fea_conc.shape[0] - context_right]
+
+    return feature_dict_context, label_dict
 
 
 def make_big_chunk(feature_dict, label_dict, normalize_feat=True, label_start_zero=True):
@@ -390,6 +452,9 @@ def make_big_chunk(feature_dict, label_dict, normalize_feat=True, label_start_ze
     if label_dict is not None:
         if label_start_zero:
             for label_name in label_dict:
+                # TODO this smells!!!!
+                logger.debug(
+                    "TODO this smells!!!! what if the lower labels are just missing, fix with proper first index from config")
                 label_chunks[label_name] = label_chunks[label_name] - label_chunks[label_name].min()
         else:
             for label_name in label_dict:

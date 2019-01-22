@@ -38,7 +38,7 @@ class TIMIT_MLP(nn.Module):
         self.context_right = 0
 
     def forward(self, x):
-        x = x['mfcc']
+        x = x[self.input_feat_name]
 
         max_len = x.shape[0]
         batch_size = x.shape[1]

@@ -12,7 +12,8 @@
     //todo allow multiple inputs
     "train_with": "TIMIT_tr",
     "valid_with": "TIMIT_dev",
-    "test_with": "TIMIT_test"
+    "test_with": "TIMIT_test",
+    "kws_eval_with": "google_speech_commands_dev"
   },
   "datasets": {
     "TIMIT_tr": {
@@ -94,22 +95,36 @@
       }
     }
   },
-  //    "google_speech_commands_test": {
-  //      "features": {
-  //        "mfcc": {
-  //          "feature_lst_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/feats.scp",
-  //          "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/mfcc_kws/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=2 ark:- ark:- |",
-  //          "cw_left": 0,
-  //          "cw_right": 0
-  //        }
-  //      },
-  //      "labels": {
-  //        "lab_text": {
-  //          "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
-  //        }
-  //      }
-  //    }
-  //  },
+  "google_speech_commands_dev": {
+    "features": {
+      "fbank": {
+        "feature_lst_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/dev/feats.scp",
+        "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/fbank/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
+        "cw_left": 0,
+        "cw_right": 0
+      }
+    },
+    "labels": {
+      "lab_text": {
+        "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
+      }
+    }
+  },
+  "google_speech_commands_test": {
+    "features": {
+      "fbank": {
+        "feature_lst_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/feats.scp",
+        "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/fbank/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
+        "cw_left": 0,
+        "cw_right": 0
+      }
+    },
+    "labels": {
+      "lab_text": {
+        "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
+      }
+    }
+  },
   "training": {
     "batch_size_train": 8,
     "max_seq_length_train": 1000,
@@ -133,10 +148,11 @@
   },
   "arch": {
     "name": "LSTM_cd_mono",
+    "framewise_labels": true,
     "args": {
       "input_feat_length": 40,
       "input_feat_name": "fbank",
-      "lab_mon_num": 48
+      "lab_mono_num": 48
     },
     "loss": {
       "name": "mtl_mono_cd",

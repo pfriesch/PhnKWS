@@ -27,7 +27,7 @@ class TIMIT_CNN(nn.Module):
                               dnn_use_batchnorm_inp=False,
                               dnn_use_batchnorm=[True, True, True, True, False],
                               dnn_use_laynorm=[False, False, False, False, False],
-                              dnn_act=["relu", "relu", "relu", "relu", "softmax"])
+                              dnn_act=['relu', 'relu', 'relu', 'relu', 'softmax'])
 
         self.context_left = 0
         self.context_right = 0
@@ -38,11 +38,6 @@ class TIMIT_CNN(nn.Module):
         if isinstance(out_dnn, PackedSequence):
             # Padd with zeros
             out_dnn, sequence_lengths = pad_packed_sequence(out_dnn)
-
-        max_len = x.shape[0]
-        batch_size = x.shape[1]
-        out_dnn = out_dnn.view(max_len * batch_size, -1)
-
         out_cd = self.mlp_lab_cd(out_dnn)
         out_mono = self.mlp_lab_mono(out_dnn)
-        return {"out_cd": out_cd, "out_mono": out_mono}
+        return {'out_cd': out_cd, 'out_mono': out_mono, 'out_dnn': out_dnn}

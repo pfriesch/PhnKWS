@@ -128,7 +128,7 @@ class BaseTrainer:
             logger.info('----- Epoch {} / {} -----'.format(format(epoch, "03d"), format(self.epochs, "03d")))
 
             with Timer("elapsed_time_epoch", [self.tensorboard_logger, logger], global_step) as t:
-                result_log, global_step = self._train_epoch(epoch)
+                result_log, global_step = self._train_epoch(epoch, global_step)
             self.tensorboard_logger.set_step(global_step, 'train')
 
             for lr_scheduler_name in self.lr_schedulers:
@@ -187,7 +187,7 @@ class BaseTrainer:
         if nvidia_smi_enabled:
             self.stop_gpu_usage_logging.set()
 
-    def _train_epoch(self, epoch):
+    def _train_epoch(self, epoch, global_step):
         """
         Training logic for an epoch
 
