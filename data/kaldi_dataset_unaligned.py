@@ -35,8 +35,7 @@ class KaldiDatasetUnaligned(object):
             assert context_left == 0 and context_right == 0
 
             # TODO make multiple chunks if too big
-            sample_name, feature_chunks, label_chunks = make_big_chunk(_feature_dict, _label_dict,
-                                                                       label_start_zero=False)
+            sample_name, feature_chunks, label_chunks = make_big_chunk(_feature_dict, _label_dict)
 
             self.ordering_length = get_order_by_length(_feature_dict)
 

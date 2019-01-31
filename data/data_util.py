@@ -401,7 +401,7 @@ def apply_context(feature_dict, label_dict, context_left, context_right):
     return feature_dict_context, label_dict
 
 
-def make_big_chunk(feature_dict, label_dict, normalize_feat=True, label_start_zero=True):
+def make_big_chunk(feature_dict, label_dict, normalize_feat=True):
     sample_name = {k: {'features': {}, 'labels': {}} for k in feature_dict[list(feature_dict.keys())[0]].keys()}
     feature_chunks = {}
     label_chunks = {}
@@ -450,17 +450,9 @@ def make_big_chunk(feature_dict, label_dict, normalize_feat=True, label_start_ze
             #                           lab_dict[lab][filename])
 
     if label_dict is not None:
-        if label_start_zero:
-            for label_name in label_dict:
-                # TODO this smells!!!!
-                logger.debug(
-                    "TODO this smells!!!! what if the lower labels are just missing, fix with proper first index from config")
-                label_chunks[label_name] = label_chunks[label_name] - label_chunks[label_name].min()
-        else:
-            for label_name in label_dict:
-                # No zero label e.g. for ctc loss with blank label at 0
-                if label_chunks[label_name].min() == 0:
-                    label_chunks[label_name] = label_chunks[label_name] + 1
+        for label_name in label_dict:
+            # Adding 1 to use 0 padding for framewise or 0 as blank with ctc
+            label_chunks[label_name] = label_chunks[label_name] + 1
 
     if normalize_feat:
         for feature_name in feature_dict:

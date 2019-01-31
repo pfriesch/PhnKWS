@@ -17,6 +17,16 @@ class MtlMonoCDLoss(nn.Module):
         len = target['lab_cd'].shape[0]
         batch_size = target['lab_cd'].shape[1]
 
+        num_cd = output['out_cd'].shape[2]
+        cd_min = target['lab_cd'].view(-1).min()
+        cd_max = target['lab_cd'].view(-1).max()
+
+        assert 0 <= cd_min and cd_max < num_cd
+        num_mono = output['out_mono'].shape[2]
+        mono_min = target['lab_mono'].view(-1).min()
+        mono_max = target['lab_mono'].view(-1).max()
+        assert 0 <= mono_min and mono_max < num_mono
+
         loss_cd = F.nll_loss(output['out_cd'].view(len * batch_size, -1),
                              target['lab_cd'].view(-1),
                              ignore_index=ignore_index)

@@ -20,8 +20,8 @@ class LayerNorm(nn.Module):
 
     def forward(self, x):
         mean = x.mean(-1, keepdim=True)
-        std = x.std(-1, keepdim=True)
-        return self.gamma * (x - mean) / (std + self.eps) + self.beta
+        std = (x + self.eps).std(-1, keepdim=True)
+        return self.gamma * (x - mean) / (std) + self.beta
 
 
 def act_fun(act_type):
@@ -41,10 +41,10 @@ def act_fun(act_type):
         return nn.ELU()
 
     elif act_type == "softmax":
-        return nn.LogSoftmax(dim=1)  # TODO fix this ambiguity
+        return nn.LogSoftmax(dim=-1)  # TODO fix this ambiguity
 
     elif act_type == "log_softmax":
-        return nn.LogSoftmax(dim=1)
+        return nn.LogSoftmax(dim=-1)
 
     elif act_type == "linear":
         return nn.LeakyReLU(1)  # initializzed like this, but not used in forward!

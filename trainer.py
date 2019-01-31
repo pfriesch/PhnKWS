@@ -12,7 +12,6 @@ from data import kaldi_io
 from data.data_util import load_counts
 from data.dataset_registry import get_dataset
 from data.kaldi_data_loader import KaldiDataLoader, KaldiChunkedDataLoader
-from data.speech_commands_dataset import SpeechCommandsDataset
 from kws_decoder import kws_decoder
 from utils.logger_config import logger
 from utils.utils import run_shell
@@ -92,9 +91,11 @@ class Trainer(BaseTrainer):
 
                 for opti in self.optimizers.values():
                     opti.zero_grad()
-                output = self.model(inputs)
-                loss = self.loss(output, targets)
-                loss["loss_final"].backward()
+
+                with torch.autograd.detect_anomaly():
+                    output = self.model(inputs)
+                    loss = self.loss(output, targets)
+                    loss["loss_final"].backward()
 
                 if self.config['training']['clip_grad_norm'] > 0:
                     trainable_params = filter(lambda p: p.requires_grad, self.model.parameters())
@@ -316,6 +317,8 @@ class Trainer(BaseTrainer):
                     if output_label in self.config['test'].keys():
 
                         out_save = output[output_label].data.cpu().numpy()
+                        if len(out_save.shape) == 3 and out_save.shape[0] == 1:
+                            out_save = out_save.squeeze(0)
 
                         if output_label in self.config['test'] and \
                                 self.config['test'][output_label]['normalize_posteriors']:

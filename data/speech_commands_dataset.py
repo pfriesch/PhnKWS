@@ -6,7 +6,7 @@ from utils.util import Timer
 from utils.utils import make_timit_kws_labels
 
 
-class SpeechCommandsDataset(object):
+class KeywordDataset(object):
 
     def __init__(self, fea_dict,
                  label_dict,
@@ -36,8 +36,7 @@ class SpeechCommandsDataset(object):
             assert context_left == 0 and context_right == 0
 
             # TODO make multiple chunks if too big
-            sample_name, feature_chunks, label_chunks = make_big_chunk(_feature_dict, _label_dict,
-                                                                       label_start_zero=False)
+            sample_name, feature_chunks, label_chunks = make_big_chunk(_feature_dict, _label_dict)
 
             self.ordering_length = get_order_by_length(_feature_dict)
 
@@ -94,7 +93,7 @@ class SpeechCommandsDataset(object):
 if __name__ == '__main__':
     kw2phn_mapping = make_timit_kws_labels()
 
-    dataset = SpeechCommandsDataset(
+    dataset = KeywordDataset(
         fea_dict={
             "fbank": {
                 "feature_lst_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/dev/feats.scp",

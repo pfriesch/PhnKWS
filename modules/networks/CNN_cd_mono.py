@@ -1,7 +1,4 @@
-from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence
-
 from base.base_model import BaseModel
-# from modules.net_modules.CNN_new import CNN
 from modules.net_modules.CNN import CNN
 from modules.net_modules.MLP import MLP
 
@@ -12,7 +9,10 @@ class CNN_cd_mono(BaseModel):
 
         self.context_left = context_left
         self.context_right = context_right
+        lab_cd_num += 2
+        lab_mono_num += 2
 
+        #
         self.cnn = CNN(input_feat_length,
                        self.context_left + self.context_right,
                        N_filters=[80, 60, 60],
@@ -33,6 +33,27 @@ class CNN_cd_mono(BaseModel):
                        dnn_use_batchnorm=[True, True, True, True],
                        dnn_use_laynorm=[False, False, False, False],
                        dnn_act=['relu', 'relu', 'relu', 'relu'])
+
+        # self.cnn = CNN(input_feat_length,
+        #                self.context_left + self.context_right,
+        #                N_filters=[80, 60],
+        #                kernel_sizes=[10, 3],
+        #                max_pool_len=[3, 1],
+        #                use_laynorm_inp=False,
+        #                use_batchnorm_inp=False,
+        #                use_laynorm=[True, True],
+        #                use_batchnorm=[False, False],
+        #                activation=['relu', 'relu'],
+        #                dropout=[0.15, 0.15])
+
+        # self.mlp = MLP(self.cnn.out_dim,
+        #                dnn_lay=[1024],
+        #                dnn_drop=[0.10],
+        #                dnn_use_laynorm_inp=False,
+        #                dnn_use_batchnorm_inp=False,
+        #                dnn_use_batchnorm=[True],
+        #                dnn_use_laynorm=[False],
+        #                dnn_act=['relu'])
 
         self.mlp_lab_cd = MLP(self.mlp.out_dim,
                               dnn_lay=[lab_cd_num],
@@ -68,13 +89,16 @@ class CNN_cd_mono(BaseModel):
 
         x = x[self.input_feat_name]
         out_dnn = self.cnn(x)
-        if isinstance(out_dnn, PackedSequence):
-            # Padd with zeros
-            out_dnn, sequence_lengths = pad_packed_sequence(out_dnn)
+        # if isinstance(out_dnn, PackedSequence):
+        #     # Padd with zeros
+        #     out_dnn, sequence_lengths = pad_packed_sequence(out_dnn)
 
         max_len = x.shape[0]
+        assert max_len == out_dnn.shape[0]
         batch_size = x.shape[1]
-        out_dnn = out_dnn.view(max_len * batch_size, -1)
+        assert batch_size == out_dnn.shape[1]
+        out_dnn = out_dnn.reshape(max_len, batch_size, -1)
+        # out_dnn = out_dnn.reshape(batch * seq_len, -1)
 
         out_mlp = self.mlp(out_dnn)
 
