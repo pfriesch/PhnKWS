@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from modules.net_modules.MLP import MLP
+from _nn.net_modules.MLP import MLP
 
 
 class TIMIT_MLP(nn.Module):

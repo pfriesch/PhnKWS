@@ -1,6 +1,6 @@
-from modules.networks.CNN_cd_mono import CNN_cd_mono
-from modules.networks.LSTM_cd_mono import LSTM_cd_mono
-from modules.networks.LSTM_phn import LSTM_phn
+from _nn.networks.CNN_cd_mono import CNN_cd_mono
+from _nn.networks.LSTM_cd_mono import LSTM_cd_mono
+from _nn.networks.LSTM_phn import LSTM_phn
 
 
 def model_init(config):

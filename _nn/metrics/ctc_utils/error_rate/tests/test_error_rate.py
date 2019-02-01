@@ -3,7 +3,7 @@
 
 import unittest
 
-from modules.metrics.ctc_utils.utils import error_rate
+from _nn.metrics.ctc_utils.utils import error_rate
 
 
 class TestParse(unittest.TestCase):

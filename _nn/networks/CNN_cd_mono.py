@@ -1,6 +1,6 @@
 from base.base_model import BaseModel
-from modules.net_modules.CNN import CNN
-from modules.net_modules.MLP import MLP
+from _nn.net_modules.CNN import CNN
+from _nn.net_modules.MLP import MLP
 
 
 class CNN_cd_mono(BaseModel):
@@ -14,25 +14,23 @@ class CNN_cd_mono(BaseModel):
 
         #
         self.cnn = CNN(input_feat_length,
-                       self.context_left + self.context_right,
+                       # self.context_left + self.context_right,
                        N_filters=[80, 60, 60],
                        kernel_sizes=[10, 3, 3],
                        max_pool_len=[3, 2, 1],
-                       use_laynorm_inp=False,
-                       use_batchnorm_inp=False,
                        use_laynorm=[True, True, True],
                        use_batchnorm=[False, False, False],
                        activation=['relu', 'relu', 'relu'],
                        dropout=[0.15, 0.15, 0.15])
-
-        self.mlp = MLP(self.cnn.out_dim,
-                       dnn_lay=[1024, 1024, 1024, 1024],
-                       dnn_drop=[0.10, 0.10, 0.10, 0.10],
-                       dnn_use_laynorm_inp=False,
-                       dnn_use_batchnorm_inp=False,
-                       dnn_use_batchnorm=[True, True, True, True],
-                       dnn_use_laynorm=[False, False, False, False],
-                       dnn_act=['relu', 'relu', 'relu', 'relu'])
+        #
+        # self.mlp = MLP(self.cnn.out_dim,
+        #                dnn_lay=[1024, 1024, 1024, 1024],
+        #                dnn_drop=[0.10, 0.10, 0.10, 0.10],
+        #                dnn_use_laynorm_inp=False,
+        #                dnn_use_batchnorm_inp=False,
+        #                dnn_use_batchnorm=[True, True, True, True],
+        #                dnn_use_laynorm=[False, False, False, False],
+        #                dnn_act=['relu', 'relu', 'relu', 'relu'])
 
         # self.cnn = CNN(input_feat_length,
         #                self.context_left + self.context_right,
@@ -45,15 +43,15 @@ class CNN_cd_mono(BaseModel):
         #                use_batchnorm=[False, False],
         #                activation=['relu', 'relu'],
         #                dropout=[0.15, 0.15])
-
-        # self.mlp = MLP(self.cnn.out_dim,
-        #                dnn_lay=[1024],
-        #                dnn_drop=[0.10],
-        #                dnn_use_laynorm_inp=False,
-        #                dnn_use_batchnorm_inp=False,
-        #                dnn_use_batchnorm=[True],
-        #                dnn_use_laynorm=[False],
-        #                dnn_act=['relu'])
+        #
+        self.mlp = MLP(self.cnn.N_out_feats,
+                       dnn_lay=[1024],
+                       dnn_drop=[0.10],
+                       dnn_use_laynorm_inp=False,
+                       dnn_use_batchnorm_inp=False,
+                       dnn_use_batchnorm=[True],
+                       dnn_use_laynorm=[False],
+                       dnn_act=['relu'])
 
         self.mlp_lab_cd = MLP(self.mlp.out_dim,
                               dnn_lay=[lab_cd_num],

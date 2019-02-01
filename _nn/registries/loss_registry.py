@@ -1,7 +1,7 @@
-from modules.losses.cd_loss import CDLoss
-from modules.losses.ctc_mtl_mono_cd_loss import CTCMtlMonoCDLoss
-from modules.losses.ctc_phn import CTCPhnLoss
-from modules.losses.mtl_mono_cd_loss import MtlMonoCDLoss
+from _nn.losses.cd_loss import CDLoss
+from _nn.losses.ctc_mtl_mono_cd_loss import CTCMtlMonoCDLoss
+from _nn.losses.ctc_phn import CTCPhnLoss
+from _nn.losses.mtl_mono_cd_loss import MtlMonoCDLoss
 
 
 def loss_init(config):

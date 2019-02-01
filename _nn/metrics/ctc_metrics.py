@@ -3,7 +3,7 @@ import ctcdecode
 from torch.nn.utils.rnn import pad_packed_sequence
 import numpy as np
 
-from modules.metrics.ctc_utils.error_rate.error_rate import cer
+from _nn.metrics.ctc_utils.error_rate.error_rate import cer
 from utils.logger_config import logger
 
 

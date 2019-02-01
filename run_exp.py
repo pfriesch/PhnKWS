@@ -7,7 +7,7 @@ import jsondiff
 import torch
 
 from data.data_util import prepare_labels
-from modules import model_init, optimizer_init, lr_scheduler_init, metrics_init, loss_init
+from _nn import model_init, optimizer_init, lr_scheduler_init, metrics_init, loss_init
 from utils.logger_config import logger
 from utils.util import code_versioning, folder_to_checkpoint, recursive_update
 from utils.utils import set_seed

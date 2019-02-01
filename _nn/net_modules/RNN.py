@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from modules.net_modules.utils import LayerNorm, act_fun, flip
+from _nn.net_modules.utils import LayerNorm, act_fun, flip
 
 
 class RNN(nn.Module):

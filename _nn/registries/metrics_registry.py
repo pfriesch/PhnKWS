@@ -1,6 +1,6 @@
-from modules.metrics.metrics import LabCDAccuracy, LabMonoAccuracy, LabCDError, LabMonoError
+from _nn.metrics.metrics import LabCDAccuracy, LabMonoAccuracy, LabCDError, LabMonoError
 
-from modules.metrics.ctc_metrics import PhnErrorRate
+from _nn.metrics.ctc_metrics import PhnErrorRate
 
 
 def metrics_init(config):

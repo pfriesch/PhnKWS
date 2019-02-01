@@ -1,25 +1,25 @@
 import torch
 import torch.nn as nn
 
-from modules.net_modules.utils import LayerNorm, act_fun, flip
+from _nn.net_modules.utils import LayerNorm, act_fun, flip
 
 
-class liGRU(nn.Module):
+class minimalGRU(nn.Module):
 
     def __init__(self, options, inp_dim):
-        super(liGRU, self).__init__()
+        super(minimalGRU, self).__init__()
 
         # Reading parameters
         self.input_dim = inp_dim
-        self.ligru_lay = options['ligru_lay']
-        self.ligru_drop = options['ligru_drop']
-        self.ligru_use_batchnorm = options['ligru_use_batchnorm']
-        self.ligru_use_laynorm = options['ligru_use_laynorm']
-        self.ligru_use_laynorm_inp = options['ligru_use_laynorm_inp']
-        self.ligru_use_batchnorm_inp = options['ligru_use_batchnorm_inp']
-        self.ligru_orthinit = options['ligru_orthinit']
-        self.ligru_act = options['ligru_act']
-        self.bidir = options['ligru_bidir']
+        self.minimalgru_lay = options['minimalgru_lay']
+        self.minimalgru_drop = options['minimalgru_drop']
+        self.minimalgru_use_batchnorm = options['minimalgru_use_batchnorm']
+        self.minimalgru_use_laynorm = options['minimalgru_use_laynorm']
+        self.minimalgru_use_laynorm_inp = options['minimalgru_use_laynorm_inp']
+        self.minimalgru_use_batchnorm_inp = options['minimalgru_use_batchnorm_inp']
+        self.minimalgru_orthinit = options['minimalgru_orthinit']
+        self.minimalgru_act = options['minimalgru_act']
+        self.bidir = options['minimalgru_bidir']
         self.use_cuda = options['use_cuda']
         self.to_do = options['to_do']
 
@@ -42,79 +42,79 @@ class liGRU(nn.Module):
         self.act = nn.ModuleList([])  # Activations
 
         # Input layer normalization
-        if self.ligru_use_laynorm_inp:
+        if self.minimalgru_use_laynorm_inp:
             self.ln0 = LayerNorm(self.input_dim)
 
         # Input batch normalization
-        if self.ligru_use_batchnorm_inp:
+        if self.minimalgru_use_batchnorm_inp:
             self.bn0 = nn.BatchNorm1d(self.input_dim, momentum=0.05)
 
-        self.N_ligru_lay = len(self.ligru_lay)
+        self.N_minimalgru_lay = len(self.minimalgru_lay)
 
         current_input = self.input_dim
 
         # Initialization of hidden layers
 
-        for i in range(self.N_ligru_lay):
+        for i in range(self.N_minimalgru_lay):
 
             # Activations
-            self.act.append(act_fun(self.ligru_act[i]))
+            self.act.append(act_fun(self.minimalgru_act[i]))
 
             add_bias = True
 
-            if self.ligru_use_laynorm[i] or self.ligru_use_batchnorm[i]:
+            if self.minimalgru_use_laynorm[i] or self.minimalgru_use_batchnorm[i]:
                 add_bias = False
 
             # Feed-forward connections
-            self.wh.append(nn.Linear(current_input, self.ligru_lay[i], bias=add_bias))
-            self.wz.append(nn.Linear(current_input, self.ligru_lay[i], bias=add_bias))
+            self.wh.append(nn.Linear(current_input, self.minimalgru_lay[i], bias=add_bias))
+            self.wz.append(nn.Linear(current_input, self.minimalgru_lay[i], bias=add_bias))
 
             # Recurrent connections
-            self.uh.append(nn.Linear(self.ligru_lay[i], self.ligru_lay[i], bias=False))
-            self.uz.append(nn.Linear(self.ligru_lay[i], self.ligru_lay[i], bias=False))
+            self.uh.append(nn.Linear(self.minimalgru_lay[i], self.minimalgru_lay[i], bias=False))
+            self.uz.append(nn.Linear(self.minimalgru_lay[i], self.minimalgru_lay[i], bias=False))
 
-            if self.ligru_orthinit:
+            if self.minimalgru_orthinit:
                 nn.init.orthogonal_(self.uh[i].weight)
                 nn.init.orthogonal_(self.uz[i].weight)
 
             # batch norm initialization
-            self.bn_wh.append(nn.BatchNorm1d(self.ligru_lay[i], momentum=0.05))
-            self.bn_wz.append(nn.BatchNorm1d(self.ligru_lay[i], momentum=0.05))
+            self.bn_wh.append(nn.BatchNorm1d(self.minimalgru_lay[i], momentum=0.05))
+            self.bn_wz.append(nn.BatchNorm1d(self.minimalgru_lay[i], momentum=0.05))
 
-            self.ln.append(LayerNorm(self.ligru_lay[i]))
+            self.ln.append(LayerNorm(self.minimalgru_lay[i]))
 
             if self.bidir:
-                current_input = 2 * self.ligru_lay[i]
+                current_input = 2 * self.minimalgru_lay[i]
             else:
-                current_input = self.ligru_lay[i]
+                current_input = self.minimalgru_lay[i]
 
-        self.out_dim = self.ligru_lay[i] + self.bidir * self.ligru_lay[i]
+        self.out_dim = self.minimalgru_lay[i] + self.bidir * self.minimalgru_lay[i]
 
     def forward(self, x):
 
         # Applying Layer/Batch Norm
-        if bool(self.ligru_use_laynorm_inp):
+        if bool(self.minimalgru_use_laynorm_inp):
             x = self.ln0((x))
 
-        if bool(self.ligru_use_batchnorm_inp):
+        if bool(self.minimalgru_use_batchnorm_inp):
             x_bn = self.bn0(x.view(x.shape[0] * x.shape[1], x.shape[2]))
             x = x_bn.view(x.shape[0], x.shape[1], x.shape[2])
 
-        for i in range(self.N_ligru_lay):
+        for i in range(self.N_minimalgru_lay):
 
             # Initial state and concatenation
             if self.bidir:
-                h_init = torch.zeros(2 * x.shape[1], self.ligru_lay[i])
+                h_init = torch.zeros(2 * x.shape[1], self.minimalgru_lay[i])
                 x = torch.cat([x, flip(x, 0)], 1)
             else:
-                h_init = torch.zeros(x.shape[1], self.ligru_lay[i])
+                h_init = torch.zeros(x.shape[1], self.minimalgru_lay[i])
 
             # Drop mask initilization (same mask for all time steps)
             if self.test_flag == False:
                 drop_mask = torch.bernoulli(
-                    torch.Tensor(h_init.shape[0], h_init.shape[1]).fill_(1 - self.ligru_drop[i]))
+                    torch.Tensor(h_init.shape[0], h_init.shape[1]).fill_(1 - self.minimalgru_drop[i]))
             else:
-                drop_mask = torch.FloatTensor([1 - self.ligru_drop[i]])
+                drop_mask = torch.FloatTensor([1 - self.minimalgru_drop[i]])
 
             if self.use_cuda:
                 h_init = h_init.cuda()
@@ -125,7 +125,7 @@ class liGRU(nn.Module):
             wz_out = self.wz[i](x)
 
             # Apply batch norm if needed (all steos in parallel)
-            if self.ligru_use_batchnorm[i]:
+            if self.minimalgru_use_batchnorm[i]:
                 wh_out_bn = self.bn_wh[i](wh_out.view(wh_out.shape[0] * wh_out.shape[1], wh_out.shape[2]))
                 wh_out = wh_out_bn.view(wh_out.shape[0], wh_out.shape[1], wh_out.shape[2])
 
@@ -138,13 +138,13 @@ class liGRU(nn.Module):
 
             for k in range(x.shape[0]):
 
-                # ligru equation
+                # minimalgru equation
                 zt = torch.sigmoid(wz_out[k] + self.uz[i](ht))
-                at = wh_out[k] + self.uh[i](ht)
+                at = wh_out[k] + self.uh[i](zt * ht)
                 hcand = self.act[i](at) * drop_mask
                 ht = (zt * ht + (1 - zt) * hcand)
 
-                if self.ligru_use_laynorm[i]:
+                if self.minimalgru_use_laynorm[i]:
                     ht = self.ln[i](ht)
 
                 hiddens.append(ht)
