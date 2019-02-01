@@ -24,10 +24,11 @@ class PhnErrorRate(Module):
 
     def forward(self, output, target):
         # decoder expects batch first
-        logits = output['out_phn'].permute(1, 0, 2)
+        logits = output['out_phn'].squeeze(1)
         # assert isinstance(target["lab_phn"], PackedSequence)
         batch_size = logits.shape[0]
         max_seq_len = logits.shape[1]
+        #batch x seq x label_size
 
         beam_result, beam_scores, timesteps, out_seq_len = self.decoder.decode(logits, output['sequence_lengths'])
 
@@ -36,10 +37,10 @@ class PhnErrorRate(Module):
         per_all = []
         for b in range(batch_size):
             if out_seq_len[b].item() > 0:
-                _decoded = self.convert_to_string(beam_result[b][0].numpy(), self.vocabulary,
+                _decoded = self.convert_to_string(beam_result[b][0].cpu().numpy(), self.vocabulary,
                                                   out_seq_len[b].item())
 
-                _labels = self.convert_to_string(labels[:, b].numpy(), self.vocabulary, label_lengths[b].item())
+                _labels = self.convert_to_string(labels[:, b].cpu().numpy(), self.vocabulary, label_lengths[b].item())
 
                 per = cer(_decoded, _labels, ignore_case=True, remove_space=True)
                 per_all.append(per)

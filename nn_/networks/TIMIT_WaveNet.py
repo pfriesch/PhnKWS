@@ -1,12 +1,11 @@
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence
-from base.base_model import BaseModel
 
-from modules.net_modules.CNN import CNN
-from modules.net_modules.MLP import MLP
+from nn_.net_modules.CNN import CNN
+from nn_.net_modules.MLP import MLP
 
 
-class TIMIT_CNN(BaseModel):
+class TIMIT_CNN(nn.Module):
     def __init__(self, inp_dim, lab_cd_num):
         super(TIMIT_CNN, self).__init__()
 
@@ -28,7 +27,7 @@ class TIMIT_CNN(BaseModel):
                               dnn_use_batchnorm_inp=False,
                               dnn_use_batchnorm=[True, True, True, True, False],
                               dnn_use_laynorm=[False, False, False, False, False],
-                              dnn_act=['relu', 'relu', 'relu', 'relu', 'softmax'])
+                              dnn_act=["relu", "relu", "relu", "relu", "softmax"])
 
         self.context_left = 0
         self.context_right = 0
@@ -39,6 +38,11 @@ class TIMIT_CNN(BaseModel):
         if isinstance(out_dnn, PackedSequence):
             # Padd with zeros
             out_dnn, sequence_lengths = pad_packed_sequence(out_dnn)
+
+        max_len = x.shape[0]
+        batch_size = x.shape[1]
+        out_dnn = out_dnn.view(max_len * batch_size, -1)
+
         out_cd = self.mlp_lab_cd(out_dnn)
         out_mono = self.mlp_lab_mono(out_dnn)
-        return {'out_cd': out_cd, 'out_mono': out_mono, 'out_dnn': out_dnn}
+        return {"out_cd": out_cd, "out_mono": out_mono}
