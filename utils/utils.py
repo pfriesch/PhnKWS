@@ -179,8 +179,13 @@ def get_dataset_metadata(config):
                 config['test'][forward_out]['normalize_with_counts_from_file'] = count_file_path
                 # kaldi labels are indexed at 1
                 # we use 0 for padding or blank label
-                config['arch']['args']['lab_cd_num'] = N_out + 1
-                config['arch']['args']['lab_mono_num'] += 1
+                config['arch']['args']['lab_cd_num'] = N_out
+
+                if not config["arch"]["framewise_labels"] == "shuffled_frames":
+                    config['arch']['args']['lab_cd_num'] += 1
+
+    if not config["arch"]["framewise_labels"] == "shuffled_frames":
+        config['arch']['args']['lab_mono_num'] += 1
 
     kw2phn_mapping = make_timit_kws_labels()
 

@@ -393,7 +393,11 @@ def apply_context(feature_dict, label_dict, context_left, context_right):
                 file_tensor = feature_dict[feature_name][filename]
                 length, num_feats = file_tensor.shape
                 feature_dict_context[feature_name][filename] = \
-                    np.empty((length - context_left - context_right, num_feats, context_left + context_right + 1))
+                    np.empty(
+                        (length - context_left - context_right,
+                         num_feats,
+                         context_left + context_right + 1)
+                    )
                 for i in range(context_left, length - context_right):
                     feature_dict_context[feature_name][filename][i - context_left, :, :] = \
                         file_tensor[i - context_left:i + context_right + 1, :].T
@@ -417,6 +421,65 @@ def apply_context(feature_dict, label_dict, context_left, context_right):
     #             fea_conc = fea_conc[context_left:fea_conc.shape[0] - context_right]
 
     return feature_dict_context, label_dict
+
+
+def make_big_chunk_no_order(feature_dict, label_dict, normalize_feat=True):
+    feature_chunks = {}
+    label_chunks = {}
+
+    for feature_name in feature_dict:
+        feature_chunks[feature_name] = []
+        for filename in feature_dict[feature_name]:
+            sample = feature_dict[feature_name][filename]
+            feature_chunks[feature_name].append(sample)
+
+    if label_dict is not None:
+        for label_name in label_dict:
+            label_chunks[label_name] = []
+            for filename in label_dict[label_name]:
+                sample = label_dict[label_name][filename]
+                label_chunks[label_name].append(sample)
+
+    for feature_name in feature_dict:
+        feature_chunks[feature_name] = np.concatenate(feature_chunks[feature_name])
+
+    if label_dict is not None:
+        for label_name in label_dict:
+            label_chunks[label_name] = np.concatenate(label_chunks[label_name])
+
+    if label_dict is not None:
+        for label_name in label_dict:
+            if label_name == "lab_mono":
+                # Adding 1 to use 0 padding for framewise or 0 as blank with ctc
+                label_chunks[label_name] -= 1
+
+            #index at 0 for no order
+            # label_chunks[label_name] += 1
+
+            if label_chunks[label_name].min() != 0:
+                logger.warn("got label with min {}".format(label_chunks[label_name].min()))
+            if label_chunks[label_name].max() >= 48:
+                logger.warn("got label with max {} {}".format(label_chunks[label_name].max(), label_name))
+    if normalize_feat:
+        for feature_name in feature_dict:
+            feature_chunks[feature_name] = (feature_chunks[feature_name] - np.mean(feature_chunks[feature_name],
+                                                                                   axis=0)) / np.std(
+                feature_chunks[feature_name], axis=0)
+
+    # check equal lengths
+    for feature_name in feature_chunks:
+        for label_name in label_chunks:
+            assert len(feature_chunks[feature_name]) == len(label_chunks[label_name])
+
+    _shuffle_order = np.arange(len(feature_chunks[next(iter(feature_chunks))]))
+    np.random.shuffle(_shuffle_order)
+
+    for feature_name in feature_chunks:
+        feature_chunks[feature_name] = feature_chunks[feature_name][_shuffle_order]
+    for label_name in label_chunks:
+        label_chunks[label_name] = label_chunks[label_name][_shuffle_order]
+
+    return feature_chunks, label_chunks
 
 
 def make_big_chunk(feature_dict, label_dict, normalize_feat=True):
@@ -470,7 +533,6 @@ def make_big_chunk(feature_dict, label_dict, normalize_feat=True):
     if label_dict is not None:
         for label_name in label_dict:
             if label_name == "lab_mono":
-
                 # Adding 1 to use 0 padding for framewise or 0 as blank with ctc
                 label_chunks[label_name] -= 1
 

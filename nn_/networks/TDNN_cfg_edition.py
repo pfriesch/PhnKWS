@@ -40,19 +40,37 @@ class TDNN_cd_mono(BaseModel):
 
     def forward(self, x):
         x = x[self.input_feat_name]
-        T = x.shape[0]
-        batch = x.shape[1]
-        feats = x.shape[2]
-        assert feats == self.input_feat_length
-        context = x.shape[3]
-        assert context == self.context_left + self.context_right + 1
-        x = x.view(T * batch, feats * context)
+        if len(x.shape) == 4:
+            T = x.shape[0]
+            batch = x.shape[1]
+            feats = x.shape[2]
+            assert feats == self.input_feat_length
+            context = x.shape[3]
+            assert context == self.context_left + self.context_right + 1
+            x = x.view(T * batch, feats * context)
+        elif len(x.shape) == 3:
+            batch = x.shape[0]
+            feats = x.shape[1]
+            assert feats == self.input_feat_length
+            context = x.shape[2]
+            assert context == self.context_left + self.context_right + 1
+            x = x.view(batch, feats * context)
+        else:
+            raise ValueError
 
         out_dnn = self.tdnn(x)
 
         out_cd = self.linear_lab_cd(out_dnn)
-        out_cd = out_cd.view(T, batch, -1)
+
+        if len(x.shape) == 4:
+            out_cd = out_cd.view(T, batch, -1)
+        elif len(x.shape) == 3:
+            out_cd = out_cd.view(batch, -1)
         out_mono = self.linear_lab_mono(out_dnn)
-        out_mono = out_mono.view(T, batch, -1)
+
+        if len(x.shape) == 4:
+            out_mono = out_mono.view(T, batch, -1)
+        elif len(x.shape) == 3:
+            out_mono = out_mono.view(batch, -1)
 
         return {'out_cd': out_cd, 'out_mono': out_mono}

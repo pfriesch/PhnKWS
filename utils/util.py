@@ -39,8 +39,8 @@ def code_versioning():
     assert current_branch == 'runs_log'
 
     subprocess.check_output(['git', 'add', '--all'])
-    _diff = subprocess.check_output(['git', 'diff', '--exit-code'])
-    if len(_diff) > 0:
+    _diff = subprocess.check_output(['git', 'status'])
+    if _diff != b'On branch runs_log\nnothing to commit, working tree clean\n':
         _ret_val = subprocess.check_output(['git', 'commit', '-am', 'update'])
 
     return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode("utf-8").strip()

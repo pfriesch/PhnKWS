@@ -6,7 +6,6 @@ import numpy as np
 import torch
 from torch.nn.utils.rnn import PackedSequence
 from tqdm import tqdm
-from data.keyword_dataset import KeywordDataset
 
 from base.base_trainer import BaseTrainer
 from data import kaldi_io
@@ -51,7 +50,7 @@ class Trainer(BaseTrainer):
             The metrics in log must have the key 'metrics'.
         """
         self.model.train()
-        self.tensorboard_logger.set_step((epoch - 1), 'train')
+        self.tensorboard_logger.set_step(global_step, 'train')
         tr_data = self.config['data_use']['train_with']
 
         train_loss = 0
@@ -79,7 +78,7 @@ class Trainer(BaseTrainer):
         # TODO chunked dataloader length
         with tqdm(disable=not logger.isEnabledFor(logging.INFO)) as pbar:
             pbar.set_description('T e:{} l: {} a: {}'.format(epoch, '-', '-'))
-            for batch_idx, (sample_names, inputs, targets) in enumerate(data_loader):
+            for batch_idx, (_, inputs, targets) in enumerate(data_loader):
                 global_step += 1
                 n_steps_this_epoch += 1
 
@@ -138,8 +137,13 @@ class Trainer(BaseTrainer):
                 pbar.update()
                 #### /Logging ####
 
-        log = {'train_loss': train_loss / n_steps_this_epoch,
-               'train_metrics':
+        self.tensorboard_logger.set_step(epoch, 'train')
+        self.tensorboard_logger.add_scalar('train_loss_avg', train_loss / n_steps_this_epoch)
+        for metric in train_metrics:
+            self.tensorboard_logger.add_scalar(metric + "_avg", train_metrics[metric] / n_steps_this_epoch)
+
+        log = {'train_loss_avg': train_loss / n_steps_this_epoch,
+               'train_metrics_avg':
                    {metric: train_metrics[metric] / n_steps_this_epoch
                     for metric in train_metrics}}
         if self.do_validation:
@@ -180,7 +184,7 @@ class Trainer(BaseTrainer):
         n_steps_this_epoch = 0
         with tqdm(disable=not logger.isEnabledFor(logging.INFO)) as pbar:
             pbar.set_description('V e:{} l: {} '.format(epoch, '-'))
-            for batch_idx, (sample_names, inputs, targets) in enumerate(valid_data_loader):
+            for batch_idx, (_, inputs, targets) in enumerate(valid_data_loader):
                 n_steps_this_epoch += 1
 
                 inputs = self.to_device(inputs)
@@ -199,7 +203,7 @@ class Trainer(BaseTrainer):
                 pbar.update()
                 #### /Logging ####
 
-        self.tensorboard_logger.set_step(global_step, 'valid')
+        self.tensorboard_logger.set_step(epoch, 'valid')
         self.tensorboard_logger.add_scalar('valid_loss', valid_loss / n_steps_this_epoch)
         for metric in valid_metrics:
             self.tensorboard_logger.add_scalar(metric, valid_metrics[metric] / n_steps_this_epoch)
@@ -244,7 +248,7 @@ class Trainer(BaseTrainer):
 
         with tqdm(total=len(test_data_loader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
             pbar.set_description('E e:{}    '.format(epoch))
-            for batch_idx, (sample_names, inputs, targets) in tqdm(enumerate(test_data_loader)):
+            for batch_idx, (_, inputs, targets) in tqdm(enumerate(test_data_loader)):
                 inputs = self.to_device(inputs)
                 targets = self.to_device(targets)
 
@@ -322,7 +326,8 @@ class Trainer(BaseTrainer):
                         # squeeze that batch
                         output[output_label] = output[output_label].squeeze(1)
                         # remove blank/padding 0th dim
-                        out_save = output[output_label][:, :-1].data.cpu().numpy()
+                        if not self.config["arch"]["framewise_labels"] == "shuffled_frames":
+                            out_save = output[output_label][:, :-1].data.cpu().numpy()
                         if len(out_save.shape) == 3 and out_save.shape[0] == 1:
                             out_save = out_save.squeeze(0)
 

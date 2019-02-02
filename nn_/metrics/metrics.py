@@ -1,6 +1,5 @@
 import torch
 from torch.nn import Module
-from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence
 
 
 class LabMonoAccuracy(Module):
@@ -9,14 +8,17 @@ class LabMonoAccuracy(Module):
         super().__init__()
 
     def forward(self, output, target):
-        ignore_index = -1
-        if isinstance(target["lab_mono"], PackedSequence):
-            target['lab_mono'] = pad_packed_sequence(target['lab_mono'], padding_value=ignore_index)[0]
+        if len(target['lab_cd'].shape) == 2:
+            _len = target['lab_cd'].shape[0]
+            batch_size = target['lab_cd'].shape[1]
 
-        len = target['lab_mono'].shape[0]
-        batch_size = target['lab_mono'].shape[1]
+        elif len(target['lab_cd'].shape) == 1:
+            _len = 1
+            batch_size = target['lab_cd'].shape[0]
+        else:
+            raise ValueError
 
-        pred = output['out_mono'].view(len * batch_size, -1).max(dim=1)[1]
+        pred = output['out_mono'].view(_len * batch_size, -1).max(dim=1)[1]
         lab = target['lab_mono'].view(-1)
 
         accuracy = torch.mean((pred == lab).to(dtype=torch.float32))
@@ -30,14 +32,17 @@ class LabMonoError(Module):
         super().__init__()
 
     def forward(self, output, target):
-        ignore_index = -1
-        if isinstance(target["lab_mono"], PackedSequence):
-            target['lab_mono'] = pad_packed_sequence(target['lab_mono'], padding_value=ignore_index)[0]
+        if len(target['lab_cd'].shape) == 2:
+            _len = target['lab_cd'].shape[0]
+            batch_size = target['lab_cd'].shape[1]
 
-        len = target['lab_mono'].shape[0]
-        batch_size = target['lab_mono'].shape[1]
+        elif len(target['lab_cd'].shape) == 1:
+            _len = 1
+            batch_size = target['lab_cd'].shape[0]
+        else:
+            raise ValueError
 
-        pred = output['out_mono'].view(len * batch_size, -1).max(dim=1)[1]
+        pred = output['out_mono'].view(_len * batch_size, -1).max(dim=1)[1]
         lab = target['lab_mono'].view(-1)
 
         error = torch.mean((pred != lab).to(dtype=torch.float32))
@@ -51,14 +56,17 @@ class LabCDAccuracy(Module):
         super().__init__()
 
     def forward(self, output, target):
-        ignore_index = -1
-        if isinstance(target["lab_cd"], PackedSequence):
-            target['lab_cd'] = pad_packed_sequence(target['lab_cd'], padding_value=ignore_index)[0]
+        if len(target['lab_cd'].shape) == 2:
+            _len = target['lab_cd'].shape[0]
+            batch_size = target['lab_cd'].shape[1]
 
-        len = target['lab_cd'].shape[0]
-        batch_size = target['lab_cd'].shape[1]
+        elif len(target['lab_cd'].shape) == 1:
+            _len = 1
+            batch_size = target['lab_cd'].shape[0]
+        else:
+            raise ValueError
 
-        pred = output['out_cd'].view(len * batch_size, -1).max(dim=1)[1]
+        pred = output['out_cd'].view(_len * batch_size, -1).max(dim=1)[1]
         lab = target['lab_cd'].view(-1)
 
         accuracy = torch.mean((pred == lab).to(dtype=torch.float32))
@@ -72,14 +80,17 @@ class LabCDError(Module):
         super().__init__()
 
     def forward(self, output, target):
-        ignore_index = -1
-        if isinstance(target["lab_cd"], PackedSequence):
-            target['lab_cd'] = pad_packed_sequence(target['lab_cd'], padding_value=ignore_index)[0]
+        if len(target['lab_cd'].shape) == 2:
+            _len = target['lab_cd'].shape[0]
+            batch_size = target['lab_cd'].shape[1]
 
-        len = target['lab_cd'].shape[0]
-        batch_size = target['lab_cd'].shape[1]
+        elif len(target['lab_cd'].shape) == 1:
+            _len = 1
+            batch_size = target['lab_cd'].shape[0]
+        else:
+            raise ValueError
 
-        pred = output['out_cd'].view(len * batch_size, -1).max(dim=1)[1]
+        pred = output['out_cd'].view(_len * batch_size, -1).max(dim=1)[1]
         lab = target['lab_cd'].view(-1)
 
         error = torch.mean((pred != lab).to(dtype=torch.float32))

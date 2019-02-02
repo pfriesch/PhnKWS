@@ -119,12 +119,12 @@
     }
   },
   "training": {
-    "batch_size_train": 2,
+    "batch_size_train": 128,
     "max_seq_length_train": 1000,
     "increase_seq_length_train": false,
     "start_seq_len_train": 100,
     "multply_factor_seq_len_train": 2,
-    "batch_size_valid": 2,
+    "batch_size_valid": 128,
     "max_seq_length_valid": 1000,
     "sort_by_feat": "fbank",
     "clip_grad_norm": -1,
@@ -140,7 +140,7 @@
   },
   "arch": {
     "name": "TDNN_cd_mono",
-    "framewise_labels": true,
+    "framewise_labels": "shuffled_frames",
     "args": {
       "input_feat_length": 40,
       "input_feat_name": "fbank",

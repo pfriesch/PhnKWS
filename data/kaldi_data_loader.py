@@ -10,7 +10,18 @@ import numpy as np
 from data.data_util import chunk_scp
 from data.dataset_registry import get_dataset
 from data.kaldi_dataset_framewise import KaldiDatasetFramewise
+from data.kaldi_dataset_framewise_shuffled_frames import KaldiDatasetFramewiseShuffledFrames
 from data.kaldi_dataset_unaligned import KaldiDatasetUnaligned
+
+
+def collate_fn_simple(sample_list):
+    fea_keys = list(sample_list[0][0].keys())
+    lab_keys = list(sample_list[0][1].keys())
+
+    fea_dict = {k: torch.stack([s[0][k] for s in sample_list]) for k in fea_keys}
+    lab_dict = {k: torch.stack([s[1][k] for s in sample_list]) for k in lab_keys}
+
+    return [], fea_dict, lab_dict
 
 
 def collate_fn_rnd_zero_pad(sample_list):
@@ -138,8 +149,24 @@ class KaldiDataLoader(DataLoader):
 
         if isinstance(dataset, KaldiDatasetUnaligned):
             _collate_fn = collate_fn
+            _sampler = BucketRandomSampler(
+                self.dataset.ordering_length,
+                sort_by_feat=sort_by_feat,
+                bucket_size_samples=100) if sort_by_feat is not None \
+                else None
         elif isinstance(dataset, KaldiDatasetFramewise):
             _collate_fn = collate_fn_rnd_zero_pad
+            # SortedSampler(
+            #     self.dataset.ordering_length,
+            #     sort_by_feat=sort_by_feat) if sort_by_feat is not None
+            _sampler = BucketRandomSampler(
+                self.dataset.ordering_length,
+                sort_by_feat=sort_by_feat,
+                bucket_size_samples=100) if sort_by_feat is not None \
+                else None
+        elif isinstance(dataset, KaldiDatasetFramewiseShuffledFrames):
+            _collate_fn = collate_fn_simple
+            _sampler = None
         else:
             raise ValueError
 
@@ -147,14 +174,7 @@ class KaldiDataLoader(DataLoader):
 
         super(KaldiDataLoader, self).__init__(self.dataset,
                                               batch_size,
-                                              # sampler=SortedSampler(
-                                              #     self.dataset.ordering_length,
-                                              #     sort_by_feat=sort_by_feat) if sort_by_feat is not None
-                                              BucketRandomSampler(
-                                                  self.dataset.ordering_length,
-                                                  sort_by_feat=sort_by_feat,
-                                                  bucket_size_samples=100) if sort_by_feat is not None
-                                              else None,
+                                              sampler=_sampler,
                                               collate_fn=_collate_fn,
                                               pin_memory=pin_memory,
                                               num_workers=num_workers,
@@ -209,10 +229,13 @@ class KaldiChunkedDataLoader:
         self.n_samples = sum(self.n_samples_per_feat.values())
         # self.n_batches = sum([n_values // batch_size for n_values in self.n_samples_per_feat.values()])
 
+        self.iterated_over = False
+
     def __len__(self):
         return -1
 
     def __iter__(self):
+        assert not self.iterated_over, "aussume to generate loader every run"
         for _chunk_id in range(self.n_chunks):
             for feature_name in self.chunk_paths:
                 _feature_dict = copy.deepcopy(self.feature_dict)
@@ -237,3 +260,4 @@ class KaldiChunkedDataLoader:
                                               self.sort_by_feat)
                 for x in iter(data_loader):
                     yield x
+        self.iterated_over = True

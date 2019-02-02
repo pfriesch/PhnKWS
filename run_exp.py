@@ -15,10 +15,13 @@ from utils.utils import check_environment, read_json
 from utils.utils import get_dataset_metadata
 
 
-def check_config():
-    # TODO  check   "sort_by_feat": "fbank", is actual feat
+def check_config(config):
+    for dataset in config['datasets']:
+        assert len(list(config['datasets'][dataset]['features'].keys())) == 1
+        assert config['training']['sort_by_feat'] == list(config['datasets'][dataset]['features'].keys())[0]
 
-    pass
+    if config['arch']['framewise_labels'] == "shuffled_frames":
+        assert not config['training']['increase_seq_length_train']
 
 
 def setup_run(config):
@@ -44,7 +47,7 @@ def setup_run(config):
 
 def main(config_path, resume_path, debug, local):
     config = read_json(config_path)
-    check_config()
+    check_config(config)
 
     if not local:
         check_environment()
