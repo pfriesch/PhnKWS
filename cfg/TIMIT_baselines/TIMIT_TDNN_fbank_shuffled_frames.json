@@ -46,7 +46,7 @@
         "fbank": {
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/feats_fbank.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-          "n_chunks": 2
+          "n_chunks": 1
         }
       },
       "labels": {
@@ -71,7 +71,7 @@
         "fbank": {
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/feats_fbank.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-          "n_chunks": 2
+          "n_chunks": 1
         }
       },
       "labels": {

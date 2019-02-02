@@ -288,7 +288,7 @@ class Trainer(BaseTrainer):
                               self.config['arch']['args']['phn_mapping'],
                               self.model.context_left, self.model.context_right,
                               max_sequence_length=max_seq_length,
-                              framewise_labels=self.config['arch']['framewise_labels'],
+                              framewise_labels=True,
                               tensorboard_logger=self.tensorboard_logger)
 
         test_data_loader = KaldiDataLoader(dataset,
@@ -326,8 +326,11 @@ class Trainer(BaseTrainer):
                         # squeeze that batch
                         output[output_label] = output[output_label].squeeze(1)
                         # remove blank/padding 0th dim
-                        if not self.config["arch"]["framewise_labels"] == "shuffled_frames":
+                        if self.config["arch"]["framewise_labels"] == "shuffled_frames":
+                            out_save = output[output_label].data.cpu().numpy()
+                        else:
                             out_save = output[output_label][:, :-1].data.cpu().numpy()
+
                         if len(out_save.shape) == 3 and out_save.shape[0] == 1:
                             out_save = out_save.squeeze(0)
 

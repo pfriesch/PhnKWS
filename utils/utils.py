@@ -187,22 +187,24 @@ def get_dataset_metadata(config):
     if not config["arch"]["framewise_labels"] == "shuffled_frames":
         config['arch']['args']['lab_mono_num'] += 1
 
-    kw2phn_mapping = make_timit_kws_labels()
+    # kw2phn_mapping = make_timit_kws_labels()
 
-    config["kws_decoding"]["kw2phn_mapping"] = kw2phn_mapping
+    # config["kws_decoding"]["kw2phn_mapping"] = kw2phn_mapping
+    config["kws_decoding"]["kw2phn_mapping"] = {}
 
-    _phn_mapping = {}
-    label_dict = config['datasets'][config['data_use']['train_with']]['labels']
-    for label_name in label_dict:
-        _phn_mapping[label_name] = phn_mapping(label_dict[label_name]['label_folder'],
-                                               no_triphone=True,
-                                               no_spoken_noise=True,
-                                               no_silence=True,
-                                               no_eps=True)
-    config['arch']['args']['phn_mapping'] = _phn_mapping
-    if not config['arch']['framewise_labels']:
-        # one for ctc blank symbol
-        config['arch']['args']['lab_phn_num'] = len(_phn_mapping['lab_phn']['used_dict']) + 1
+    # _phn_mapping = {}
+    # label_dict = config['datasets'][config['data_use']['train_with']]['labels']
+    # for label_name in label_dict:
+    #     _phn_mapping[label_name] = phn_mapping(label_dict[label_name]['label_folder'],
+    #                                            no_triphone=True,
+    #                                            no_spoken_noise=True,
+    #                                            no_silence=True,
+    #                                            no_eps=True)
+    # config['arch']['args']['phn_mapping'] = _phn_mapping
+    config['arch']['args']['phn_mapping'] = {}
+    # if not config['arch']['framewise_labels']:
+    #     # one for ctc blank symbol
+    #     config['arch']['args']['lab_phn_num'] = len(_phn_mapping['lab_phn']['used_dict']) + 1
 
     return config
 

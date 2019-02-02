@@ -4,7 +4,7 @@ import copy
 
 import torch
 from torch.nn.utils.rnn import pack_sequence
-from torch.utils.data import DataLoader, Sampler
+from torch.utils.data import DataLoader, Sampler, RandomSampler
 import numpy as np
 
 from data.data_util import chunk_scp
@@ -166,7 +166,7 @@ class KaldiDataLoader(DataLoader):
                 else None
         elif isinstance(dataset, KaldiDatasetFramewiseShuffledFrames):
             _collate_fn = collate_fn_simple
-            _sampler = None
+            _sampler = RandomSampler(dataset)
         else:
             raise ValueError
 
@@ -178,7 +178,7 @@ class KaldiDataLoader(DataLoader):
                                               collate_fn=_collate_fn,
                                               pin_memory=pin_memory,
                                               num_workers=num_workers,
-                                              drop_last=False)
+                                              drop_last=True) #drop last because maybe batchnorm
 
 
 class KaldiChunkedDataLoader:
