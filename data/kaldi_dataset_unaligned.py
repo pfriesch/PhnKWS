@@ -13,25 +13,14 @@ class KaldiDatasetUnaligned(object):
                  context_left,
                  context_right,
                  max_sequence_length,
-                 tensorboard_logger,
-                 debug=False,
-                 local=False):
+                 tensorboard_logger):
         self.tensorboard_logger = tensorboard_logger
         with Timer("init_dataset_elapsed_time_load", [self.tensorboard_logger, logger]) as t:
-            assert local == False
-
             _feature_dict, _label_dict = load_data_unaligned(feature_dict, label_dict, phn_mapping,
                                                              max_sequence_length)
 
-            if debug:
-                for label_name in _label_dict:
-                    _label_dict[label_name] = dict(
-                        sorted(list(_label_dict[label_name].items()), key=lambda x: x[0])[:30])
-                for feat_name in _feature_dict:
-                    _feature_dict[feat_name] = dict(
-                        sorted(list(_feature_dict[feat_name].items()), key=lambda x: x[0])[:30])
-
             # TODO handle context for ctc (padding) ?
+            logger.warn("no context handling")
             assert context_left == 0 and context_right == 0
 
             # TODO make multiple chunks if too big

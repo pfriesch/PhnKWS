@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from _nn.utils.CNN_utils import LayerStats
+from nn_.utils.CNN_utils import LayerStats
 
 
 class BaseLayer(nn.Module):

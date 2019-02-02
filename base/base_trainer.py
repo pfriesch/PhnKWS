@@ -234,7 +234,7 @@ class BaseTrainer:
         resume_path = folder_to_checkpoint(resume_folder_path)
 
         logger.info("Loading checkpoint: {} ...".format(resume_path))
-        checkpoint = torch.load(resume_path)
+        checkpoint = torch.load(resume_path, map_location='cpu')
         self.start_epoch = checkpoint['epoch'] + 1
         self.model.load_state_dict(checkpoint['state_dict'])
 

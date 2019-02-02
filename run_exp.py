@@ -1,4 +1,3 @@
-import json
 import os
 import argparse
 import datetime
@@ -7,7 +6,7 @@ import jsondiff
 import torch
 
 from data.data_util import prepare_labels
-from _nn import model_init, optimizer_init, lr_scheduler_init, metrics_init, loss_init
+from nn_ import model_init, optimizer_init, lr_scheduler_init, metrics_init, loss_init
 from utils.logger_config import logger
 from utils.util import code_versioning, folder_to_checkpoint, recursive_update
 from utils.utils import set_seed
@@ -56,16 +55,15 @@ def main(config_path, resume_path, debug, local):
         config['versioning']['git_commit'] = git_commit
 
     if resume_path:
-        resume_config = torch.load(folder_to_checkpoint(args.resume))['config']
+        resume_config = torch.load(folder_to_checkpoint(args.resume), map_location='cpu')['config']
         # also the results won't be the same give the different random seeds with different number of draws
         del config['exp']['name']
         recursive_update(resume_config, config)
 
-        result = jsondiff.diff(config, resume_config)
         print("".join(["="] * 80))
         print("Resume with these changes in the config:")
         print("".join(["-"] * 80))
-        print(json.dumps(result, indent=1))
+        print(jsondiff.diff(config, resume_config, dump=True, dumper=jsondiff.JsonDumper(indent=1)))
         print("".join(["="] * 80))
 
         config = resume_config
@@ -84,6 +82,7 @@ def main(config_path, resume_path, debug, local):
 
     logger.configure_logger(out_folder)
     logger.info("Experiment name : {}".format(out_folder))
+    logger.info("tensorboard : tensorboard --logdir {}".format(os.path.abspath(out_folder)))
 
     model, loss, metrics, optimizers, config, lr_schedulers = setup_run(config)
 
@@ -91,9 +90,7 @@ def main(config_path, resume_path, debug, local):
                       resume_path=resume_path,
                       config=config,
                       do_validation=True,
-                      lr_schedulers=lr_schedulers,
-                      debug=debug,
-                      local=local)
+                      lr_schedulers=lr_schedulers)
     trainer.train()
 
 

@@ -360,6 +360,24 @@ def get_order_by_length(feature_dict):
 def apply_context(feature_dict, label_dict, context_left, context_right):
     """
     Remove labels left and right to account for the needed context.
+
+    Note:
+        Reasons to just concatinate the context:
+
+        Pro:
+
+        - Like in production, we continously predict a frame with context
+        - one frame and context corresponds to one out value, no confusion
+        - TDNN possible
+        - easier to reason about
+        - less confusion with wired effects of padding etc
+
+        Contra:
+
+        - recomputation of convolutions
+        - not clear how to do it continously
+        - more memory needed since it grows exponentially with the context size
+
     """
     for label_name in label_dict:
         for filename in label_dict[label_name]:
@@ -375,10 +393,10 @@ def apply_context(feature_dict, label_dict, context_left, context_right):
                 file_tensor = feature_dict[feature_name][filename]
                 length, num_feats = file_tensor.shape
                 feature_dict_context[feature_name][filename] = \
-                    np.empty((length - context_left - context_right, context_left + context_right + 1, num_feats))
+                    np.empty((length - context_left - context_right, num_feats, context_left + context_right + 1))
                 for i in range(context_left, length - context_right):
                     feature_dict_context[feature_name][filename][i - context_left, :, :] = \
-                        file_tensor[i - context_left:i + context_right + 1, :]
+                        file_tensor[i - context_left:i + context_right + 1, :].T
 
     # with Timer("roll", [logger]): # 30% faster but harder to reason about
     #
@@ -451,9 +469,17 @@ def make_big_chunk(feature_dict, label_dict, normalize_feat=True):
 
     if label_dict is not None:
         for label_name in label_dict:
-            # Adding 1 to use 0 padding for framewise or 0 as blank with ctc
-            label_chunks[label_name] = label_chunks[label_name] + 1
+            if label_name == "lab_mono":
 
+                # Adding 1 to use 0 padding for framewise or 0 as blank with ctc
+                label_chunks[label_name] -= 1
+
+            label_chunks[label_name] += 1
+
+            if label_chunks[label_name].min() != 0:
+                logger.warn("got label with min {}".format(label_chunks[label_name].min()))
+            if label_chunks[label_name].max() >= 48:
+                logger.warn("got label with max {} {}".format(label_chunks[label_name].max(), label_name))
     if normalize_feat:
         for feature_name in feature_dict:
             feature_chunks[feature_name] = (feature_chunks[feature_name] - np.mean(feature_chunks[feature_name],

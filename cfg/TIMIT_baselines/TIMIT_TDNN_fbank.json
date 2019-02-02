@@ -1,11 +1,11 @@
 {
   "exp": {
-    "save_dir": "exp",
-    "name": "TIMIT_CNN_fbank",
+    "save_dir": "../exp",
+    "name": "TIMIT_TDNN_fbank",
     "seed": 2234,
     "n_gpu": 1,
     "prefetch_to_gpu": true,
-    "n_epochs_tr": 20,
+    "n_epochs_tr": 24,
     "save_period": 1
   },
   "data_use": {
@@ -21,7 +21,7 @@
         "fbank": {
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/feats_fbank.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/train/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_train.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-          "n_chunks": 1
+          "n_chunks": 5
         }
       },
       "labels": {
@@ -46,7 +46,7 @@
         "fbank": {
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/feats_fbank.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-          "n_chunks": 3
+          "n_chunks": 2
         }
       },
       "labels": {
@@ -71,7 +71,7 @@
         "fbank": {
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/feats_fbank.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-          "n_chunks": 3
+          "n_chunks": 2
         }
       },
       "labels": {
@@ -131,7 +131,7 @@
     "optimizer": {
       "type": "adam",
       "args": {
-        "lr": 0.0008
+        "lr": 0.008
       }
     },
     "lr_scheduler": {
@@ -140,7 +140,7 @@
     }
   },
   "arch": {
-    "name": "CNN_cd_mono",
+    "name": "TDNN_cd_mono",
     "framewise_labels": true,
     "args": {
       "input_feat_length": 40,

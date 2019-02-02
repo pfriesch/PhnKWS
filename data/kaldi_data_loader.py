@@ -1,3 +1,4 @@
+import itertools
 import random
 import copy
 
@@ -26,7 +27,7 @@ def collate_fn_rnd_zero_pad(sample_list):
     sample_names = []
 
     fea_dict = {k: torch.zeros([max_length, batch_size] + list(sample_list[0][1][k].shape[1:])) for k in fea_keys}
-    lab_dict = {k: torch.zeros(max_length, batch_size, dtype=torch.int64) for k in lab_keys}
+    lab_dict = {k: torch.full((max_length, batch_size), dtype=torch.int64, fill_value=-100) for k in lab_keys}
     for _idx, sample in enumerate(sample_list):
         _len_feat = sample[1][fea_keys[0]].shape[0]
         _len_lab = sample[2][lab_keys[0]].shape[0]
@@ -69,13 +70,53 @@ def collate_fn(sample_list):
     return sample_names, fea_dict, lab_dict
 
 
+class BucketRandomSampler(Sampler):
+    def __init__(self, ordering_length, sort_by_feat, n_buckets=None, bucket_size_samples=None):
+        assert n_buckets is not bucket_size_samples
+        self.ordering_length = ordering_length
+        self.feat = sort_by_feat
+
+        ordering_length_items = list(ordering_length[self.feat].items())
+        if n_buckets is not None:
+
+            _bucket_length = len(ordering_length_items) // n_buckets
+
+            self.ordering_length_buckets = \
+                [ordering_length_items[_bucked_id * _bucket_length:
+                                       _bucked_id * _bucket_length + _bucket_length]
+                 for _bucked_id in range(n_buckets - 1)]
+            self.ordering_length_buckets.append(ordering_length_items[n_buckets - 1 * _bucket_length:])
+
+        elif bucket_size_samples is not None:
+
+            _bucket_length = bucket_size_samples
+
+            _n_buckets = len(ordering_length_items) // _bucket_length
+
+            self.ordering_length_buckets = \
+                [ordering_length_items[_bucked_id * _bucket_length:
+                                       _bucked_id * _bucket_length + _bucket_length]
+                 for _bucked_id in range(_n_buckets - 1)]
+            self.ordering_length_buckets.append(ordering_length_items[_n_buckets - 1 * _bucket_length:])
+
+    def __iter__(self):
+        for bucket in self.ordering_length_buckets:
+            random.shuffle(bucket)
+        return iter([idx_length['idx'] for filename, idx_length in
+                     itertools.chain(*self.ordering_length_buckets)
+                     ])
+
+    def __len__(self):
+        return len(self.ordering_length[self.feat])
+
+
 class SortedSampler(Sampler):
     def __init__(self, ordering_length, sort_by_feat):
         self.ordering_length = ordering_length
         self.feat = sort_by_feat
 
     def __iter__(self):
-        return iter([idx_length['idx'] for filename, idx_length in self.ordering_length[self.feat].items()])
+        return iter([_file_metadata['idx'] for filename, _file_metadata in self.ordering_length[self.feat].items()])
 
     def __len__(self):
         return len(self.ordering_length[self.feat])
@@ -106,10 +147,13 @@ class KaldiDataLoader(DataLoader):
 
         super(KaldiDataLoader, self).__init__(self.dataset,
                                               batch_size,
-                                              sampler=
-                                              SortedSampler(
+                                              # sampler=SortedSampler(
+                                              #     self.dataset.ordering_length,
+                                              #     sort_by_feat=sort_by_feat) if sort_by_feat is not None
+                                              BucketRandomSampler(
                                                   self.dataset.ordering_length,
-                                                  sort_by_feat=sort_by_feat) if sort_by_feat is not None
+                                                  sort_by_feat=sort_by_feat,
+                                                  bucket_size_samples=100) if sort_by_feat is not None
                                               else None,
                                               collate_fn=_collate_fn,
                                               pin_memory=pin_memory,
@@ -126,7 +170,7 @@ class KaldiChunkedDataLoader:
                  tensorboard_logger,
 
                  batch_size, use_gpu, prefetch_to_gpu,
-                 device, sort_by_feat=None, debug=False, local=False):
+                 device, sort_by_feat=None):
 
         #### DATASET
         self.feature_dict = feature_dict
@@ -138,8 +182,6 @@ class KaldiChunkedDataLoader:
         self.max_sequence_length = max_sequence_length
         self.framewise_labels = framewise_labels
         self.tensorboard_logger = tensorboard_logger
-        self.debug = debug
-        self.local = local
 
         #### DATALOADER
 
@@ -165,9 +207,10 @@ class KaldiChunkedDataLoader:
                                                                                               out_dir)
 
         self.n_samples = sum(self.n_samples_per_feat.values())
+        # self.n_batches = sum([n_values // batch_size for n_values in self.n_samples_per_feat.values()])
 
     def __len__(self):
-        return self.n_samples
+        return -1
 
     def __iter__(self):
         for _chunk_id in range(self.n_chunks):
@@ -183,9 +226,7 @@ class KaldiChunkedDataLoader:
                                       self.context_right,
                                       self.max_sequence_length,
                                       self.framewise_labels,
-                                      self.tensorboard_logger,
-                                      self.debug,
-                                      self.local)
+                                      self.tensorboard_logger)
 
                 data_loader = KaldiDataLoader(dataset,
                                               self.batch_size,

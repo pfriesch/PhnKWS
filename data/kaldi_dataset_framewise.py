@@ -9,42 +9,31 @@ from utils.util import Timer
 
 class KaldiDatasetFramewise(object):
 
-    def __init__(self, feature_dict, label_dict, context_left, context_right, max_sequence_length, tensorboard_logger,
-                 debug=False, local=False):
+    def __init__(self, feature_dict,
+                 label_dict,
+                 context_left,
+                 context_right,
+                 max_sequence_length,
+                 tensorboard_logger):
         self.tensorboard_logger = tensorboard_logger
         with Timer("init_dataset_elapsed_time_load", [self.tensorboard_logger, logger]) as t:
+            _feature_dict, _label_dict = load_data(feature_dict, label_dict, max_sequence_length,
+                                                   context_left + context_right)
 
-            if local:
-                path = "dataset_full_timit.pyt"
-                if os.path.exists(path):
-                    self.load(path)
-            else:
+            _feature_dict, _label_dict = apply_context(_feature_dict, _label_dict, context_left, context_right)
 
-                _feature_dict, _label_dict = load_data(feature_dict, label_dict, max_sequence_length,
-                                                       context_left + context_right)
+            # TODO make multiple chunks if too big
+            sample_name, feature_chunks, label_chunks = make_big_chunk(_feature_dict, _label_dict)
 
-                if debug:
-                    for label_name in _label_dict:
-                        _label_dict[label_name] = dict(
-                            sorted(list(_label_dict[label_name].items()), key=lambda x: x[0])[:30])
-                    for feat_name in _feature_dict:
-                        _feature_dict[feat_name] = dict(
-                            sorted(list(_feature_dict[feat_name].items()), key=lambda x: x[0])[:30])
+            self.ordering_length = get_order_by_length(_feature_dict)
 
-                _feature_dict, _label_dict = apply_context(_feature_dict, _label_dict, context_left, context_right)
+            self.feature_chunks = {feat_name: torch.from_numpy(feature_chunks[feat_name]).float()
+                                   for feat_name, v in feature_chunks.items()}
+            self.label_chunks = {label_name: torch.from_numpy(label_chunks[label_name]).long()
+                                 for label_name, v in label_chunks.items()}
+            self.sample_names, self.samples = zip(*list(sample_name.items()))
 
-                # TODO make multiple chunks if too big
-                sample_name, feature_chunks, label_chunks = make_big_chunk(_feature_dict, _label_dict)
-
-                self.ordering_length = get_order_by_length(_feature_dict)
-
-                self.feature_chunks = {feat_name: torch.from_numpy(feature_chunks[feat_name]).float()
-                                       for feat_name, v in feature_chunks.items()}
-                self.label_chunks = {label_name: torch.from_numpy(label_chunks[label_name]).long()
-                                     for label_name, v in label_chunks.items()}
-                self.sample_names, self.samples = zip(*list(sample_name.items()))
-
-                self.feature_dim = {feat_name: v.shape[1] for feat_name, v in self.feature_chunks.items()}
+            self.feature_dim = {feat_name: v.shape[1] for feat_name, v in self.feature_chunks.items()}
 
     def move_to(self, device):
         with Timer("move_to_gpu_dataset_elapsed_time_load", [self.tensorboard_logger, logger]) as t:

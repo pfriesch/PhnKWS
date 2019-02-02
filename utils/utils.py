@@ -177,7 +177,10 @@ def get_dataset_metadata(config):
                     N_out) + " \"ark:ali-to-pdf " + folder_lab_count + "/final.mdl \\\"ark:gunzip -c " + folder_lab_count + "/ali.*.gz |\\\" ark:- |\" " + count_file_path
                 run_shell(cmd)
                 config['test'][forward_out]['normalize_with_counts_from_file'] = count_file_path
-                config['arch']['args']['lab_cd_num'] = N_out
+                # kaldi labels are indexed at 1
+                # we use 0 for padding or blank label
+                config['arch']['args']['lab_cd_num'] = N_out + 1
+                config['arch']['args']['lab_mono_num'] += 1
 
     kw2phn_mapping = make_timit_kws_labels()
 
