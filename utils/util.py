@@ -10,11 +10,14 @@ from utils.tensorboard_logger import WriterTensorboardX
 
 
 def recursive_update(_dict, _update_dict):
+    if isinstance(_dict, str):
+        return _update_dict
     for k, v in _update_dict.items():
         if isinstance(v, collections.Mapping):
             _dict[k] = recursive_update(_dict.get(k, {}), v)
         else:
             _dict[k] = v
+
     return _dict
 
 
@@ -80,4 +83,3 @@ class Timer:
                 logger.add_scalar(self.name, self.interval, global_step=self.global_step)
             elif isinstance(logger, Logger):
                 logger.debug("{} took {:.5f}s".format(self.name, self.interval))
-

@@ -1,6 +1,6 @@
-import configparser
 import logging
 import os
+from glob import glob
 
 import numpy as np
 import torch
@@ -12,9 +12,9 @@ from data import kaldi_io
 from data.data_util import load_counts
 from data.dataset_registry import get_dataset
 from data.kaldi_data_loader import KaldiDataLoader, KaldiChunkedDataLoader
+from kaldi_decoding_scripts.decode_dnn import decode, best_wer
 from kws_decoder import kws_decoder
 from utils.logger_config import logger
-from utils.utils import run_shell
 
 
 class Trainer(BaseTrainer):
@@ -382,64 +382,26 @@ class Trainer(BaseTrainer):
             # forward_dec_outs = self.config['test'][out_lab]['require_decoding']
 
             for data in forward_data_lst:
-
                 logger.debug('Decoding {} output {}'.format(data, out_lab))
 
-                info_file = '{}/exp_files/decoding_{}_{}.info'.format(out_folder, data, out_lab)
-
-                # create decode config file
-                config_dec_file = '{}/decoding_{}_{}.conf'.format(out_folder, data, out_lab)
-                config_dec = configparser.ConfigParser()
-                config_dec.add_section('decoding')
-
-                for dec_key in self.config['decoding'].keys():
-                    config_dec.set('decoding', dec_key, str(self.config['decoding'][dec_key]))
-
-                # add graph_dir, datadir, alidir
                 lab_field = self.config['datasets'][data]['labels']['lab_cd']
-                config_dec.set('decoding', 'alidir', os.path.abspath(lab_field['label_folder']))
-                config_dec.set('decoding', 'data', os.path.abspath(lab_field['lab_data_folder']))
-                config_dec.set('decoding', 'graphdir', os.path.abspath(lab_field['lab_graph']))
-
-                with open(config_dec_file, 'w') as configfile:
-                    config_dec.write(configfile)
 
                 out_folder = os.path.abspath(out_folder)
-                files_dec = '{}/exp_files/forward_{}_ep*_{}_to_decode.ark'.format(out_folder, data, out_lab)
                 out_dec_folder = '{}/decode_{}_{}'.format(out_folder, data, out_lab)
 
-                if not (os.path.exists(info_file)):
-                    # Run the decoder
-                    cmd_decode = '{}/{} {} {} \"{}\"'.format(
-                        self.config['decoding']['decoding_script_folder'],
-                        self.config['decoding']['decoding_script'],
-                        os.path.abspath(config_dec_file),
-                        out_dec_folder,
-                        files_dec)
-                    run_shell(cmd_decode)
+                files_dec_list = glob('{}/exp_files/forward_{}_ep*_{}_to_decode.ark'.format(out_folder, data, out_lab))
 
-                    # TODO remove ark files if needed
-                    # if not forward_save_files:
-                    #     list_rem = glob.glob(files_dec)
-                    #     for rem_ark in list_rem:
-                    #         os.remove(rem_ark)
+                decode(**self.config['decoding'],
+                       alidir=os.path.abspath(lab_field['label_folder']),
+                       data=os.path.abspath(lab_field['lab_data_folder']),
+                       graphdir=os.path.abspath(lab_field['lab_graph']),
+                       out_folder=out_dec_folder,
+                       featstrings=files_dec_list)
 
-                # Print WER results and write info file
-                cmd_res = './scripts/check_res_dec.sh ' + out_dec_folder
-                results = run_shell(cmd_res).decode('utf-8')
-                logger.info(results)
+                decoding_results = best_wer(out_dec_folder)
+                logger.info(decoding_results)
 
-                results = results.split("|")
-                wer = float(results[0].split(" ")[1].strip())
-
-                _corr, _sub, _del, _ins, _err, _s_err = [float(elem.strip())
-                                                         for elem in results[2].split(" ") if len(elem) > 0]
-                decoding_str = "WER: {} Corr: {} Sub: {} Del: {} Ins: {} Err: {}" \
-                    .format(wer, _corr, _sub, _del, _ins, _err)
-                logger.info(decoding_str)
-                decoding_results.append(decoding_str)
-
-                self.tensorboard_logger.add_text("WER results", decoding_str)
+                self.tensorboard_logger.add_text("WER results", str(decoding_results))
 
             # TODO plotting curves
 

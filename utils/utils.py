@@ -19,6 +19,7 @@ def set_seed(seed):
     torch.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
+    #TODO add saving and loading of random state for reproducable research
 
 
 def config2dict(config):
@@ -70,6 +71,9 @@ def check_environment():
     assert "tools/openfst" in PATH and "src/featbin" in PATH and "src/gmmbin" in PATH and "src/bin" in PATH and "src/nnetbin" in PATH
 
     assert isinstance(which("hmm-info"), str), which("hmm-info")
+
+    "lattice-align-phones"
+    "lattice-to-ctm-conf"
     # TODO test with which for other commands
 
 
@@ -90,25 +94,6 @@ def run_shell(cmd):
 
     logger.debug("OUTPUT: {}".format(output.decode("utf-8")))
     return output
-
-
-def compute_avg_performance(info_lst):
-    losses = []
-    errors = []
-    times = []
-
-    for tr_info_file in info_lst:
-        config_res = configparser.ConfigParser()
-        config_res.read(tr_info_file)
-        losses.append(float(config_res['results']['loss']))
-        errors.append(float(config_res['results']['err']))
-        times.append(float(config_res['results']['elapsed_time']))
-
-    loss = np.mean(losses)
-    error = np.mean(errors)
-    time = np.sum(times)
-
-    return [loss, error, time]
 
 
 def phn_mapping(phone_path, no_triphone=True, no_spoken_noise=True, no_silence=True, no_eps=True, start_idx=1):
