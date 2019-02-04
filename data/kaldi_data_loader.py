@@ -3,15 +3,14 @@ import random
 import copy
 
 import torch
-from torch.nn.utils.rnn import pack_sequence
 from torch.utils.data import DataLoader, Sampler, RandomSampler
-import numpy as np
 
 from data.data_util import chunk_scp
 from data.dataset_registry import get_dataset
 from data.kaldi_dataset_framewise import KaldiDatasetFramewise
 from data.kaldi_dataset_framewise_shuffled_frames import KaldiDatasetFramewiseShuffledFrames
 from data.kaldi_dataset_unaligned import KaldiDatasetUnaligned
+from nn_.registries.loss_registry import PADDING_IGNORE_INDEX
 
 
 def collate_fn_simple(sample_list):
@@ -24,7 +23,7 @@ def collate_fn_simple(sample_list):
     return [], fea_dict, lab_dict
 
 
-def collate_fn_rnd_zero_pad(sample_list):
+def collate_fn_zero_pad(sample_list):
     fea_keys = list(sample_list[0][1].keys())
     lab_keys = list(sample_list[0][2].keys())
 
@@ -38,45 +37,17 @@ def collate_fn_rnd_zero_pad(sample_list):
     sample_names = []
 
     fea_dict = {k: torch.zeros([max_length, batch_size] + list(sample_list[0][1][k].shape[1:])) for k in fea_keys}
-    lab_dict = {k: torch.full((max_length, batch_size), dtype=torch.int64, fill_value=-100) for k in lab_keys}
+    lab_dict = {k: torch.full((max_length, batch_size), dtype=torch.int64, fill_value=-PADDING_IGNORE_INDEX) for k in
+                lab_keys}
     for _idx, sample in enumerate(sample_list):
         _len_feat = sample[1][fea_keys[0]].shape[0]
         _len_lab = sample[2][lab_keys[0]].shape[0]
 
-        padding_zeros = max_length - _len_feat
-        padding_zeros_left = random.randint(0, padding_zeros)
-
         sample_names.append(sample[0])
         for fea in fea_dict:
-            fea_dict[fea][padding_zeros_left: padding_zeros_left + _len_feat, _idx, :, :] = sample[1][fea]
+            fea_dict[fea][:_len_feat, _idx, :, :] = sample[1][fea]
         for lab in lab_dict:
-            lab_dict[lab][padding_zeros_left: padding_zeros_left + _len_lab, _idx] = sample[2][lab]
-
-    return sample_names, fea_dict, lab_dict
-
-
-def collate_fn(sample_list):
-    fea_keys = list(sample_list[0][1].keys())
-    lab_keys = list(sample_list[0][2].keys())
-
-    sample_names = []
-    fea_dict = {k: list() for k in fea_keys}
-    lab_dict = {k: list() for k in lab_keys}
-
-    for sample in sample_list:
-        sample_names.append(sample[0])
-        for fea in fea_dict:
-            fea_dict[fea].append(sample[1][fea])
-        for lab in lab_dict:
-            lab_dict[lab].append(sample[2][lab])
-
-    for fea in fea_dict:
-        fea_dict[fea] = pack_sequence(sorted(fea_dict[fea], key=lambda x: x.shape[0], reverse=True))
-
-    for lab in lab_dict:
-        lab_dict[lab] = sorted(lab_dict[lab], key=lambda x: x.shape[0], reverse=True)
-        sequence_length = torch.from_numpy(np.array([len(l) for l in lab_dict[lab]]))
-        lab_dict[lab] = {"label": pack_sequence(lab_dict[lab]), "sequence_lengths": sequence_length}
+            lab_dict[lab][:_len_lab, _idx] = sample[2][lab]
 
     return sample_names, fea_dict, lab_dict
 
@@ -148,14 +119,14 @@ class KaldiDataLoader(DataLoader):
         pin_memory = False
 
         if isinstance(dataset, KaldiDatasetUnaligned):
-            _collate_fn = collate_fn
+            _collate_fn = collate_fn_zero_pad
             _sampler = BucketRandomSampler(
                 self.dataset.ordering_length,
                 sort_by_feat=sort_by_feat,
                 bucket_size_samples=100) if sort_by_feat is not None \
                 else None
         elif isinstance(dataset, KaldiDatasetFramewise):
-            _collate_fn = collate_fn_rnd_zero_pad
+            _collate_fn = collate_fn_zero_pad
             # SortedSampler(
             #     self.dataset.ordering_length,
             #     sort_by_feat=sort_by_feat) if sort_by_feat is not None
@@ -178,7 +149,7 @@ class KaldiDataLoader(DataLoader):
                                               collate_fn=_collate_fn,
                                               pin_memory=pin_memory,
                                               num_workers=num_workers,
-                                              drop_last=True) #drop last because maybe batchnorm
+                                              drop_last=True)  # drop last because maybe batchnorm
 
 
 class KaldiChunkedDataLoader:

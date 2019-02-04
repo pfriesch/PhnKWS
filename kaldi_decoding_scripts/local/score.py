@@ -59,8 +59,7 @@ def score(data, lang_or_graph, dir, num_jobs, stage=0,
             acoustic_scale = 1 / LMWT * mbr_scale
             cmd = f"{pl_cmd_script} JOB=1:{nj} {dir}/scoring/log/best_path.{LMWT}.JOB.log " + \
                   f"lattice-align-phones {model} \"ark:gunzip -c {dir}/lat.JOB.gz|\" ark:- \| " + \
-                  f"lattice-to-ctm-conf --acoustic-scale={acoustic_scale:.8f} " + \
-                  f"--lm-scale={mbr_scale} ark:- {dir}/scoring/{LMWT}.JOB.ctm || exit 1;"
+                  f"lattice-to-ctm-conf --acoustic-scale={acoustic_scale:.8f} --lm-scale={mbr_scale} ark:- {dir}/scoring/{LMWT}.JOB.ctm || exit 1;"
             run_shell(cmd)
             run_shell(f"cat {dir}/scoring/{LMWT}.*.ctm | sort > {dir}/scoring/{LMWT}.ctm")
             run_shell(f"rm {dir}/scoring/{LMWT}.*.ctm")

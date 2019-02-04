@@ -39,8 +39,7 @@ def score(data, lang_or_graph, dir, num_jobs,
     # Get the phone-sequence on the best-path:
     for LMWT in range(min_lmwt, max_lmwt):
         cmd = f"{pl_cmd_script} JOB=1:{nj} {dir}/scoring/log/best_path_basic.{LMWT}.JOB.log " + \
-              f"lattice-best-path --lm-scale={LMWT} --word-symbol-table={symtab} --verbose=2 " + \
-              f"\"ark:gunzip -c {dir}/lat.JOB.gz|\" ark,t:{dir}/scoring/{LMWT}.JOB.tra || exit 1;"
+              f"lattice-best-path --lm-scale={LMWT} --word-symbol-table={symtab} --verbose=2 \"ark:gunzip -c {dir}/lat.JOB.gz|\" ark,t:{dir}/scoring/{LMWT}.JOB.tra || exit 1;"
         run_shell(cmd)
         run_shell(f"cat {dir}/scoring/{LMWT}.*.tra | sort > {dir}/scoring/{LMWT}.tra")
         run_shell(f"rm {dir}/scoring/{LMWT}.*.tra")
@@ -50,6 +49,5 @@ def score(data, lang_or_graph, dir, num_jobs,
           f"cat {dir}/scoring/LMWT.tra \| " + \
           f"{int2sym_script} -f 2- {symtab} \| " + \
           f"{timit_norm_trans_script} -i - -m {phonemap} -from 48 -to 39 \| " + \
-          f"compute-wer --text --mode=all " + \
-          f"ark:{dir}/scoring/test_filt.txt ark,p:- \">&\" {dir}/wer_LMWT || exit 1;"
+          f"compute-wer --text --mode=all ark:{dir}/scoring/test_filt.txt ark,p:- \">&\" {dir}/wer_LMWT || exit 1;"
     run_shell(cmd)

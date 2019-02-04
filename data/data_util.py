@@ -453,7 +453,7 @@ def make_big_chunk_no_order(feature_dict, label_dict, normalize_feat=True):
                 # Adding 1 to use 0 padding for framewise or 0 as blank with ctc
                 label_chunks[label_name] -= 1
 
-            #index at 0 for no order
+            # index at 0 for no order
             # label_chunks[label_name] += 1
 
             if label_chunks[label_name].min() != 0:
