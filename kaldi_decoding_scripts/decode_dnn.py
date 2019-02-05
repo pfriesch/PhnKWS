@@ -5,6 +5,7 @@ import re
 
 from kaldi_decoding_scripts.local.score import score as score
 from kaldi_decoding_scripts.local.score_basic import score as score_basic
+from kaldi_decoding_scripts.local.score_libri import score as score_libri
 from utils.utils import run_shell
 from utils.logger_config import logger
 
@@ -23,7 +24,8 @@ def decode(alidir,
            max_arcs=-1.0,
            scoring_type="std",  # none, std & basic so far
            scoring_opts=None,
-           norm_vars=False, **kwargs):
+           norm_vars=False,
+           **kwargs):
     if scoring_opts is None:
         scoring_opts = {"min-lmwt": 1, "max-lmwt": 10}
     assert isinstance(featstrings, list)
@@ -41,7 +43,6 @@ def decode(alidir,
         f.write(str(num_jobs))
 
     assert os.path.exists(os.path.join(graphdir, "HCLG.fst"))
-    assert os.path.exists(os.path.join(data, "feats.scp"))
 
     JOB = 1
     for ck_data in featstrings:
@@ -61,11 +62,52 @@ def decode(alidir,
     if scoring_type != "none":
         if scoring_type == "std":
             score(data, graphdir, out_folder, num_jobs, **scoring_opts)
-        if scoring_type == "basic":
+        elif scoring_type == "basic":
             score_basic(data, graphdir, out_folder, num_jobs, **scoring_opts)
+        elif scoring_type == "libri":
+            score_libri(data, graphdir, out_folder, **scoring_opts)
+        else:
+            raise ValueError
 
 
-def best_wer(decoding_dir):
+def best_wer(decoding_dir, scoring_type):
+    if scoring_type != "none":
+        if scoring_type == "std" or scoring_type == "basic":
+            return best_wer_timit(decoding_dir)
+        elif scoring_type == "libri":
+            return best_wer_libri(decoding_dir)
+        else:
+            raise ValueError
+    else:
+        raise ValueError
+
+
+def best_wer_libri(decoding_dir):
+    avg_lines = []
+    for path in glob(os.path.join(decoding_dir, "wer_*")):
+        _, LMWT, word_ins_penalty = os.path.basename(path).split("_")
+        with open(path, "r") as  f:
+            wer_file_lines = f.readlines()
+        avg_lines.append((LMWT, word_ins_penalty, next(line for line in wer_file_lines if "WER" in line)))
+
+    result = []
+    for line in avg_lines:
+        _split = line[2].split(" ")
+        wer = float(_split[1])
+        total_fail = int(_split[3])
+        total_possible = int(_split[5].strip(","))
+        ins = int(_split[6])
+        _del = int(_split[8])
+        sub = int(_split[10])
+
+        result.append({"lm_weight": int(line[0]), "word_ins_penalty": float(line[1]),
+                       "wer": wer, "total": f"{total_fail}/{total_possible}",
+                       "del": _del, "ins": ins, "sub": sub})
+
+    return min(result, key=lambda x: x['wer'])
+
+
+def best_wer_timit(decoding_dir):
     avg_lines = []
     for path in glob(os.path.join(decoding_dir, "score_*", "*.sys")):
         with open(path, "r") as  f:

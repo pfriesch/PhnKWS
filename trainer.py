@@ -7,6 +7,7 @@ import torch
 from torch.nn.utils.rnn import PackedSequence
 from tqdm import tqdm
 
+from data.keyword_dataset import KeywordDataset
 from base.base_trainer import BaseTrainer
 from data import kaldi_io
 from data.data_util import load_counts
@@ -398,7 +399,7 @@ class Trainer(BaseTrainer):
                        out_folder=out_dec_folder,
                        featstrings=files_dec_list)
 
-                decoding_results = best_wer(out_dec_folder)
+                decoding_results = best_wer(out_dec_folder, self.config['decoding']['scoring_type'])
                 logger.info(decoding_results)
 
                 self.tensorboard_logger.add_text("WER results", str(decoding_results))
