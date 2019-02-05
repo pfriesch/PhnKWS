@@ -101,6 +101,56 @@ def prepare_labels(datasets, phn_mapping):
                     logger.debug("Labels already extracted at {}".format(out_path))
 
 
+def load_features(feature_lst_path, feature_opts):
+    features_loaded = \
+        {k: m for k, m in
+         kaldi_io.read_mat_ark('ark:copy-feats scp:{} ark:- |{}'.format(feature_lst_path, feature_opts))}
+    assert len(features_loaded) > 0
+
+    return features_loaded
+
+
+def load_labels(label_folder, label_opts, phn_mapping=None, filenames=None):
+    debug_removed_ids = Counter()
+
+    def map_label(label):
+        nonlocal phn_mapping
+        if phn_mapping is not None:
+            #### Debugging
+            for _lab_id in label:
+                if _lab_id not in phn_mapping.id_mapping:
+                    debug_removed_ids[_lab_id] += 1
+            #### /Debugging
+
+            labels_new = [phn_mapping.id_mapping[_lab_id] for _lab_id in label if
+                          _lab_id in phn_mapping.id_mapping]
+
+            assert 0 not in labels_new
+
+            # We probably do not want to remove repeating phonemes since we do not know if there is a silence between them. Also it can't hurt too much to detect the same phoneneme twice?!...
+            ## Remove repeating characters
+            ## labels_new = [i for i, _ in itertools.groupby(labels_new)]
+            return np.array(labels_new)
+        else:
+            return label
+
+    if filenames is not None:
+        labels_loaded = \
+            {k: map_label(v) for k, v in
+             kaldi_io.read_vec_int_ark(
+                 'gunzip -c {}/ali*.gz | {} {}/final.mdl ark:- ark:-|'
+                     .format(label_folder, label_opts, label_folder))
+             if k in filenames}
+    else:
+        labels_loaded = \
+            {k: map_label(v) for k, v in
+             kaldi_io.read_vec_int_ark(
+                 'gunzip -c {}/ali*.gz | {} {}/final.mdl ark:- ark:-|'
+                     .format(label_folder, label_opts, label_folder))}
+    assert len(labels_loaded) > 0
+    return labels_loaded
+
+
 def load_data_unaligned(feature_dict, label_dict, phn_mapping, max_sequence_length,
                         check_for_feat_label_mismatch=False, tensorboard_logger=None):
     features_loaded = {}
@@ -345,6 +395,54 @@ def load_data(feature_dict, label_dict, max_sequence_length, context_size, tenso
     return features_loaded_chunked, labels_loaded_chunked
 
 
+def chunks_by_seqlen(samples_list, max_sequence_length, context_left, context_right):
+    # TODO remove with 1/4 of max length -> add to config
+    # TODO add option weather the context_size is applied to the minimum sequence length
+    min_sequence_length = max_sequence_length // 4  # + (context_left + context_right)
+
+    # samples_list_chunked = []
+    chunks = []
+
+    for sample in samples_list:
+        filename, sample_dict = sample
+
+        assert len(sample_dict["features"]) == 1  # TODO multi feature
+        for feature_name in sample_dict["features"]:
+            if len(sample_dict["features"][feature_name]) - (context_left + context_right) > (
+                    max_sequence_length + min_sequence_length) and max_sequence_length > 0:
+                for i in range((len(sample_dict["features"][feature_name]) - (context_left + context_right)
+                                + max_sequence_length - 1) // max_sequence_length):
+                    if (len(sample_dict["features"][feature_name][
+                            i * max_sequence_length + context_left:-context_right])
+                            > max_sequence_length + min_sequence_length):
+                        # we do not want to have sequences shorter than {min_sequence_length} but also do not want to discard sequences
+                        # so we allow a few sequeces with length {max_sequence_length + min_sequence_length} instead
+                        #####
+                        # If the sequence length is above the threshold, we split it with a minimal length max/4
+                        # If max length = 500, then the split will start at 500 + (500/4) = 625.
+                        # A seq of length 625 will be splitted in one of 500 and one of 125
+                        # filename_new = filename + "_c" + str(i)
+
+                        total = len(sample_dict["features"][feature_name])
+
+                        start_idx = context_left + i * max_sequence_length
+                        end_idx = context_left + i * max_sequence_length + max_sequence_length
+                        chunks.append(
+                            (filename, start_idx, end_idx))
+                    else:
+                        start_idx = context_left + i * max_sequence_length
+                        end_idx = len(sample_dict["features"][feature_name]) - context_right
+                        chunks.append((filename, start_idx, end_idx))
+                        break
+
+            else:
+                start_idx = context_left
+                end_idx = len(sample_dict["features"][feature_name]) - context_right
+                chunks.append((filename, start_idx, end_idx))
+
+    return chunks
+
+
 def get_order_by_length(feature_dict):
     ordering_length = {}
     for feature_name in feature_dict:
@@ -430,6 +528,55 @@ def apply_context(feature_dict, label_dict, context_left, context_right):
     #             fea_conc = fea_conc[context_left:fea_conc.shape[0] - context_right]
 
     return feature_dict_context, label_dict
+
+
+
+# def apply_context(samples_list, left_context, right_context):
+#     """
+#     Remove labels left and right to account for the needed context.
+#
+#     Note:
+#         Reasons to just concatinate the context:
+#
+#         Pro:
+#
+#         - Like in production, we continously predict a frame with context
+#         - one frame and context corresponds to one out value, no confusion
+#         - TDNN possible
+#         - easier to reason about
+#         - less confusion with wired effects of padding etc
+#
+#         Contra:
+#
+#         - recomputation of convolutions
+#         - not clear how to do it continously
+#         - more memory needed since it grows exponentially with the context size
+#
+#     """
+#
+#     # Using views, so it should be fine on the data
+#
+#     for sample in samples_list:
+#         filename, sample_dict = sample
+#         for label_name in sample_dict["labels"]:
+#             sample_dict["labels"][label_name] = sample_dict["labels"][label_name][
+#                                                 left_context:len(
+#                                                     sample_dict["labels"][label_name]) - right_context]
+#
+#         for feature_name in sample_dict["features"]:
+#
+#             length, num_feats = sample_dict["features"][feature_name].shape
+#             # features_context = []
+#             # new_view = np.empty(list(sample_dict["features"][feature_name][left_context:-right_context].shape) + [
+#             #     left_context + right_context + 1])
+#             new_view = []
+#             for i in range(length - left_context - right_context):
+#                 new_view.append(sample_dict["features"][feature_name][i:i + left_context + right_context + 1, :].T)
+#                 assert sample_dict["features"][feature_name][i:i + left_context + right_context + 1, :].T.base.shape == \
+#                        new_view[i].base.shape
+#             sample_dict["features"][feature_name] = new_view
+#
+#     return samples_list
 
 
 def make_big_chunk_no_order(feature_dict, label_dict, normalize_feat=True):
