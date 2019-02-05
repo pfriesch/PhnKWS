@@ -28,12 +28,12 @@ def split_chunks(seq, size):
     return newseq
 
 
-def chunk_scp(feature_lst_path, N_chunks, out_dir):
+def chunk_scp(feature_lst_path, n_samples_per_chunk, out_dir):
     with open(feature_lst_path, "r") as f:
         lines = f.readlines()
 
     random.shuffle(lines)
-    chunks = list(split_chunks(lines, N_chunks))
+    chunks = list(split_chunks(lines, n_samples_per_chunk))
 
     chunk_paths = []
     for _id, chunk in enumerate(chunks):

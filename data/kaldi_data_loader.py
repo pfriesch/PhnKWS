@@ -188,14 +188,15 @@ class KaldiChunkedDataLoader:
         self.n_samples_per_feat = {}
 
         # all featers have same amount of chunks
-        assert len(set([feature_dict[feature_name]['n_chunks'] for feature_name in feature_dict])) == 1
+        assert len(set([feature_dict[feature_name]['n_samples_per_chunk'] for feature_name in feature_dict])) == 1
 
         for feature_name in feature_dict:
             feature_lst_path = feature_dict[feature_name]['feature_lst_path']
-            self.n_chunks = feature_dict[feature_name]['n_chunks']
+            self.n_samples_per_chunk = feature_dict[feature_name]['n_samples_per_chunk']
             self.chunk_paths[feature_name], self.n_samples_per_feat[feature_name] = chunk_scp(feature_lst_path,
-                                                                                              self.n_chunks,
+                                                                                              self.n_samples_per_chunk,
                                                                                               out_dir)
+            self.n_chunks = len(self.chunk_paths[feature_name])
 
         self.n_samples = sum(self.n_samples_per_feat.values())
         # self.n_batches = sum([n_values // batch_size for n_values in self.n_samples_per_feat.values()])
