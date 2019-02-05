@@ -1,7 +1,7 @@
 import torch.nn.functional as F
 from torch import nn
 
-from nn_.registries.loss_registry import PADDING_IGNORE_INDEX
+from data import PADDING_IGNORE_INDEX
 
 
 class MtlMonoCDLoss(nn.Module):
@@ -13,7 +13,7 @@ class MtlMonoCDLoss(nn.Module):
     def forward(self, output, target):
         if len(target['lab_cd'].shape) == 1:
             sequence_input = False
-        if len(target['lab_cd'].shape) == 2:
+        elif len(target['lab_cd'].shape) == 2:
             sequence_input = True
         else:
             raise ValueError

@@ -33,7 +33,7 @@ def optimizer_init(config, model):
                                                       centered=False)
 
     elif config['training']['optimizer']['type'] == 'sgd':
-        trainable_params = filter(lambda p: p.requires_grad, model.cnn.parameters())
+        trainable_params = filter(lambda p: p.requires_grad, model.parameters())
         optimizers['all'] = optim.SGD(trainable_params, **config['training']['optimizer']["args"])
     else:
         raise ValueError("Can't find the optimizer {}".format(optimizers))

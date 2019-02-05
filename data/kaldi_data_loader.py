@@ -5,12 +5,12 @@ import copy
 import torch
 from torch.utils.data import DataLoader, Sampler, RandomSampler
 
+from data import PADDING_IGNORE_INDEX
 from data.data_util import chunk_scp
 from data.dataset_registry import get_dataset
 from data.kaldi_dataset_framewise import KaldiDatasetFramewise
 from data.kaldi_dataset_framewise_shuffled_frames import KaldiDatasetFramewiseShuffledFrames
 from data.kaldi_dataset_unaligned import KaldiDatasetUnaligned
-from nn_.registries.loss_registry import PADDING_IGNORE_INDEX
 
 
 def collate_fn_simple(sample_list):

@@ -21,9 +21,10 @@ def load_counts(class_counts_file):
 
 def split_chunks(seq, size):
     newseq = []
-    splitsize = 1.0 / size * len(seq)
-    for i in range(size):
-        newseq.append(seq[int(round(i * splitsize)):int(round((i + 1) * splitsize))])
+    for chunk in range(len(seq) // size):
+        newseq.append(seq[chunk * size:chunk * size + size])
+    newseq.append(seq[chunk * size + size:])
+
     return newseq
 
 
