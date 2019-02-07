@@ -9,7 +9,6 @@ class KaldiDatasetUnaligned(object):
 
     def __init__(self, feature_dict,
                  label_dict,
-                 phn_mapping,
                  context_left,
                  context_right,
                  max_sequence_length,

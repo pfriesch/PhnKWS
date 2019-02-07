@@ -41,12 +41,12 @@ class KaldiDatasetFramewise(object):
             self.feature_chunks = {k: v.to(device) for k, v in self.feature_chunks.items()}
             self.label_chunks = {k: v.to(device) for k, v in self.label_chunks.items()}
 
-    def _get_by_filename(self, filename):
-        index = self.sample_names.index(filename)
-        return ({feat_name: self.feature_chunks[feat_name][v['start_idx']:v['end_idx']]
-                 for feat_name, v in self.samples[index]['features'].items()},
-                {lab_name: self.label_chunks[lab_name][v['start_idx']:v['end_idx']]
-                 for lab_name, v in self.samples[index]['labels'].items()})
+    # def _get_by_filename(self, filename):
+    #     index = self.sample_names.index(filename)
+    #     return ({feat_name: self.feature_chunks[feat_name][v['start_idx']:v['end_idx']]
+    #              for feat_name, v in self.samples[index]['features'].items()},
+    #             {lab_name: self.label_chunks[lab_name][v['start_idx']:v['end_idx']]
+    #              for lab_name, v in self.samples[index]['labels'].items()})
 
     def __getitem__(self, index):
         return (self.sample_names[index],

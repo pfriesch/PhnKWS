@@ -49,14 +49,6 @@ def main(config_path, resume_path, debug, local):
     config = read_json(config_path)
     check_config(config)
 
-    if not local:
-        check_environment()
-    if not debug and not local:
-        git_commit = code_versioning()
-        if 'versioning' not in config:
-            config['versioning'] = {}
-        config['versioning']['git_commit'] = git_commit
-
     if resume_path:
         resume_config = torch.load(folder_to_checkpoint(args.resume), map_location='cpu')['config']
         # also the results won't be the same give the different random seeds with different number of draws
@@ -70,8 +62,8 @@ def main(config_path, resume_path, debug, local):
         print("".join(["="] * 80))
 
         config = resume_config
-        start_time = datetime.datetime.now().strftime('_%Y%m%d_%H%M%S')
-        config['exp']['name'] = config['exp']['name'] + "r-" + start_time
+        # start_time = datetime.datetime.now().strftime('_%Y%m%d_%H%M%S')
+        # config['exp']['name'] = config['exp']['name'] + "r-" + start_time
     else:
         start_time = datetime.datetime.now().strftime('_%Y%m%d_%H%M%S')
         config['exp']['name'] = config['exp']['name'] + start_time
@@ -84,6 +76,15 @@ def main(config_path, resume_path, debug, local):
         os.makedirs(out_folder + '/exp_files')
 
     logger.configure_logger(out_folder)
+
+    if not local:
+        check_environment()
+    if not debug and not local:
+        git_commit = code_versioning()
+        if 'versioning' not in config:
+            config['versioning'] = {}
+        config['versioning']['git_commit'] = git_commit
+
     logger.info("Experiment name : {}".format(out_folder))
     logger.info("tensorboard : tensorboard --logdir {}".format(os.path.abspath(out_folder)))
 

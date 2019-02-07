@@ -3,7 +3,7 @@ from data.kaldi_dataset_framewise_shuffled_frames import KaldiDatasetFramewiseSh
 from data.kaldi_dataset_unaligned import KaldiDatasetUnaligned
 
 
-def get_dataset(feature_dict, label_dict, phn_mapping, context_left, context_right, max_sequence_length,
+def get_dataset(feature_dict, label_dict, context_left, context_right, max_sequence_length,
                 framewise_labels,
                 tensorboard_logger):
     if framewise_labels == "shuffled_frames":
@@ -13,7 +13,7 @@ def get_dataset(feature_dict, label_dict, phn_mapping, context_left, context_rig
         dataset = KaldiDatasetFramewise(feature_dict, label_dict, context_left, context_right, max_sequence_length,
                                         tensorboard_logger)
     else:
-        dataset = KaldiDatasetUnaligned(feature_dict, label_dict, phn_mapping, context_left, context_right,
+        dataset = KaldiDatasetUnaligned(feature_dict, label_dict, context_left, context_right,
                                         max_sequence_length,
                                         tensorboard_logger)
     return dataset

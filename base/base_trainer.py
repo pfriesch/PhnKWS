@@ -5,6 +5,7 @@ import threading
 
 import torch
 
+from base import resume_checkpoint
 from utils.logger_config import logger
 from utils.tensorboard_logger import WriterTensorboardX
 from utils.util import ensure_dir, folder_to_checkpoint, every, Timer
@@ -83,7 +84,7 @@ class BaseTrainer:
             json.dump(config, f, indent=4, sort_keys=False)
 
         if resume_path:
-            self._resume_checkpoint(resume_path)
+            self.start_epoch = resume_checkpoint(resume_path, model, logger, optimizers, lr_schedulers)
 
         if nvidia_smi_enabled:
             self.log_gpu_usage()

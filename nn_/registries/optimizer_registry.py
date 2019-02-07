@@ -3,11 +3,7 @@ from torch import optim
 
 def optimizer_init(config, model):
     optimizers = {}
-    if config['training']['optimizer']['type'] == 'adam':
-        trainable_params = filter(lambda p: p.requires_grad, model.parameters())
-        optimizers['all'] = optim.Adam(trainable_params, **config['training']['optimizer']["args"])
-
-    elif config['training']['optimizer']['type'] == 'CE_triple_rmsprop_cfg':
+    if config['training']['optimizer']['type'] == 'CE_triple_rmsprop_cfg':
         trainable_params_tdnn = filter(lambda p: p.requires_grad, model.tdnn.parameters())
         optimizers['tdnn'] = optim.SGD(trainable_params_tdnn,
                                        lr=0.08,
@@ -35,7 +31,11 @@ def optimizer_init(config, model):
     elif config['training']['optimizer']['type'] == 'sgd':
         trainable_params = filter(lambda p: p.requires_grad, model.parameters())
         optimizers['all'] = optim.SGD(trainable_params, **config['training']['optimizer']["args"])
+    elif config['training']['optimizer']['type'] == 'adam':
+        trainable_params = filter(lambda p: p.requires_grad, model.parameters())
+        optimizers['all'] = optim.Adam(trainable_params, **config['training']['optimizer']["args"])
+
     else:
-        raise ValueError("Can't find the optimizer {}".format(optimizers))
+        raise ValueError(f"Can't find the optimizer {config['training']['optimizer']['type']}")
 
     return optimizers

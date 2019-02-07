@@ -9,6 +9,7 @@
     "save_period": 1
   },
   "data_use": {
+    "data_root": "/mnt/data/pytorch-kaldi/data",
     //todo allow multiple inputs
     "train_with": "train_clean_100",
     "valid_with": "dev_clean",
@@ -108,13 +109,13 @@
     "sort_by_feat": "fbank",
     "clip_grad_norm": -1,
     "optimizer": {
-      "type": "sgd",
+      "type": "adam",
       "args": {
-        "lr": 0.08,
-        "momentum": 0.0,
-        "weight_decay": 0.0,
-        "dampening": 0.0,
-        "nesterov": false
+        "lr": 0.001
+        //        "momentum": 0.0,
+        //        "weight_decay": 0.0,
+        //        "dampening": 0.0,
+        //        "nesterov": false
       }
     },
     "lr_scheduler": {

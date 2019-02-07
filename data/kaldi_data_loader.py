@@ -154,7 +154,7 @@ class KaldiDataLoader(DataLoader):
 
 class KaldiChunkedDataLoader:
 
-    def __init__(self, feature_dict, label_dict, phn_mapping, out_dir,
+    def __init__(self, feature_dict, label_dict, out_dir,
                  context_left, context_right,
                  max_sequence_length,
                  framewise_labels,
@@ -166,7 +166,6 @@ class KaldiChunkedDataLoader:
         #### DATASET
         self.feature_dict = feature_dict
         self.label_dict = label_dict
-        self.phn_mapping = phn_mapping
         self.out_dir = out_dir
         self.context_left = context_left
         self.context_right = context_right
@@ -216,7 +215,6 @@ class KaldiChunkedDataLoader:
 
                 dataset = get_dataset(_feature_dict,
                                       self.label_dict,
-                                      self.phn_mapping,
                                       self.context_left,
                                       self.context_right,
                                       self.max_sequence_length,
