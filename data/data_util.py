@@ -395,13 +395,13 @@ def load_data(feature_dict, label_dict, max_sequence_length, context_size, tenso
     return features_loaded_chunked, labels_loaded_chunked
 
 
-def chunks_by_seqlen(samples_list, max_sequence_length, context_left, context_right):
+def splits_by_seqlen(samples_list, max_sequence_length, context_left, context_right):
     # TODO remove with 1/4 of max length -> add to config
     # TODO add option weather the context_size is applied to the minimum sequence length
     min_sequence_length = max_sequence_length // 4  # + (context_left + context_right)
 
-    # samples_list_chunked = []
-    chunks = []
+    # samples_list_splited = []
+    splits = []
 
     for sample in samples_list:
         filename, sample_dict = sample
@@ -427,20 +427,20 @@ def chunks_by_seqlen(samples_list, max_sequence_length, context_left, context_ri
 
                         start_idx = context_left + i * max_sequence_length
                         end_idx = context_left + i * max_sequence_length + max_sequence_length
-                        chunks.append(
+                        splits.append(
                             (filename, start_idx, end_idx))
                     else:
                         start_idx = context_left + i * max_sequence_length
                         end_idx = len(sample_dict["features"][feature_name]) - context_right
-                        chunks.append((filename, start_idx, end_idx))
+                        splits.append((filename, start_idx, end_idx))
                         break
 
             else:
                 start_idx = context_left
                 end_idx = len(sample_dict["features"][feature_name]) - context_right
-                chunks.append((filename, start_idx, end_idx))
+                splits.append((filename, start_idx, end_idx))
 
-    return chunks
+    return splits
 
 
 def get_order_by_length(feature_dict):
@@ -457,6 +457,25 @@ def get_order_by_length(feature_dict):
 
 
 def apply_context_single_feat(feat, context_left, context_right):
+
+    # with Timer("roll", [logger]): # 30% faster but harder to reason about
+    #
+    #     feature_dict_context = {}
+    #     for feature_name in feature_dict:
+    #         feature_dict_context[feature_name] = {}
+    #         for filename in feature_dict[feature_name]:
+    #             file_tensor = feature_dict[feature_name][filename]
+    #             length, num_feats = file_tensor.shape
+    #
+    #             fea_conc = np.empty([length, num_feats * (context_left + context_right + 1)])
+    #
+    #             index_fea = 0
+    #             for lag in range(-context_left, context_right + 1):
+    #                 fea_conc[:, index_fea:index_fea + num_feats] = np.roll(file_tensor, lag, axis=0)
+    #                 index_fea = index_fea + num_feats
+    #
+    #             fea_conc = fea_conc[context_left:fea_conc.shape[0] - context_right]
+
     length, num_feats = feat.shape
     out_feat = \
         np.empty(

@@ -166,6 +166,8 @@ class Trainer(BaseTrainer):
                 pbar.update()
                 #### /Logging ####
 
+        # TODO checkpointing by time
+
         self.tensorboard_logger.set_step(epoch, 'train')
         self.tensorboard_logger.add_scalar('train_loss_avg', train_loss / n_steps_this_epoch)
         for metric in train_metrics:
