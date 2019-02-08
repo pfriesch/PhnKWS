@@ -110,43 +110,12 @@ def load_features(feature_lst_path, feature_opts):
     return features_loaded
 
 
-def load_labels(label_folder, label_opts, phn_mapping=None, filenames=None):
-    debug_removed_ids = Counter()
-
-    def map_label(label):
-        nonlocal phn_mapping
-        if phn_mapping is not None:
-            #### Debugging
-            for _lab_id in label:
-                if _lab_id not in phn_mapping.id_mapping:
-                    debug_removed_ids[_lab_id] += 1
-            #### /Debugging
-
-            labels_new = [phn_mapping.id_mapping[_lab_id] for _lab_id in label if
-                          _lab_id in phn_mapping.id_mapping]
-
-            assert 0 not in labels_new
-
-            # We probably do not want to remove repeating phonemes since we do not know if there is a silence between them. Also it can't hurt too much to detect the same phoneneme twice?!...
-            ## Remove repeating characters
-            ## labels_new = [i for i, _ in itertools.groupby(labels_new)]
-            return np.array(labels_new)
-        else:
-            return label
-
-    if filenames is not None:
-        labels_loaded = \
-            {k: map_label(v) for k, v in
-             kaldi_io.read_vec_int_ark(
-                 'gunzip -c {}/ali*.gz | {} {}/final.mdl ark:- ark:-|'
-                     .format(label_folder, label_opts, label_folder))
-             if k in filenames}
-    else:
-        labels_loaded = \
-            {k: map_label(v) for k, v in
-             kaldi_io.read_vec_int_ark(
-                 'gunzip -c {}/ali*.gz | {} {}/final.mdl ark:- ark:-|'
-                     .format(label_folder, label_opts, label_folder))}
+def load_labels(label_folder, label_opts):
+    labels_loaded = \
+        {k: v for k, v in
+         kaldi_io.read_vec_int_ark(
+             'gunzip -c {}/ali*.gz | {} {}/final.mdl ark:- ark:-|'
+                 .format(label_folder, label_opts, label_folder))}
     assert len(labels_loaded) > 0
     return labels_loaded
 

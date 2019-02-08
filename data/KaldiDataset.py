@@ -18,7 +18,7 @@ from data.phoneme_dicts.phoneme_dict import get_phoneme_dict
 from utils.logger_config import logger, Logger
 
 
-def apply_context(sample, context_left, context_right):
+def apply_context(sample, context_left, context_right, aligned_labels):
     """
     Remove labels left and right to account for the needed context.
 
@@ -40,9 +40,13 @@ def apply_context(sample, context_left, context_right):
         - more memory needed since it grows exponentially with the context size
 
     """
+
     lables = {}
     for label_name in sample['labels']:
-        lables[label_name] = sample['labels'][label_name][context_left: -context_right]
+        if aligned_labels[label_name]:
+            lables[label_name] = sample['labels'][label_name][context_left: -context_right]
+        else:
+            lables[label_name] = sample['labels'][label_name]
 
     features = {}
     for feature_name in sample['features']:
@@ -73,41 +77,60 @@ class KaldiDataset(data.Dataset):
     dataset_prefix = "kaldi"
     info_filename = "info.json"
 
-    def __init__(self, root,
+    def __init__(self, cache_data_root,
                  dataset_name,
                  feature_dict,
                  label_dict,
-                 chunk_by_seqlen=True,
-                 max_seq_len=100,
+                 max_sample_len=1000,
                  left_context=5,
                  right_context=5,
                  normalize_features=True,
-                 phoneme_dict=None  # e.g. kaldi/egs/librispeech/s5/data/lang/phones.txt
+                 phoneme_dict=None,  # e.g. kaldi/egs/librispeech/s5/data/lang/phones.txt
+
+                 split_files_max_seq_len=100,
 
                  ):
-        self.root = os.path.expanduser(root)
+        self.aligned_labels = {}
+        #### sanity checks
+        for label_name in label_dict:
+            if label_dict[label_name]["label_opts"] == "ali-to-phones --per-frame=true" or \
+                    label_dict[label_name]["label_opts"] == "ali-to-pdf":
+                self.aligned_labels[label_name] = True
+
+            if label_dict[label_name]["label_opts"] == "ali-to-phones":
+                self.aligned_labels[label_name] = False
+                assert split_files_max_seq_len == False or split_files_max_seq_len is None or split_files_max_seq_len < 1, \
+                    "Can't split the files without aligned labels."
+        #### / sanity checks
+
+        self.cache_data_root = os.path.expanduser(cache_data_root)
         self.chunk_size = 100  # 1000 for TIMIT & 100 for libri
         self.samples_per_chunk = None
         self.max_len_per_chunk = None
         self.min_len_per_chunk = None
         self.cached_pt = 0
-        self.split_files_by_len = chunk_by_seqlen
-        self.max_seq_len = max_seq_len
+        self.split_files_max_seq_len = split_files_max_seq_len
+        self.max_sample_len = max_sample_len
         self.left_context = left_context
         self.right_context = right_context
         self.phoneme_dict = phoneme_dict
 
         self.normalize_features = normalize_features
 
-        self.dataset_path = os.path.join(self.root, self.dataset_prefix, "processed", dataset_name)
-
-        self.convert_from_kaldi_format(feature_dict, label_dict)
+        self.dataset_path = os.path.join(self.cache_data_root, self.dataset_prefix, "processed", dataset_name)
+        if not self._check_exists(feature_dict, label_dict):
+            self._convert_from_kaldi_format(feature_dict, label_dict)
         if not self._check_exists(feature_dict, label_dict):
             raise RuntimeError('Dataset not found.')
         self._read_info()
 
         self.samples = torch.load(
             os.path.join(self.dataset_path, "chunk_{:04d}.pyt".format(self.cached_pt)))
+
+    def set_split_files_max_seq_len(self, split_files_max_seq_len):
+        if self.split_files_max_seq_len != split_files_max_seq_len:
+            self.split_files_max_seq_len = split_files_max_seq_len
+            self._convert_from_kaldi_format(self.feature_dict, self.label_dict)
 
     def __getitem__(self, index):
         """
@@ -125,9 +148,12 @@ class KaldiDataset(data.Dataset):
         index = index % self.chunk_size
         filename, start_idx, end_idx = self.samples['sample_splits'][index]
         features, lables = apply_context(self.samples['samples'][filename], context_right=self.right_context,
-                                         context_left=self.left_context)
-        narrow_by_split(features, lables, start_idx, end_idx)
+                                         context_left=self.left_context, aligned_labels=self.aligned_labels)
+        narrow_by_split(features, lables, start_idx - self.left_context, end_idx - self.right_context)
+        for feature_name in features:
+            assert end_idx - start_idx == len(features[feature_name])
         if self.normalize_features:
+            # Normalize over whole chunk instead of only over a single file, which is done by applying the kaldi cmvn
             for feature_name in features:
                 features[feature_name] = (features[feature_name] -
                                           np.expand_dims(self.samples['means'][feature_name], axis=-1)) / \
@@ -147,7 +173,7 @@ class KaldiDataset(data.Dataset):
 
             if not (feature_dict == _info["feature_dict"]
                     or label_dict == _info["label_dict"]
-                    or self.split_files_by_len == _info["feats_chunked_by_seqlen"]):
+                    or self.split_files_max_seq_len == _info["feats_chunked_by_seqlen"]):
                 return False
             else:
                 return True
@@ -158,7 +184,7 @@ class KaldiDataset(data.Dataset):
                        "max_len_per_chunk": self.max_len_per_chunk,
                        "min_len_per_chunk": self.min_len_per_chunk,
                        "chunk_size": self.chunk_size,
-                       "chunked_by_seqlen": self.split_files_by_len,
+                       "split_files_max_seq_len": self.split_files_max_seq_len,
                        "feature_dict": feature_dict,
                        "label_dict": label_dict}, f)
 
@@ -168,54 +194,38 @@ class KaldiDataset(data.Dataset):
             self.samples_per_chunk = _info["samples_per_chunk"]
             self.max_len_per_chunk = _info["max_len_per_chunk"]
             self.min_len_per_chunk = _info["min_len_per_chunk"]
+            self.split_files_max_seq_len = _info["split_files_max_seq_len"]
             assert self.chunk_size == _info["chunk_size"]
             self.feature_dict = _info["feature_dict"]
             self.label_dict = _info["label_dict"]
 
-    # def make_chunks(self, samples_list):
-    #
-    #     for chnk_id in range(int(len(self) // self.chunk_size) + 1):
-    #
-    #         # TODO assert framewise
-    #         self.chunks = chunks_by_seqlen(samples_list, self.max_seq_len,
-    #                                        self.left_context, self.right_context)
-    #
-    #         for sample_id, start_idx, end_idx in self.chunks:
-    #             # sample_id, sample_dict = samples[sample_id]
-    #             # take the last features assuming all have the samme length #todo check that
-    #             self.max_len_per_chunk[chnk_id] = (end_idx - start_idx) \
-    #                 if (end_idx - start_idx) > self.max_len_per_chunk[chnk_id] else self.max_len_per_chunk[chnk_id]
-    #
-    #             self.min_len_per_chunk[chnk_id] = (end_idx - start_idx) \
-    #                 if (end_idx - start_idx) < self.min_len_per_chunk[chnk_id] else self.min_len_per_chunk[chnk_id]
-
-    def load_labels(self, label_dict):
+    def _load_labels(self, label_dict):
         all_labels_loaded = {}
 
         for lable_name in label_dict:
             # phn_mapping[lable_name]) #TODO
             all_labels_loaded[lable_name] = load_labels(label_dict[lable_name]['label_folder'],
                                                         label_dict[lable_name]['label_opts'])
-            if self.phoneme_dict is not None:
-                for sample_id in all_labels_loaded[lable_name]:
-                    assert max(all_labels_loaded[lable_name][sample_id]) <= max(
-                        self.phoneme_dict.idx2reducedIdx.keys()), \
-                        "Are you sure you have the righ phoneme dict? Labels have higher indices than phonemes ( {} <!= {} )" \
-                            .format(max(all_labels_loaded[lable_name][sample_id]),
-                                    max(self.phoneme_dict.idx2reducedIdx.keys()))
 
-                    # map labels according to phoneme dict
-                    tmp_labels = np.copy(all_labels_loaded[lable_name][sample_id])
-                    for k, v in self.phoneme_dict.idx2reducedIdx.items():
-                        tmp_labels[all_labels_loaded[lable_name][sample_id] == k] = v
+            if lable_name == "lab_phn":
+                if self.phoneme_dict is not None:
+                    for sample_id in all_labels_loaded[lable_name]:
+                        assert max(all_labels_loaded[lable_name][sample_id]) <= max(
+                            self.phoneme_dict.idx2reducedIdx.keys()), \
+                            "Are you sure you have the righ phoneme dict? Labels have higher indices than phonemes ( {} <!= {} )" \
+                                .format(max(all_labels_loaded[lable_name][sample_id]),
+                                        max(self.phoneme_dict.idx2reducedIdx.keys()))
 
-                    all_labels_loaded[lable_name][sample_id] = tmp_labels
+                        # map labels according to phoneme dict
+                        tmp_labels = np.copy(all_labels_loaded[lable_name][sample_id])
+                        for k, v in self.phoneme_dict.idx2reducedIdx.items():
+                            tmp_labels[all_labels_loaded[lable_name][sample_id] == k] = v
+
+                        all_labels_loaded[lable_name][sample_id] = tmp_labels
 
         return all_labels_loaded
 
-    def convert_from_kaldi_format(self, feature_dict, label_dict):
-        if self._check_exists(feature_dict, label_dict):
-            return
+    def _convert_from_kaldi_format(self, feature_dict, label_dict):
 
         main_feat = next(iter(feature_dict))
 
@@ -228,7 +238,7 @@ class KaldiDataset(data.Dataset):
             else:
                 raise
 
-        all_labels_loaded = self.load_labels(label_dict)
+        all_labels_loaded = self._load_labels(label_dict)
 
         with open(feature_dict[main_feat]["feature_lst_path"], "r") as f:
             lines = f.readlines()
@@ -291,13 +301,13 @@ class KaldiDataset(data.Dataset):
                 mean[feature_name] = np.mean(feat_concat, axis=0)
                 std[feature_name] = np.std(feat_concat, axis=0)
 
-            if self.split_files_by_len:
-                # TODO assert framewise
-                sample_splits = splits_by_seqlen(samples_list, self.max_seq_len,
+            if self.split_files_max_seq_len:
+                sample_splits = splits_by_seqlen(samples_list, self.split_files_max_seq_len,
                                                  self.left_context, self.right_context)
             else:
-                sample_splits = [(filename, 0, len(sample_dict["features"][main_feat])) for filename, sample_dict in
-                                 samples]
+                sample_splits = [
+                    (filename, self.left_context, len(sample_dict["features"][main_feat]) - self.right_context)
+                    for filename, sample_dict in samples_list]
 
             for sample_id, start_idx, end_idx in sample_splits:
                 self.max_len_per_chunk[chnk_id] = (end_idx - start_idx) \
@@ -322,60 +332,94 @@ class KaldiDataset(data.Dataset):
         self._write_info(feature_dict, label_dict)
         logger.info('Done extracting kaldi features!')
 
-    # def norm(self):
-    #     if label_dict is not None:
-    #         for label_name in label_dict:
-    #             if label_name == "lab_mono":
-    #                 # Adding 1 to use 0 padding for framewise or 0 as blank with ctc
-    #                 label_chunks[label_name] -= 1
-    #
-    #             label_chunks[label_name] += 1
-    #
-    #             if label_chunks[label_name].min() != 0:
-    #                 logger.warn("got label with min {}".format(label_chunks[label_name].min()))
-    #             if label_chunks[label_name].max() >= 48:
-    #                 logger.warn("got label with max {} {}".format(label_chunks[label_name].max(), label_name))
-    #     # if normalize_feat:
-    #     #     for feature_name in feature_dict:
-    #     #         feature_chunks[feature_name] = (feature_chunks[feature_name] - np.mean(feature_chunks[feature_name],
-    #     #                                                                                axis=0)) / np.std(
-    #     #             feature_chunks[feature_name], axis=0)
 
-    # TODO check if norm is actually doing anythong in cfg since they are normaized with kaldi
+def test1():
+    dataset = KaldiDataset(cache_data_root="/mnt/data/pytorch-kaldi/data",
+                           dataset_name="TIMIT_tr",
+                           feature_dict={
+                               "fbank": {
+                                   "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/feats_fbank.scp",
+                                   "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/train/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_train.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
+                               }
+                           },
+                           label_dict={
+                               "lab_phn": {
+                                   "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
+                                   "label_opts": "ali-to-phones",
+                                   "lab_count_file": "none",
+                                   "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
+                                   "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph",
+                               }
+                           },
+                           max_sample_len=200,
+                           left_context=10, right_context=2,
+                           normalize_features=True,
+                           phoneme_dict=get_phoneme_dict("/mnt/data/libs/kaldi/egs/timit/s5/data/lang/phones.txt",
+                                                         stress_marks=True, word_position_dependency=False),
+                           split_files_max_seq_len=False
+
+                           )
+    return dataset
+
+
+def test2():
+    dataset = KaldiDataset(cache_data_root="/mnt/data/pytorch-kaldi/data",
+                           dataset_name="TIMIT_tr",
+                           feature_dict={
+                               "fbank": {
+                                   "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/feats_fbank.scp",
+                                   "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/train/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_train.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
+                               }
+                           },
+                           label_dict={
+                               "lab_cd_phn": {
+                                   "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
+                                   "label_opts": "ali-to-pdf",
+                                   "lab_count_file": "auto",
+                                   "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
+                                   "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+                               },
+                               "lab_phn": {
+                                   "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
+                                   "label_opts": "ali-to-phones --per-frame=true",
+                                   "lab_count_file": "none",
+                                   "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
+                                   "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+                               }
+                           },
+                           max_sample_len=100,
+                           left_context=10, right_context=2,
+                           normalize_features=True,
+                           phoneme_dict=get_phoneme_dict("/mnt/data/libs/kaldi/egs/timit/s5/data/lang/phones.txt",
+                                                         stress_marks=True, word_position_dependency=False),
+                           split_files_max_seq_len=100
+
+                           )
+    return dataset
 
 
 if __name__ == '__main__':
     logger.configure_logger(out_folder="/mnt/data/pytorch-kaldi/data")
-    dataset = KaldiDataset("/mnt/data/pytorch-kaldi/data",
-                           dataset_name="train_clean_100",
-                           feature_dict={
-                               "fbank": {
-                                   "feature_lst_path": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/train_clean_100/feats_fbank.scp",
-                                   "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/librispeech/s5/data/train_clean_100/utt2spk  ark:/mnt/data/libs/kaldi/egs/librispeech/s5/fbank/cmvn_train_clean_100.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-                               }
-                           },
-                           label_dict={
-                               # "lab_cd": {
-                               #     "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
-                               #     "label_opts": "ali-to-pdf",
-                               #     "lab_count_file": "auto",
-                               #     "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
-                               #     "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
-                               # },
-                               "lab_mono": {
-                                   "label_folder": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/",
-                                   "label_opts": "ali-to-phones --per-frame=true",
-                                   "lab_count_file": "none",
-                                   "lab_data_folder": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/train_clean_100/",
-                                   "lab_graph": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/graph_tgsmall/"
-                               }
-                           },
-                           phoneme_dict=get_phoneme_dict("/mnt/data/libs/kaldi/egs/librispeech/s5/data/lang/phones.txt",
-                                                         stress_marks=True, word_position_dependency=False))
+    if os.path.exists("/mnt/data/pytorch-kaldi/data/kaldi/processed/TIMIT_tr/info.json"):
+        os.remove("/mnt/data/pytorch-kaldi/data/kaldi/processed/TIMIT_tr/info.json")
 
-    print(len(dataset))
-
-    all_feats = []
-    for filename, features, lables in dataset:
-        all_feats.append(features['fbank'][:, :, 0])
-        print("t")
+    ds = test1()
+    print("unaligned")
+    print(len(ds))
+    filename, features, lables = next(iter(ds))
+    print(filename)
+    for feature_name in features:
+        print(feature_name, features[feature_name].shape)
+    for label_name in lables:
+        print(label_name, lables[label_name].shape)
+    input()
+    os.remove("/mnt/data/pytorch-kaldi/data/kaldi/processed/TIMIT_tr/info.json")
+    ds = test2()
+    print("force-aligned")
+    print(len(ds))
+    filename, features, lables = next(iter(ds))
+    print(filename)
+    for feature_name in features:
+        print(feature_name, features[feature_name].shape)
+    for label_name in lables:
+        print(label_name, lables[label_name].shape)
