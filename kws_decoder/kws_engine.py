@@ -1,4 +1,5 @@
 import os
+import torch
 from os.path import join as join_path
 
 from base.base_decoder import BaseDecoder
@@ -6,6 +7,9 @@ from data import kaldi_io
 from utils.logger_config import logger
 from utils.utils import run_shell, check_environment
 from ww_benchmark.engine import Engine
+import numpy as np
+
+import matplotlib.pyplot as plt
 
 
 # TODO kaldi feat extraction for a single file
@@ -62,7 +66,10 @@ class KWSEngine(Engine):
         tmp_scp, spk2utt_path, utt2spk_path = self.preppare_tmp_files(wav_files, self.tmp_dir)
         feats = get_kaldi_feats(tmp_scp, self.tmp_dir, spk2utt_path, utt2spk_path)
 
-        return self.decoder.is_keyword(feats, self.keyword, self.sensitivity)
+        return {filename:
+                    self.decoder.is_keyword({"fbank": self.decoder.preprocess_feat(feat)},
+                                            self.keyword, self.sensitivity)
+                for filename, feat in feats.items()}
 
     def release(self):
         pass
@@ -114,14 +121,38 @@ class KWSEngine(Engine):
         return tmp_scp, spk2utt_path, utt2spk_path
 
 
+def plot_output_phonemes(model_logits):
+    for filename, logits in model_logits.items():
+        #### P1
+
+        # just_max_val = logits.max(axis=2)[:, 0]
+        # fig, axs = plt.subplots(1, 1)
+        # axs.plot(just_max_val)
+        # fig.tight_layout()
+        # plt.savefig("just_max_val.png")
+
+        #### P2
+
+        max_20 = sorted(logits.argmax(axis=2).squeeze(), reverse=True)[:20]
+        log_max_20 = logits[:, :, max_20]
+
+        fig, axs = plt.subplots(20, 1)
+        for i in range(20):
+            axs[i].plot(logits[:, :, i].squeeze())
+        # fig.tight_layout()
+        plt.savefig("max_20.png")
+
+
 def test():
-    engine = KWSEngine()
+    engine = KWSEngine("", 0.0,
+                       "/mnt/data/pytorch-kaldi/exp/libri_TDNN_fbank_20190205_025557/checkpoints/checkpoint-epoch9.pth")
 
     data_folder = "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/speech_commands_v0.02"
 
     files = [join_path(data_folder, "bed/20a0d54b_nohash_0.wav"),
              join_path(data_folder, "bed/1ed557b9_nohash_0.wav")]
-    engine.process(files)
+    model_logits = engine.process(files)
+    plot_output_phonemes(model_logits)
 
 
 if __name__ == '__main__':

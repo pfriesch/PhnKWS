@@ -358,6 +358,21 @@ def get_order_by_length(feature_dict):
     return ordering_length
 
 
+def apply_context_single_feat(feat, context_left, context_right):
+    length, num_feats = feat.shape
+    out_feat = \
+        np.empty(
+            (length - context_left - context_right,
+             num_feats,
+             context_left + context_right + 1)
+        )
+    for i in range(context_left, length - context_right):
+        out_feat[i - context_left, :, :] = \
+            feat[i - context_left:i + context_right + 1, :].T
+
+    return out_feat
+
+
 def apply_context(feature_dict, label_dict, context_left, context_right):
     """
     Remove labels left and right to account for the needed context.
@@ -391,17 +406,10 @@ def apply_context(feature_dict, label_dict, context_left, context_right):
         for feature_name in feature_dict:
             feature_dict_context[feature_name] = {}
             for filename in feature_dict[feature_name]:
-                file_tensor = feature_dict[feature_name][filename]
-                length, num_feats = file_tensor.shape
                 feature_dict_context[feature_name][filename] = \
-                    np.empty(
-                        (length - context_left - context_right,
-                         num_feats,
-                         context_left + context_right + 1)
-                    )
-                for i in range(context_left, length - context_right):
-                    feature_dict_context[feature_name][filename][i - context_left, :, :] = \
-                        file_tensor[i - context_left:i + context_right + 1, :].T
+                    apply_context_single_feat(
+                        feature_dict[feature_name][filename],
+                        context_left, context_right)
 
     # with Timer("roll", [logger]): # 30% faster but harder to reason about
     #

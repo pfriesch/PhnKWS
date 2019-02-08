@@ -73,6 +73,52 @@ class Trainer(BaseTrainer):
 
         self.tensorboard_logger.add_scalar("max_seq_length_train_curr", self.max_seq_length_train_curr, global_step)
 
+        chunk_sum_train_losses = {}
+        chunk_sum_train_metrics = {}
+        n_steps_chunk = 0
+
+        def chunk_completed_fun(x):
+            (_, last_inputs, last_targets) = x
+            nonlocal chunk_sum_train_losses
+            nonlocal chunk_sum_train_metrics
+            nonlocal n_steps_chunk
+            nonlocal global_step
+            nonlocal self
+
+            self.tensorboard_logger.set_step(global_step, 'train')
+            for _loss, loss_value in chunk_sum_train_losses.items():
+                self.tensorboard_logger.add_scalar(_loss, loss_value / n_steps_chunk)
+            for metric, metric_value in chunk_sum_train_metrics.items():
+                self.tensorboard_logger.add_scalar(metric, metric_value / n_steps_chunk)
+
+            for feat_name in last_inputs:
+                if isinstance(last_inputs[feat_name], PackedSequence):
+                    total_padding = torch.sum(
+                        (torch.ones_like(last_inputs[feat_name][1]) * last_inputs[feat_name][1][0]) -
+                        last_inputs[feat_name][
+                            1])
+                    self.tensorboard_logger.add_scalar('total_padding_{}'.format(feat_name),
+                                                       total_padding.item())
+                elif isinstance(last_inputs[feat_name], dict) and 'sequence_lengths' in last_inputs[feat_name]:
+                    total_padding = torch.sum(
+                        (torch.ones_like(last_inputs[feat_name]['sequence_lengths']) *
+                         last_inputs[feat_name]['sequence_lengths'][0]) - last_inputs[feat_name]['sequence_lengths'])
+                    self.tensorboard_logger.add_scalar('total_padding_{}'.format(feat_name),
+                                                       total_padding.item())
+                else:
+                    pass  # TODO for shuffle
+                    # total_padding = (last_targets['lab_mono'] == 0).sum()
+                    # # TODO check if 0 is only padding or also a label
+                    # self.tensorboard_logger.add_scalar('total_padding_{}'.format(feat_name),
+                    #                                    total_padding.item())
+                    # TODO save model etc
+
+            chunk_sum_train_losses = {}
+            chunk_sum_train_metrics = {}
+            n_steps_chunk = 0
+
+        data_loader.chunk_completed_hook(chunk_completed_fun)
+
         n_steps_this_epoch = 0
         # TODO chunked dataloader length
         with tqdm(disable=not logger.isEnabledFor(logging.INFO)) as pbar:
@@ -103,36 +149,20 @@ class Trainer(BaseTrainer):
                     opti.step()
 
                 #### Logging ####
-                self.tensorboard_logger.set_step(global_step, 'train')
+                n_steps_chunk += 1
                 for _loss, loss_value in loss.items():
-                    self.tensorboard_logger.add_scalar(_loss, loss_value.item())
-                train_loss += loss["loss_final"].item()
+                    if _loss not in chunk_sum_train_losses:
+                        chunk_sum_train_losses[_loss] = 0
+                    chunk_sum_train_losses[_loss] += loss_value
+
                 _train_metrics = self._eval_metrics(output, targets)
-                train_metrics = {metric: train_metrics[metric] + metric_value for
-                                 metric, metric_value
-                                 in _train_metrics.items()}
                 for metric, metric_value in _train_metrics.items():
-                    self.tensorboard_logger.add_scalar(metric, metric_value)
-
-                for feat_name in inputs:
-                    if isinstance(inputs[feat_name], PackedSequence):
-                        total_padding = torch.sum(
-                            (torch.ones_like(inputs[feat_name][1]) * inputs[feat_name][1][0]) - inputs[feat_name][1])
-                        self.tensorboard_logger.add_scalar('total_padding_{}'.format(feat_name), total_padding.item())
-                    elif isinstance(inputs[feat_name], dict) and 'sequence_lengths' in inputs[feat_name]:
-                        total_padding = torch.sum(
-                            (torch.ones_like(inputs[feat_name]['sequence_lengths']) *
-                             inputs[feat_name]['sequence_lengths'][0]) - inputs[feat_name]['sequence_lengths'])
-                        self.tensorboard_logger.add_scalar('total_padding_{}'.format(feat_name), total_padding.item())
-                    else:
-                        total_padding = (targets['lab_cd'] == 0).sum()
-                        # TODO check if 0 is only padding or also a label
-                        self.tensorboard_logger.add_scalar('total_padding_{}'.format(feat_name), total_padding.item())
-
-                pbar.set_description('T e:{} l: {:.4f} a: {:.3f}'.format(epoch,
-                                                                         loss["loss_final"].item(),
-                                                                         _train_metrics[
-                                                                             self.config['arch']['metrics'][0]]))
+                    if metric not in chunk_sum_train_metrics:
+                        chunk_sum_train_metrics[metric] = 0
+                    chunk_sum_train_metrics[metric] += metric_value
+                #
+                pbar.set_description('T e:{} l: {:.4f}'.format(epoch,
+                                                               loss["loss_final"].item()))
                 pbar.update()
                 #### /Logging ####
 

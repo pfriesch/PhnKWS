@@ -201,6 +201,7 @@ class KaldiChunkedDataLoader:
         # self.n_batches = sum([n_values // batch_size for n_values in self.n_samples_per_feat.values()])
 
         self.iterated_over = False
+        self.chunk_completed_callback_fun = None
 
     def __len__(self):
         return -1
@@ -230,4 +231,11 @@ class KaldiChunkedDataLoader:
                                               self.sort_by_feat)
                 for x in iter(data_loader):
                     yield x
+
+                if self.chunk_completed_callback_fun is not None:
+                    self.chunk_completed_callback_fun(x)
+
         self.iterated_over = True
+
+    def chunk_completed_hook(self, callback_fun):
+        self.chunk_completed_callback_fun = callback_fun

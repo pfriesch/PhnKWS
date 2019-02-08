@@ -138,29 +138,32 @@ def get_dataset_metadata(config):
         train_dataset_lab = config['datasets'][config['data_use']['train_with']]['labels']
         N_out_lab = {}
         for forward_out in config['test']:
-            normalize_with_counts_from = config['test'][forward_out]['normalize_with_counts_from']
-            assert 'label_opts' in train_dataset_lab[normalize_with_counts_from]
-            if config['test'][forward_out]['normalize_posteriors']:
-                # Try to automatically retrieve the config file
-                assert "ali-to-pdf" in train_dataset_lab[normalize_with_counts_from]['label_opts']
-                folder_lab_count = train_dataset_lab[normalize_with_counts_from]['label_folder']
-                cmd = "hmm-info " + folder_lab_count + "/final.mdl | awk '/pdfs/{print $4}'"
-                output = run_shell(cmd)
-                N_out = int(output.decode().rstrip())
-                N_out_lab[normalize_with_counts_from] = N_out
-                count_file_path = os.path.join(config['exp']['save_dir'], config['exp']['name'],
-                                               'exp_files/forward_' + forward_out + '_' + \
-                                               normalize_with_counts_from + '.count')
-                cmd = "analyze-counts --print-args=False --verbose=0 --binary=false --counts-dim=" + str(
-                    N_out) + " \"ark:ali-to-pdf " + folder_lab_count + "/final.mdl \\\"ark:gunzip -c " + folder_lab_count + "/ali.*.gz |\\\" ark:- |\" " + count_file_path
-                run_shell(cmd)
-                config['test'][forward_out]['normalize_with_counts_from_file'] = count_file_path
-                # kaldi labels are indexed at 1
-                # we use 0 for padding or blank label
-                config['arch']['args']['lab_cd_num'] = N_out
+            if 'normalize_with_counts_from' in config['test'][forward_out]:
+                normalize_with_counts_from = config['test'][forward_out]['normalize_with_counts_from']
+                assert 'label_opts' in train_dataset_lab[normalize_with_counts_from]
+                if config['test'][forward_out]['normalize_posteriors']:
+                    # Try to automatically retrieve the config file
+                    assert "ali-to-pdf" in train_dataset_lab[normalize_with_counts_from]['label_opts']
+                    folder_lab_count = train_dataset_lab[normalize_with_counts_from]['label_folder']
+                    cmd = "hmm-info " + folder_lab_count + "/final.mdl | awk '/pdfs/{print $4}'"
+                    output = run_shell(cmd)
+                    N_out = int(output.decode().rstrip())
+                    N_out_lab[normalize_with_counts_from] = N_out
+                    count_file_path = os.path.join(config['exp']['save_dir'], config['exp']['name'],
+                                                   'exp_files/forward_' + forward_out + '_' + \
+                                                   normalize_with_counts_from + '.count')
+                    cmd = "analyze-counts --print-args=False --verbose=0 --binary=false --counts-dim=" + str(
+                        N_out) + " \"ark:ali-to-pdf " + folder_lab_count + "/final.mdl \\\"ark:gunzip -c " + folder_lab_count + "/ali.*.gz |\\\" ark:- |\" " + count_file_path
+                    run_shell(cmd)
+                    config['test'][forward_out]['normalize_with_counts_from_file'] = count_file_path
+                    # kaldi labels are indexed at 1
+                    # we use 0 for padding or blank label
+                    config['arch']['args']['lab_cd_num'] = N_out
 
-                # if not config["arch"]["framewise_labels"]:
-                config['arch']['args']['lab_cd_num'] += 1
+                    # if not config["arch"]["framewise_labels"]:
+                    config['arch']['args']['lab_cd_num'] += 1
+            else:
+                logger.debug("Skipping getting normalize_with_counts for {}".format(forward_out))
 
     if "lab_mono_num" in config['arch']['args']:
         config['arch']['args']['lab_mono_num'] += 1

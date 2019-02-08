@@ -8,13 +8,13 @@ class LabMonoAccuracy(Module):
         super().__init__()
 
     def forward(self, output, target):
-        if len(target['lab_cd'].shape) == 2:
-            _len = target['lab_cd'].shape[0]
-            batch_size = target['lab_cd'].shape[1]
+        if len(target['lab_mono'].shape) == 2:
+            _len = target['lab_mono'].shape[0]
+            batch_size = target['lab_mono'].shape[1]
 
-        elif len(target['lab_cd'].shape) == 1:
+        elif len(target['lab_mono'].shape) == 1:
             _len = 1
-            batch_size = target['lab_cd'].shape[0]
+            batch_size = target['lab_mono'].shape[0]
         else:
             raise ValueError
 
@@ -32,13 +32,13 @@ class LabMonoError(Module):
         super().__init__()
 
     def forward(self, output, target):
-        if len(target['lab_cd'].shape) == 2:
-            _len = target['lab_cd'].shape[0]
-            batch_size = target['lab_cd'].shape[1]
+        if len(target['lab_mono'].shape) == 2:
+            _len = target['lab_mono'].shape[0]
+            batch_size = target['lab_mono'].shape[1]
 
-        elif len(target['lab_cd'].shape) == 1:
+        elif len(target['lab_mono'].shape) == 1:
             _len = 1
-            batch_size = target['lab_cd'].shape[0]
+            batch_size = target['lab_mono'].shape[0]
         else:
             raise ValueError
 

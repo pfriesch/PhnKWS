@@ -5,7 +5,7 @@ import threading
 
 import torch
 
-from base import resume_checkpoint
+from base.utils import resume_checkpoint
 from utils.logger_config import logger
 from utils.tensorboard_logger import WriterTensorboardX
 from utils.util import ensure_dir, folder_to_checkpoint, every, Timer
