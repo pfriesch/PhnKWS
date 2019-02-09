@@ -6,22 +6,24 @@
     "n_gpu": 1,
     "prefetch_to_gpu": true,
     "n_epochs_tr": 24,
-    "save_period": 1
+    "save_period": 1,
+    "cache_data_root": "/mnt/data/pytorch-kaldi/data",
+    "checkpoint_interval_seconds": 600, //Every 10 mins
+    "num_workers": 0 //TODO
   },
   "data_use": {
+    "phones": "/mnt/data/libs/kaldi/egs/timit/s5/data/lang/phones.txt",
     //todo allow multiple inputs
     "train_with": "TIMIT_tr",
     "valid_with": "TIMIT_dev",
-    "test_with": "TIMIT_test",
-    "kws_eval_with": "google_speech_commands_dev"
+    "test_with": "TIMIT_test"
   },
   "datasets": {
     "TIMIT_tr": {
       "features": {
         "fbank": {
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/feats_fbank.scp",
-          "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/train/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_train.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-          "n_chunks": 5
+          "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/train/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_train.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |"
         }
       },
       "labels": {
@@ -45,8 +47,7 @@
       "features": {
         "fbank": {
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/feats_fbank.scp",
-          "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-          "n_chunks": 1
+          "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |"
         }
       },
       "labels": {
@@ -70,8 +71,7 @@
       "features": {
         "fbank": {
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/feats_fbank.scp",
-          "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-          "n_chunks": 1
+          "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/timit/s5/data/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/timit/s5/fbank/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |"
         }
       },
       "labels": {
@@ -92,45 +92,25 @@
       }
     }
   },
-  "google_speech_commands_dev": {
-    "features": {
-      "fbank": {
-        "feature_lst_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/dev/feats.scp",
-        "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/dev/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/fbank/cmvn_dev.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |"
-      }
-    },
-    "labels": {
-      "lab_text": {
-        "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
-      }
-    }
-  },
-  "google_speech_commands_test": {
-    "features": {
-      "fbank": {
-        "feature_lst_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/feats.scp",
-        "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/utt2spk  ark:/mnt/data/libs/kaldi/egs/google_speech_commands/kws/fbank/cmvn_test.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |"
-      }
-    },
-    "labels": {
-      "lab_text": {
-        "text_path": "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/test/text"
-      }
-    }
-  },
   "training": {
     "batch_size_train": 128,
-    "max_seq_length_train": 1000,
+    "max_seq_length_train": null,
+    "shuffle_frames": true,
     "increase_seq_length_train": false,
-    "start_seq_len_train": 100,
-    "multply_factor_seq_len_train": 2,
+    "start_seq_len_train": null,
+    "multply_factor_seq_len_train": null,
     "batch_size_valid": 128,
-    "max_seq_length_valid": 1000,
+    "max_seq_length_valid": null,
     "sort_by_feat": "fbank",
     "clip_grad_norm": -1,
     "optimizer": {
-      "type": "CE_triple_rmsprop_cfg",
+      "type": "sgd",
       "args": {
+        "lr": 0.08,
+        "momentum": 0.0,
+        "weight_decay": 0.0,
+        "dampening": 0.0,
+        "nesterov": false
       }
     },
     "lr_scheduler": {
@@ -139,8 +119,8 @@
     }
   },
   "arch": {
-    "name": "TDNN_cd_mono",
-    "framewise_labels": "shuffled_frames",
+    "name": "TDNN_cd_mono_TIMIT",
+    "framewise_labels": true,
     "args": {
       "input_feat_length": 40,
       "input_feat_name": "fbank",

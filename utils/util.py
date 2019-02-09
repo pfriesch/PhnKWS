@@ -9,6 +9,8 @@ from utils.logger_config import Logger
 from utils.tensorboard_logger import WriterTensorboardX
 
 
+
+
 def recursive_update(_dict, _update_dict):
     if isinstance(_dict, str):
         return _update_dict
@@ -72,11 +74,11 @@ class Timer:
         self.global_step = global_step
 
     def __enter__(self):
-        self.start = time.clock()
+        self.start = time.process_time()
         return self
 
     def __exit__(self, *args):
-        self.end = time.clock()
+        self.end = time.process_time()
         self.interval = self.end - self.start
         for logger in self.loggers:
             if isinstance(logger, WriterTensorboardX):

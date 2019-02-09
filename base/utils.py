@@ -22,3 +22,5 @@ def resume_checkpoint(resume_path, model, logger, optimizers=None, lr_schedulers
 
     logger.info("Checkpoint '{}' (epoch {}) loaded".format(resume_path, start_epoch))
     return start_epoch
+
+

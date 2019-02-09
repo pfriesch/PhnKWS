@@ -22,7 +22,6 @@
         "fbank": {
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/train_clean_100/feats_fbank.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/librispeech/s5/data/train_clean_100/utt2spk  ark:/mnt/data/libs/kaldi/egs/librispeech/s5/fbank/cmvn_train_clean_100.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-          "n_samples_per_chunk": 100
         }
       },
       "labels": {
@@ -41,7 +40,6 @@
         "fbank": {
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/dev_clean/feats_fbank.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/librispeech/s5/data/dev_clean/utt2spk  ark:/mnt/data/libs/kaldi/egs/librispeech/s5/fbank/cmvn_dev_clean.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-          "n_samples_per_chunk": 800
         }
       },
       "labels": {
@@ -59,7 +57,6 @@
         "fbank": {
           "feature_lst_path": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/test_clean/feats_fbank.scp",
           "feature_opts": "apply-cmvn --utt2spk=ark:/mnt/data/libs/kaldi/egs/librispeech/s5/data/test_clean/utt2spk  ark:/mnt/data/libs/kaldi/egs/librispeech/s5/fbank/cmvn_test_clean.ark ark:- ark:- | add-deltas --delta-order=0 ark:- ark:- |",
-          "n_samples_per_chunk": 800
         }
       },
       "labels": {

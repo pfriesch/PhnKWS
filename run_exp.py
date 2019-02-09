@@ -2,13 +2,10 @@ import os
 import argparse
 import datetime
 
-import jsondiff
-import torch
-
-from data.data_util import prepare_labels
 from nn_ import model_init, optimizer_init, lr_scheduler_init, metrics_init, loss_init
 from utils.logger_config import logger
-from utils.util import code_versioning, folder_to_checkpoint, recursive_update
+from utils.nvidia_smi import nvidia_smi_enabled
+from utils.util import code_versioning
 from utils.utils import set_seed
 from trainer import Trainer
 from utils.utils import check_environment, read_json
@@ -16,20 +13,13 @@ from utils.utils import get_dataset_metadata
 
 
 def check_config(config):
-    for dataset in config['datasets']:
-        assert len(list(config['datasets'][dataset]['features'].keys())) == 1
-        assert config['training']['sort_by_feat'] == list(config['datasets'][dataset]['features'].keys())[0]
-
-    if config['arch']['framewise_labels'] == "shuffled_frames":
-        assert not config['training']['increase_seq_length_train']
+    # TODO impl schema or sth
+    pass
 
 
 def setup_run(config):
     set_seed(config['exp']['seed'])
     config = get_dataset_metadata(config)
-
-    if not config['arch']['framewise_labels']:
-        prepare_labels(config['datasets'], config['arch']['args']['phn_mapping'])
 
     model = model_init(config)
 
@@ -45,28 +35,29 @@ def setup_run(config):
     return model, loss, metrics, optimizers, config, lr_schedulers
 
 
-def main(config_path, resume_path, debug, local):
+def main(config_path, resume_path):
     config = read_json(config_path)
     check_config(config)
 
-    if resume_path:
-        resume_config = torch.load(folder_to_checkpoint(args.resume), map_location='cpu')['config']
-        # also the results won't be the same give the different random seeds with different number of draws
-        del config['exp']['name']
-        recursive_update(resume_config, config)
-
-        print("".join(["="] * 80))
-        print("Resume with these changes in the config:")
-        print("".join(["-"] * 80))
-        print(jsondiff.diff(config, resume_config, dump=True, dumper=jsondiff.JsonDumper(indent=1)))
-        print("".join(["="] * 80))
-
-        config = resume_config
-        # start_time = datetime.datetime.now().strftime('_%Y%m%d_%H%M%S')
-        # config['exp']['name'] = config['exp']['name'] + "r-" + start_time
-    else:
-        start_time = datetime.datetime.now().strftime('_%Y%m%d_%H%M%S')
-        config['exp']['name'] = config['exp']['name'] + start_time
+    # if resume_path:
+    # TODO
+    #     resume_config = torch.load(folder_to_checkpoint(args.resume), map_location='cpu')['config']
+    #     # also the results won't be the same give the different random seeds with different number of draws
+    #     del config['exp']['name']
+    #     recursive_update(resume_config, config)
+    #
+    #     print("".join(["="] * 80))
+    #     print("Resume with these changes in the config:")
+    #     print("".join(["-"] * 80))
+    #     print(jsondiff.diff(config, resume_config, dump=True, dumper=jsondiff.JsonDumper(indent=1)))
+    #     print("".join(["="] * 80))
+    #
+    #     config = resume_config
+    #     # start_time = datetime.datetime.now().strftime('_%Y%m%d_%H%M%S')
+    #     # config['exp']['name'] = config['exp']['name'] + "r-" + start_time
+    # else:
+    start_time = datetime.datetime.now().strftime('_%Y%m%d_%H%M%S')
+    config['exp']['name'] = config['exp']['name'] + start_time
 
     set_seed(config['exp']['seed'])
 
@@ -77,9 +68,9 @@ def main(config_path, resume_path, debug, local):
 
     logger.configure_logger(out_folder)
 
-    if not local:
-        check_environment()
-    if not debug and not local:
+    check_environment()
+
+    if nvidia_smi_enabled:  # TODO chage criteria or the whole thing
         git_commit = code_versioning()
         if 'versioning' not in config:
             config['versioning'] = {}
@@ -106,13 +97,9 @@ if __name__ == '__main__':
                         help='path to latest checkpoint (default: None)')
     parser.add_argument('-d', '--device', default=None, type=str,
                         help='indices of GPUs to enable (default: all)')
-    parser.add_argument('--debug', default=False, action='store_true',
-                        help='Run in debug mode with few samples')
-    parser.add_argument('--local', default=False, action='store_true',
-                        help='Run in local mode without kaldi install')
     args = parser.parse_args()
 
     if args.device:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.device
 
-    main(args.config, args.resume, debug=args.debug, local=args.local)
+    main(args.config, args.resume)
