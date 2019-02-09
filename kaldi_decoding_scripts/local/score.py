@@ -41,7 +41,7 @@ def score(data, lang_or_graph, dir, num_jobs, stage=0,
     phonemap = os.path.join(decoing_scripts_folder, phonemap)
     assert os.path.exists(phonemap)
     pl_cmd_script = os.path.join(decoing_scripts_folder, "utils/run.pl")
-    assert os.path.exists(pl_cmd_script)
+    assert os.path.exists(pl_cmd_script) #TODO remove run.pl command
     assert os.access(pl_cmd_script, os.X_OK)
 
     os.makedirs(os.path.join(dir, "scoring", "log"))

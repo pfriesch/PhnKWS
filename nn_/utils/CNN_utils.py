@@ -7,7 +7,7 @@ from tabulate import tabulate
 
 class LayerStats:
 
-    def __init__(self, kernel_size: int, stride: int, dilation: int, padding: int, name=""):
+    def __init__(self, kernel_size, stride, dilation, padding, name=""):
         self.kernel_size = kernel_size
         self.stride = stride
         self.dilation = dilation
