@@ -9,8 +9,6 @@ from utils.logger_config import Logger
 from utils.tensorboard_logger import WriterTensorboardX
 
 
-
-
 def recursive_update(_dict, _update_dict):
     if isinstance(_dict, str):
         return _update_dict

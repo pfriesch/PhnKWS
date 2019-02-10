@@ -48,6 +48,7 @@ class BaseTrainer:
             self.early_stop = config['exp'].get('early_stop', math.inf)
 
         self.start_epoch = 0
+        self.global_step = 0
 
         self.out_dir = os.path.join(config['exp']['save_dir'], config['exp']['name'])
 
@@ -67,20 +68,21 @@ class BaseTrainer:
             json.dump(config, f, indent=4, sort_keys=False)
 
         if resume_path:
-            self.start_epoch = resume_checkpoint(resume_path, model, logger, optimizers, lr_schedulers)
+            self.start_epoch, self.global_step = resume_checkpoint(resume_path, model, logger, optimizers,
+                                                                   lr_schedulers)
 
         if nvidia_smi_enabled:
-            self.log_gpu_usage(0)
+            self.log_gpu_usage()
 
             self.stop_gpu_usage_logging = threading.Event()
 
             threading.Thread(target=lambda: every(1, self.log_gpu_usage, logger, self.stop_gpu_usage_logging)).start()
 
-    def log_gpu_usage(self, global_step):
+    def log_gpu_usage(self):
         if nvidia_smi_enabled:
-            self.tensorboard_logger.add_scalar('usage', get_gpu_usage(), mode="gpu", global_step=global_step)
+            self.tensorboard_logger.add_scalar('usage', get_gpu_usage(), mode="gpu", global_step=self.global_step)
             self.tensorboard_logger.add_scalar('memory_usage_MiB', get_gpu_memory_consumption(), mode="gpu",
-                                               global_step=global_step)
+                                               global_step=self.global_step)
 
     def _prepare_device(self, n_gpu_use):
         """
@@ -106,13 +108,12 @@ class BaseTrainer:
         """
 
         epoch = self.start_epoch
-        global_step = 0
         for epoch in range(self.start_epoch, self.epochs):
             logger.info('----- Epoch {} / {} -----'.format(format(epoch, "03d"), format(self.epochs, "03d")))
 
-            with Timer("elapsed_time_epoch", [self.tensorboard_logger, logger], global_step) as t:
-                result_log, global_step = self._train_epoch(epoch, global_step)
-            self.tensorboard_logger.set_step(global_step, 'train')
+            with Timer("elapsed_time_epoch", [self.tensorboard_logger, logger], self.global_step) as t:
+                result_log = self._train_epoch(epoch)
+            self.tensorboard_logger.set_step(self.global_step, 'train')
 
             for lr_scheduler_name in self.lr_schedulers:
                 self.tensorboard_logger.add_scalar("lr_{}".format(lr_scheduler_name),
@@ -166,12 +167,12 @@ class BaseTrainer:
             if epoch % self.save_period == 0:
                 self.save_checkpoint(epoch, save_best=best)
 
-        result_eval = self._eval_epoch(epoch, global_step)
+        result_eval = self._eval_epoch(epoch)
         logger.info(result_eval)
         if nvidia_smi_enabled:
             self.stop_gpu_usage_logging.set()
 
-    def _train_epoch(self, epoch, global_step):
+    def _train_epoch(self, epoch):
         """
         Training logic for an epoch
 
@@ -179,7 +180,7 @@ class BaseTrainer:
         """
         raise NotImplementedError
 
-    def _eval_epoch(self, epoch, global_step):
+    def _eval_epoch(self, epoch):
         raise NotImplementedError
 
     def save_checkpoint(self, epoch, save_best=False):
@@ -193,6 +194,7 @@ class BaseTrainer:
 
         state = {
             'epoch': epoch,
+            'global_step': self.global_step,
             'state_dict': self.model.state_dict(),
             'optimizers': {opti_name: self.optimizers[opti_name].state_dict() for opti_name in self.optimizers},
             'lr_schedulers': {lr_sched_name: self.lr_schedulers[lr_sched_name].state_dict()

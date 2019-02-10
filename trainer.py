@@ -32,7 +32,7 @@ class Trainer(BaseTrainer):
             self.tensorboard_logger.add_scalar(metric, acc_metrics[metric])
         return acc_metrics
 
-    def _train_epoch(self, epoch, global_step):
+    def _train_epoch(self, epoch):
         """
         Training logic for an epoch
 
@@ -84,7 +84,7 @@ class Trainer(BaseTrainer):
         with tqdm(disable=not logger.isEnabledFor(logging.INFO)) as pbar:
             pbar.set_description('T e:{} l: {} a: {}'.format(epoch, '-', '-'))
             for batch_idx, (_, inputs, targets) in enumerate(dataloader):
-                global_step += 1
+                self.global_step += 1
                 n_steps_this_epoch += 1
 
                 # TODO assert out.shape[1] >= lab_dnn.max() and lab_dnn.min() >= 0, \
@@ -127,7 +127,7 @@ class Trainer(BaseTrainer):
 
                 # Log training every minute
                 if (time.process_time() - last_train_logging) > 60:
-                    self.tensorboard_logger.set_step(global_step, 'train')
+                    self.tensorboard_logger.set_step(self.global_step, 'train')
                     for _loss, loss_value in accumulated_train_losses.items():
                         self.tensorboard_logger.add_scalar(_loss, loss_value / n_steps_chunk)
                     for metric, metric_value in accumulated_train_metrics.items():
@@ -163,12 +163,12 @@ class Trainer(BaseTrainer):
                    {metric: train_metrics[metric] / n_steps_this_epoch
                     for metric in train_metrics}}
         if self.do_validation:
-            valid_log = self._valid_epoch(epoch, global_step=global_step)
+            valid_log = self._valid_epoch(epoch)
             log.update(valid_log)
 
-        return log, global_step
+        return log
 
-    def _valid_epoch(self, epoch, global_step):
+    def _valid_epoch(self, epoch):
         """
         Validate after training an epoch
         :return: A log that contains information about validation
@@ -229,16 +229,16 @@ class Trainer(BaseTrainer):
                 'valid_metrics': {metric: valid_metrics[metric] / n_steps_this_epoch for metric in
                                   valid_metrics}}
 
-    def _eval_epoch(self, epoch, global_step):
+    def _eval_epoch(self, epoch):
 
         if 'test' in self.config:
-            result_decode = self._eval_epoch_kaldi_decode(epoch, global_step)
+            result_decode = self._eval_epoch_kaldi_decode(epoch)
         else:
-            result_decode = self._eval_epoch_ctc_decode(epoch, global_step)
-        result_kws = self._eval_kws(epoch, global_step)
+            result_decode = self._eval_epoch_ctc_decode(epoch)
+        result_kws = self._eval_kws(epoch)
         return {"result_decode": result_decode, "result_kws": result_kws}
 
-    def _eval_epoch_ctc_decode(self, epoch, global_step):
+    def _eval_epoch_ctc_decode(self, epoch):
         self.model.eval()
         batch_size = 1
         max_seq_length = -1
@@ -285,14 +285,14 @@ class Trainer(BaseTrainer):
 
         logger.critical("Done decoding... TODO implement with lm decoding")
 
-        self.tensorboard_logger.set_step(global_step, 'test')
+        self.tensorboard_logger.set_step(self.global_step, 'test')
         for metric in test_metrics:
             self.tensorboard_logger.add_scalar(metric, test_metrics[metric] / len(dataloader))
 
         return {'test_metrics': {metric: test_metrics[metric] / len(dataloader) for metric in
                                  test_metrics}}
 
-    def _eval_epoch_kaldi_decode(self, epoch, global_step):
+    def _eval_epoch_kaldi_decode(self, epoch):
         self.model.eval()
         batch_size = 1
         max_seq_length = -1
@@ -372,7 +372,7 @@ class Trainer(BaseTrainer):
                                 logger.debug("Skipping saving forward for decoding for key {}".format(output_label))
                                 warned_label = True
 
-            self.tensorboard_logger.set_step(global_step, 'eval')
+            self.tensorboard_logger.set_step(self.global_step, 'eval')
             for metric, metric_value in test_metrics.items():
                 self.tensorboard_logger.add_scalar(metric, test_metrics[metric] / len(dataloader))
 

@@ -29,7 +29,7 @@ def collate_fn_zero_pad(sample_list):
     sample_names = []
 
     fea_dict = {k: torch.zeros([max_length, batch_size] + list(sample_list[0][1][k].shape[1:])) for k in fea_keys}
-    lab_dict = {k: torch.full((max_length, batch_size), dtype=torch.int64, fill_value=-PADDING_IGNORE_INDEX) for k in
+    lab_dict = {k: torch.full((max_length, batch_size), dtype=torch.int64, fill_value=PADDING_IGNORE_INDEX) for k in
                 lab_keys}
     for _idx, sample in enumerate(sample_list):
         _len_feat = sample[1][fea_keys[0]].shape[0]

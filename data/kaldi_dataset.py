@@ -147,22 +147,33 @@ class KaldiDataset(data.Dataset):
                     "{} <!= {}".format(in_sample_index + self.left_context + self.right_context + 1,
                                        len(sample['features'][feature_name]))
 
-        else:
-            if self.cached_pt != index // self.chunk_size:
-                self.cached_pt = int(index // self.chunk_size)
+        elif self.split_files_max_sample_len:
+            _samples_per_chunk_cumulative = np.cumsum(self.samples_per_chunk)
+            chunk_idx = bisect.bisect_left(_samples_per_chunk_cumulative, index)
+            assert _samples_per_chunk_cumulative[chunk_idx - 1] < index <= _samples_per_chunk_cumulative[
+                chunk_idx] or 0 < index <= _samples_per_chunk_cumulative[0], \
+                f"{_samples_per_chunk_cumulative[chunk_idx - 1]} < {index} < " \
+                + f"{_samples_per_chunk_cumulative[chunk_idx]} or 0 < {index} < {_samples_per_chunk_cumulative[0]}"
+
+            if self.cached_pt != chunk_idx:
+                self.cached_pt = chunk_idx
                 self.cached_samples = torch.load(
                     os.path.join(self.dataset_path, "chunk_{:04d}.pyt".format(self.cached_pt)))
-            index = index % self.chunk_size
 
-            filename, start_idx, end_idx = self.cached_samples['sample_splits'][index]
+            # get the file the index is in
+            in_chunk_dx = index - (_samples_per_chunk_cumulative[chunk_idx - 1] if chunk_idx > 0 else 0)
+            in_chunk_dx -= 1  # TODO figure out this thing
+            assert in_chunk_dx < self.samples_per_chunk[chunk_idx]
+
+            filename, start_idx, end_idx = self.cached_samples['sample_splits'][in_chunk_dx]
 
             features, lables = apply_context(self.cached_samples['samples'][filename], context_right=self.right_context,
                                              context_left=self.left_context, aligned_labels=self.aligned_labels)
-            if not self.shuffle_frames:
-                narrow_by_split(features, lables, start_idx - self.left_context, end_idx - self.right_context)
+            narrow_by_split(features, lables, start_idx - self.left_context, end_idx - self.right_context)
             for feature_name in features:
                 assert end_idx - start_idx == len(features[feature_name])
-
+        else:
+            raise NotImplementedError
         if self.normalize_features:
             # Normalize over whole chunk instead of only over a single file, which is done by applying the kaldi cmvn
             for feature_name in features:
@@ -229,7 +240,7 @@ class KaldiDataset(data.Dataset):
             self.samples_per_chunk = _info["samples_per_chunk"]
             self.max_len_per_chunk = _info["max_len_per_chunk"]
             self.min_len_per_chunk = _info["min_len_per_chunk"]
-            self.split_files_max_sample_len = _info["split_files_max_seq_len"]
+            self.split_files_max_sample_len = _info["split_files_max_sample_len"]
             assert self.chunk_size == _info["chunk_size"]
             self.max_sample_len = _info["max_sample_len"]
             self.left_context = _info["left_context"]

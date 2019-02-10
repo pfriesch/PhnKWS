@@ -10,6 +10,7 @@ def resume_checkpoint(resume_path, model, logger, optimizers=None, lr_schedulers
     logger.info("Loading checkpoint: {} ...".format(resume_path))
     checkpoint = torch.load(resume_path, map_location='cpu')
     start_epoch = checkpoint['epoch'] + 1
+    start_global_step = checkpoint['global_step']
     model.load_state_dict(checkpoint['state_dict'])
 
     assert (optimizers is None and lr_schedulers is None) \
@@ -21,6 +22,4 @@ def resume_checkpoint(resume_path, model, logger, optimizers=None, lr_schedulers
             lr_schedulers[lr_sched_name].load_state_dict(checkpoint['lr_schedulers'][lr_sched_name])
 
     logger.info("Checkpoint '{}' (epoch {}) loaded".format(resume_path, start_epoch))
-    return start_epoch
-
-
+    return start_epoch, start_global_step

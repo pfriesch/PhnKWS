@@ -3,6 +3,19 @@ import numpy as np
 
 from utils.logger_config import logger
 
+# @see https://stackoverflow.com/questions/3154460/python-human-readable-large-numbers/3155023
+import math
+
+millnames = ['', ' Thousand', ' Million', ' Billion', ' Trillion']
+
+
+def millify(n):
+    n = float(n)
+    millidx = max(0, min(len(millnames) - 1,
+                         int(math.floor(0 if n == 0 else math.log10(abs(n)) / 3))))
+
+    return '{:.1f}{}'.format(n / 10 ** (3 * millidx), millnames[millidx])
+
 
 class BaseModel(nn.Module):
     """
@@ -37,4 +50,6 @@ class BaseModel(nn.Module):
         """
         Model prints with number of trainable parameters
         """
-        return super(BaseModel, self).__str__() + '\nTrainable parameters: {}'.format(self.trainable_parameters())
+        _trainable_parameters = self.trainable_parameters()
+        return super(BaseModel, self).__str__() + '\nTrainable parameters: ~{} ({})'.format(
+            millify(_trainable_parameters), _trainable_parameters)
