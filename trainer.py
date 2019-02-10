@@ -7,6 +7,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+# from data.kaldi_dataset_prefetch_gpu import KaldiDataset
 from data.kaldi_dataset import KaldiDataset
 from base.base_trainer import BaseTrainer
 from data import kaldi_io
@@ -58,6 +59,7 @@ class Trainer(BaseTrainer):
                                tr_data,
                                self.config['datasets'][tr_data]['features'],
                                self.config['datasets'][tr_data]['labels'],
+                               self.device,
                                self.config['training']['max_seq_length_train'],
                                self.model.context_left,
                                self.model.context_right,
@@ -81,7 +83,7 @@ class Trainer(BaseTrainer):
 
         n_steps_this_epoch = 0
         # TODO chunked dataloader length
-        with tqdm(disable=not logger.isEnabledFor(logging.INFO)) as pbar:
+        with tqdm(disable=not logger.isEnabledFor(logging.INFO), total=len(dataloader)) as pbar:
             pbar.set_description('T e:{} l: {} a: {}'.format(epoch, '-', '-'))
             for batch_idx, (_, inputs, targets) in enumerate(dataloader):
                 self.global_step += 1
@@ -185,6 +187,7 @@ class Trainer(BaseTrainer):
                                valid_data,
                                self.config['datasets'][valid_data]['features'],
                                self.config['datasets'][valid_data]['labels'],
+                               self.device,
                                self.config['training']['max_seq_length_valid'],
                                self.model.context_left,
                                self.model.context_right,
@@ -199,7 +202,7 @@ class Trainer(BaseTrainer):
                                      self.config['exp']['num_workers'])
 
         n_steps_this_epoch = 0
-        with tqdm(disable=not logger.isEnabledFor(logging.INFO)) as pbar:
+        with tqdm(disable=not logger.isEnabledFor(logging.INFO), total=len(dataloader)) as pbar:
             pbar.set_description('V e:{} l: {} '.format(epoch, '-'))
             for batch_idx, (_, inputs, targets) in enumerate(dataloader):
                 n_steps_this_epoch += 1
@@ -250,6 +253,7 @@ class Trainer(BaseTrainer):
                                test_data,
                                self.config['datasets'][test_data]['features'],
                                self.config['datasets'][test_data]['labels'],
+                               self.device,
                                max_seq_length,
                                self.model.context_left,
                                self.model.context_right,

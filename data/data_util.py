@@ -1,4 +1,5 @@
 import itertools
+import torch
 from collections import OrderedDict
 
 import numpy as np
@@ -144,14 +145,24 @@ def get_order_by_length(feature_dict):
 
 def apply_context_single_feat(feat, context_left, context_right):
     length, num_feats = feat.shape
-    out_feat = \
-        np.empty(
-            (length - context_left - context_right,
-             num_feats,
-             context_left + context_right + 1)
-        )
+    if isinstance(feat, np.ndarray):
+        out_feat = \
+            np.empty(
+                (length - context_left - context_right,
+                 num_feats,
+                 context_left + context_right + 1)
+            )
+    elif isinstance(feat, torch.Tensor):
+        out_feat = \
+            torch.empty(
+                (length - context_left - context_right,
+                 num_feats,
+                 context_left + context_right + 1), device=feat.device
+            )
+    else:
+        raise ValueError
     for i in range(context_left, length - context_right):
         out_feat[i - context_left, :, :] = \
-            feat[i - context_left:i + context_right + 1, :].T
+            feat[i - context_left:i + context_right + 1, :].transpose(1, 0)
 
     return out_feat

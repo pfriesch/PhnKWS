@@ -85,8 +85,12 @@ class KaldiDataset(data.Dataset):
             raise RuntimeError('Dataset not found.')
         self._read_info()
 
-        self.cached_samples = torch.load(
-            os.path.join(self.dataset_path, "chunk_{:04d}.pyt".format(self.cached_pt)))
+        self.cached_samples = []
+        for chunk_idx in range(len(self.samples_per_chunk)):
+            self.cached_samples.append(dict_to_torch(
+                torch.load(os.path.join(self.dataset_path, "chunk_{:04d}.pyt".format(chunk_idx))), device))
+            assert len(self.cached_samples[-1]['sample_splits']) == self.samples_per_chunk[chunk_idx], \
+                f"{len(self.cached_samples[-1]['sample_splits'])} =!= {self.samples_per_chunk[chunk_idx]}"
 
     def __getitem__(self, index):
         """
@@ -106,17 +110,14 @@ class KaldiDataset(data.Dataset):
             # Get the chunk the index is in
             _samples_per_chunk_cumulative = np.cumsum(self.samples_per_chunk)
             chunk_idx = bisect.bisect_left(_samples_per_chunk_cumulative, index)
-            assert _samples_per_chunk_cumulative[chunk_idx - 1] < index < _samples_per_chunk_cumulative[
-                chunk_idx] or 0 < index < _samples_per_chunk_cumulative[0]
+            assert _samples_per_chunk_cumulative[chunk_idx - 1] <= index < _samples_per_chunk_cumulative[
+                chunk_idx] or 0 <= index < _samples_per_chunk_cumulative[0]
 
-            if self.cached_pt != chunk_idx:
-                self.cached_pt = chunk_idx
-                self.cached_samples = torch.load(
-                    os.path.join(self.dataset_path, "chunk_{:04d}.pyt".format(self.cached_pt)))
+            _cached_samples = self.cached_samples[chunk_idx]
 
             # get the file the index is in
             in_chunk_dx = index - (_samples_per_chunk_cumulative[chunk_idx - 1] if chunk_idx > 0 else 0)
-            filenames, end_idx_total_in_chunk = self.cached_samples['sample_splits']
+            filenames, end_idx_total_in_chunk = _cached_samples['sample_splits']
             assert in_chunk_dx <= end_idx_total_in_chunk[-1]
             file_index = bisect.bisect_left(end_idx_total_in_chunk, in_chunk_dx)
 
@@ -127,17 +128,17 @@ class KaldiDataset(data.Dataset):
             # so to get the index it's len - 1
             in_sample_index -= 1
 
-            sample = self.cached_samples['samples'][filename]
+            sample = _cached_samples['samples'][filename]
             lables = {}
             for label_name in sample['labels']:
-                lables[label_name] = np.expand_dims(sample['labels'][label_name][in_sample_index], 0)
+                lables[label_name] = sample['labels'][label_name][in_sample_index].unsqueeze(0)
 
             features = {}
             for feature_name in sample['features']:
                 features[feature_name] = \
-                    np.expand_dims(sample['features'][feature_name][
-                                   in_sample_index:
-                                   in_sample_index + self.left_context + self.right_context + 1, :].T, 0)
+                    sample['features'][feature_name][
+                    in_sample_index:
+                    in_sample_index + self.left_context + self.right_context + 1, :].transpose().unsqueeze(0)
 
                 assert features[feature_name].shape[2] == self.left_context + self.right_context + 1
                 assert end_idx_total_in_chunk[file_index] - (
@@ -156,19 +157,17 @@ class KaldiDataset(data.Dataset):
                 f"{_samples_per_chunk_cumulative[chunk_idx - 1]} < {index} < " \
                 + f"{_samples_per_chunk_cumulative[chunk_idx]} or 0 < {index} < {_samples_per_chunk_cumulative[0]}"
 
-            if self.cached_pt != chunk_idx:
-                self.cached_pt = chunk_idx
-                self.cached_samples = torch.load(
-                    os.path.join(self.dataset_path, "chunk_{:04d}.pyt".format(self.cached_pt)))
+            _cached_samples = self.cached_samples[chunk_idx]
+            assert len(_cached_samples['sample_splits']) == self.samples_per_chunk[chunk_idx]
 
             # get the file the index is in
             in_chunk_dx = index - (_samples_per_chunk_cumulative[chunk_idx - 1] if chunk_idx > 0 else 0)
             in_chunk_dx -= 1  # TODO figure out this thing
             assert in_chunk_dx < self.samples_per_chunk[chunk_idx]
 
-            filename, start_idx, end_idx = self.cached_samples['sample_splits'][in_chunk_dx]
+            filename, start_idx, end_idx = _cached_samples['sample_splits'][in_chunk_dx]
 
-            features, lables = apply_context(self.cached_samples['samples'][filename], context_right=self.right_context,
+            features, lables = apply_context(_cached_samples['samples'][filename], context_right=self.right_context,
                                              context_left=self.left_context, aligned_labels=self.aligned_labels)
             narrow_by_split(features, lables, start_idx - self.left_context, end_idx - self.right_context)
             for feature_name in features:
@@ -179,10 +178,10 @@ class KaldiDataset(data.Dataset):
             # Normalize over whole chunk instead of only over a single file, which is done by applying the kaldi cmvn
             for feature_name in features:
                 features[feature_name] = (features[feature_name] -
-                                          np.expand_dims(self.cached_samples['means'][feature_name], axis=-1)) / \
-                                         np.expand_dims(self.cached_samples['std'][feature_name], axis=-1)
+                                          _cached_samples['means'][feature_name].unsqueeze(-1)) / \
+                                         _cached_samples['std'][feature_name].unsqueeze(-1)
 
-        return filename, np_dict_to_torch(features), np_dict_to_torch(lables)
+        return filename, features, lables
 
     def __len__(self):
         return sum(self.samples_per_chunk)
@@ -469,7 +468,16 @@ def narrow_by_split(features, lables, start_idx, end_idx):
         features[feature_name] = features[feature_name][start_idx: end_idx]
 
 
-def np_dict_to_torch(_dict):
-    for k in _dict:
-        _dict[k] = torch.from_numpy(_dict[k])
+def dict_to_torch(_dict, device):
+    for filename in _dict['samples']:
+        for feat_name in _dict['samples'][filename]['features']:
+            _dict['samples'][filename]['features'][feat_name] = torch.tensor(
+                _dict['samples'][filename]['features'][feat_name], device=device)
+        for lab_name in _dict['samples'][filename]['labels']:
+            _dict['samples'][filename]['labels'][lab_name] = torch.tensor(
+                _dict['samples'][filename]['labels'][lab_name], device=device)
+    for feat_name in _dict['means']:
+        _dict['means'][feat_name] = torch.tensor(_dict['means'][feat_name], device=device)
+    for feat_name in _dict['std']:
+        _dict['std'][feat_name] = torch.tensor(_dict['std'][feat_name], device=device)
     return _dict

@@ -70,8 +70,10 @@ class BaseTrainer:
         if resume_path:
             self.start_epoch, self.global_step = resume_checkpoint(resume_path, model, logger, optimizers,
                                                                    lr_schedulers)
-
+        self.device = 'cpu'
         if nvidia_smi_enabled:
+            self.device = 'cuda:0'
+
             self.log_gpu_usage()
 
             self.stop_gpu_usage_logging = threading.Event()

@@ -9,6 +9,8 @@ KALDI_ROOT = os.environ["KALDI_ROOT"]
 assert os.path.exists(f"{KALDI_ROOT}/egs"), f"{KALDI_ROOT}/egs not found!"
 
 
+# TODO add tests that test the edge cases of chunks -> index
+
 def test_unaligned(tmpdir):
     logger.configure_logger(out_folder=tmpdir)
     dataset = KaldiDataset(cache_data_root=tmpdir,
