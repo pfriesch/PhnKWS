@@ -143,26 +143,28 @@ def get_order_by_length(feature_dict):
     return ordering_length
 
 
-def apply_context_single_feat(feat, context_left, context_right):
-    length, num_feats = feat.shape
+def apply_context_single_feat(feat, context_left, context_right, start_idx, end_idx):
+    _, num_feats = feat.shape
+    length = end_idx - start_idx
     if isinstance(feat, np.ndarray):
         out_feat = \
             np.empty(
-                (length - context_left - context_right,
+                (length,
                  num_feats,
                  context_left + context_right + 1)
             )
     elif isinstance(feat, torch.Tensor):
         out_feat = \
             torch.empty(
-                (length - context_left - context_right,
+                (length,
                  num_feats,
                  context_left + context_right + 1), device=feat.device
             )
     else:
         raise ValueError
-    for i in range(context_left, length - context_right):
-        out_feat[i - context_left, :, :] = \
-            feat[i - context_left:i + context_right + 1, :].transpose(1, 0)
+    for i in range(0, end_idx - start_idx):
+        assert i + start_idx >= context_left, f"{i + start_idx} >= {context_left}"
+        out_feat[i, :, :] = \
+            feat[i + start_idx - context_left:i + start_idx + context_right + 1, :].transpose(1, 0)
 
     return out_feat

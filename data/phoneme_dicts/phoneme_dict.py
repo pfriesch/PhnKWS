@@ -3,6 +3,12 @@ import collections
 PhonemeDict = collections.namedtuple("PhonemeDict", ["idx2phoneme", "idx2reducedIdx", "phoneme2reducedIdx"])
 
 
+def load_phoneme_dict(idx2phoneme, idx2reducedIdx, phoneme2reducedIdx):
+    idx2phoneme = {int(k): v for k, v in idx2phoneme.items()}
+    idx2reducedIdx = {int(k): v for k, v in idx2reducedIdx.items()}
+    return PhonemeDict(idx2phoneme, idx2reducedIdx, phoneme2reducedIdx)
+
+
 def get_phoneme_dict(phoneme_path, stress_marks=False, word_position_dependency=False):
     with open(phoneme_path, "r") as f:
         phoneme_list = f.readlines()

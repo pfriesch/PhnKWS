@@ -14,6 +14,7 @@ import torch
 from tqdm import tqdm
 
 from data.data_util import load_features, split_chunks, load_labels, splits_by_seqlen, apply_context_single_feat
+from data.phoneme_dicts.phoneme_dict import load_phoneme_dict
 from utils.logger_config import logger
 
 
@@ -105,9 +106,11 @@ class KaldiDataset(data.Dataset):
 
             # Get the chunk the index is in
             _samples_per_chunk_cumulative = np.cumsum(self.samples_per_chunk)
-            chunk_idx = bisect.bisect_left(_samples_per_chunk_cumulative, index)
-            assert _samples_per_chunk_cumulative[chunk_idx - 1] < index < _samples_per_chunk_cumulative[
-                chunk_idx] or 0 < index < _samples_per_chunk_cumulative[0]
+            chunk_idx = bisect.bisect_right(_samples_per_chunk_cumulative, index)
+            assert _samples_per_chunk_cumulative[chunk_idx - 1] <= index < _samples_per_chunk_cumulative[
+                chunk_idx] or 0 <= index < _samples_per_chunk_cumulative[0], \
+                f"{_samples_per_chunk_cumulative[chunk_idx - 1]} <= {index} <" \
+                + f" {_samples_per_chunk_cumulative[chunk_idx]} or 0 < {index} < {_samples_per_chunk_cumulative[0]}"
 
             if self.cached_pt != chunk_idx:
                 self.cached_pt = chunk_idx
@@ -117,15 +120,16 @@ class KaldiDataset(data.Dataset):
             # get the file the index is in
             in_chunk_dx = index - (_samples_per_chunk_cumulative[chunk_idx - 1] if chunk_idx > 0 else 0)
             filenames, end_idx_total_in_chunk = self.cached_samples['sample_splits']
-            assert in_chunk_dx <= end_idx_total_in_chunk[-1]
-            file_index = bisect.bisect_left(end_idx_total_in_chunk, in_chunk_dx)
+            assert in_chunk_dx <= end_idx_total_in_chunk[-1], f"{in_chunk_dx} <= {end_idx_total_in_chunk[-1]}"
+            file_index = bisect.bisect_right(end_idx_total_in_chunk, in_chunk_dx)
 
             # get the actual sample frame from the file
             filename = filenames[file_index]
             in_sample_index = in_chunk_dx - (end_idx_total_in_chunk[file_index - 1] if file_index > 0 else 0)
             # in_sample_index is the length if the sample instead of the index till here
             # so to get the index it's len - 1
-            in_sample_index -= 1
+            assert 0 <= in_sample_index
+            assert in_sample_index < end_idx_total_in_chunk[file_index]
 
             sample = self.cached_samples['samples'][filename]
             lables = {}
@@ -143,18 +147,32 @@ class KaldiDataset(data.Dataset):
                 assert end_idx_total_in_chunk[file_index] - (
                     end_idx_total_in_chunk[file_index - 1] if file_index > 0 else 0) == len(
                     sample['features'][feature_name]) - self.left_context - self.right_context
-                assert 0 <= in_sample_index + self.left_context + self.right_context + 1 < len(
+                assert 0 <= in_sample_index + self.right_context + 1 < len(
                     sample['features'][feature_name]), \
                     "{} <!= {}".format(in_sample_index + self.left_context + self.right_context + 1,
                                        len(sample['features'][feature_name]))
 
-        elif self.split_files_max_sample_len:
+        # elif self.split_files_max_sample_len:
+        else:
+            #     context left    context right
+            #         |---|         |-|
+            #          _ _ _ _ _ _ _ _
+            #         |   |         | |
+            #         |   | frames  | |
+            #         |_ _|_ _ _ _ _|_|
+            #             ^         ^
+            #           start      end
+            #            index      index
+            #
+
             _samples_per_chunk_cumulative = np.cumsum(self.samples_per_chunk)
-            chunk_idx = bisect.bisect_left(_samples_per_chunk_cumulative, index)
-            assert _samples_per_chunk_cumulative[chunk_idx - 1] < index <= _samples_per_chunk_cumulative[
-                chunk_idx] or 0 < index <= _samples_per_chunk_cumulative[0], \
-                f"{_samples_per_chunk_cumulative[chunk_idx - 1]} < {index} < " \
-                + f"{_samples_per_chunk_cumulative[chunk_idx]} or 0 < {index} < {_samples_per_chunk_cumulative[0]}"
+            chunk_idx = bisect.bisect_right(_samples_per_chunk_cumulative, index)
+            if not (_samples_per_chunk_cumulative[chunk_idx - 1] <= index < _samples_per_chunk_cumulative[
+                chunk_idx] or 0 <= index < _samples_per_chunk_cumulative[0]):
+                assert _samples_per_chunk_cumulative[chunk_idx - 1] <= index < _samples_per_chunk_cumulative[
+                    chunk_idx] or 0 <= index < _samples_per_chunk_cumulative[0], \
+                    f"{_samples_per_chunk_cumulative[chunk_idx - 1]} <= {index} < " \
+                    + f"{_samples_per_chunk_cumulative[chunk_idx]} or 0 <= {index} < {_samples_per_chunk_cumulative[0]}"
 
             if self.cached_pt != chunk_idx:
                 self.cached_pt = chunk_idx
@@ -163,18 +181,18 @@ class KaldiDataset(data.Dataset):
 
             # get the file the index is in
             in_chunk_dx = index - (_samples_per_chunk_cumulative[chunk_idx - 1] if chunk_idx > 0 else 0)
-            in_chunk_dx -= 1  # TODO figure out this thing
             assert in_chunk_dx < self.samples_per_chunk[chunk_idx]
 
             filename, start_idx, end_idx = self.cached_samples['sample_splits'][in_chunk_dx]
 
-            features, lables = apply_context(self.cached_samples['samples'][filename], context_right=self.right_context,
-                                             context_left=self.left_context, aligned_labels=self.aligned_labels)
-            narrow_by_split(features, lables, start_idx - self.left_context, end_idx - self.right_context)
+            features, lables = apply_context(self.cached_samples['samples'][filename],
+                                             start_idx=start_idx, end_idx=end_idx,
+                                             context_right=self.right_context, context_left=self.left_context,
+                                             aligned_labels=self.aligned_labels)
             for feature_name in features:
-                assert end_idx - start_idx == len(features[feature_name])
-        else:
-            raise NotImplementedError
+                if not end_idx - start_idx == len(features[feature_name]):
+                    assert end_idx - start_idx == len(features[feature_name]), \
+                        f"{end_idx - start_idx} =!= {len(features[feature_name])}"
         if self.normalize_features:
             # Normalize over whole chunk instead of only over a single file, which is done by applying the kaldi cmvn
             for feature_name in features:
@@ -211,7 +229,7 @@ class KaldiDataset(data.Dataset):
                     or self.left_context != _info["left_context"]
                     or self.right_context != _info["right_context"]
                     or self.normalize_features != _info["normalize_features"]
-                    or self.phoneme_dict != _info["phoneme_dict"]
+                    or self.phoneme_dict != load_phoneme_dict(*_info["phoneme_dict"])
                     or self.split_files_max_sample_len != _info["split_files_max_sample_len"]
                     or self.shuffle_frames != _info["shuffle_frames"]):
 
@@ -247,7 +265,7 @@ class KaldiDataset(data.Dataset):
             self.left_context = _info["left_context"]
             self.right_context = _info["right_context"]
             self.normalize_features = _info["normalize_features"]
-            self.phoneme_dict = _info["phoneme_dict"]
+            self.phoneme_dict = load_phoneme_dict(*_info["phoneme_dict"])
             self.shuffle_frames = _info["shuffle_frames"]
             self.feature_dict = _info["feature_dict"]
             self.label_dict = _info["label_dict"]
@@ -368,27 +386,39 @@ class KaldiDataset(data.Dataset):
                 std[feature_name] = np.std(feat_concat, axis=0)
 
             if not self.shuffle_frames:
-                if self.split_files_max_sample_len:
-                    sample_splits = splits_by_seqlen(samples_list, self.split_files_max_sample_len,
-                                                     self.left_context, self.right_context)
+                if any([not self.aligned_labels[label_name] for label_name in self.aligned_labels]):
+                    # unaligned labels
+                    assert not self.split_files_max_sample_len
 
-                else:
+                if any([not self.aligned_labels[label_name] for label_name in self.aligned_labels]) \
+                        or not self.split_files_max_sample_len:
                     sample_splits = [
                         (filename, self.left_context, len(sample_dict["features"][main_feat]) - self.right_context)
                         for filename, sample_dict in samples_list]
+                else:
+                    # framewise sequential
+                    if self.split_files_max_sample_len:
+                        sample_splits = splits_by_seqlen(samples_list, self.split_files_max_sample_len,
+                                                         self.left_context, self.right_context)
 
                 for sample_id, start_idx, end_idx in sample_splits:
                     self.max_len_per_chunk[chnk_id] = (end_idx - start_idx) \
-                        if (end_idx - start_idx) > self.max_len_per_chunk[chnk_id] else self.max_len_per_chunk[chnk_id]
+                        if (end_idx - start_idx) > self.max_len_per_chunk[chnk_id] else self.max_len_per_chunk[
+                        chnk_id]
 
                     self.min_len_per_chunk[chnk_id] = (end_idx - start_idx) \
-                        if (end_idx - start_idx) < self.min_len_per_chunk[chnk_id] else self.min_len_per_chunk[chnk_id]
+                        if (end_idx - start_idx) < self.min_len_per_chunk[chnk_id] else self.min_len_per_chunk[
+                        chnk_id]
 
                 # sort sigs/labels: longest -> shortest
                 sample_splits = sorted(sample_splits, key=lambda x: x[2] - x[1])
                 self.samples_per_chunk.append(len(sample_splits))
 
+                if not len(sample_splits) == self.samples_per_chunk[chnk_id]:
+                    assert len(sample_splits) == self.samples_per_chunk[chnk_id], \
+                        f"{len(sample_splits)} =!= {self.samples_per_chunk[chnk_id]}"
             else:
+                # framewise shuffled frames
                 prev_index = 0
                 samples_idices = []
                 sample_ids = []
@@ -401,8 +431,6 @@ class KaldiDataset(data.Dataset):
 
                 sample_splits = (sample_ids, samples_idices)
                 self.samples_per_chunk.append(samples_idices[-1])
-
-            assert len(sample_splits) == self.samples_per_chunk[chnk_id]
 
             torch.save(
                 {"samples": samples,
@@ -417,7 +445,7 @@ class KaldiDataset(data.Dataset):
         logger.info('Done extracting kaldi features!')
 
 
-def apply_context(sample, context_left, context_right, aligned_labels):
+def apply_context(sample, start_idx, end_idx, context_left, context_right, aligned_labels):
     """
     Remove labels left and right to account for the needed context.
 
@@ -443,30 +471,23 @@ def apply_context(sample, context_left, context_right, aligned_labels):
     lables = {}
     for label_name in sample['labels']:
         if aligned_labels[label_name]:
-            if context_right > 0:
-                lables[label_name] = sample['labels'][label_name][context_left: -context_right]
-            else:
-                lables[label_name] = sample['labels'][label_name][context_left:]
+            assert end_idx > 0
+            lables[label_name] = sample['labels'][label_name][start_idx: end_idx]
 
         else:
             lables[label_name] = sample['labels'][label_name]
 
     features = {}
     for feature_name in sample['features']:
+        if any([not aligned_labels[label_name] for label_name in sample['labels']]):
+            assert len(sample['features'][feature_name]) == end_idx - start_idx + context_left + context_right, \
+                f"{len(sample['features'][feature_name])} {end_idx} {start_idx} {context_left} {context_right}"
         features[feature_name] = \
             apply_context_single_feat(
                 sample['features'][feature_name],
-                context_left, context_right)
+                context_left, context_right, start_idx, end_idx)
 
     return features, lables
-
-
-def narrow_by_split(features, lables, start_idx, end_idx):
-    for label_name in lables:
-        lables[label_name] = lables[label_name][start_idx: end_idx]
-
-    for feature_name in features:
-        features[feature_name] = features[feature_name][start_idx: end_idx]
 
 
 def np_dict_to_torch(_dict):
