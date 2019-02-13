@@ -21,8 +21,8 @@
 # the word list from the CMU dictionary. No pronunciations are employed.
 
 # run this from ../
-phndir=data/local/dict_phn
-dir=data/local/dict_char
+#phndir=data/local/dict_phn
+#dir=data/local/dict_char
 #mkdir -p $dir
 
 . utils/parse_options.sh || exit 1;
@@ -52,7 +52,7 @@ cat $lm_dir/$dict_name | \
   > $dst_dir/lexicon2_raw_nosil.txt || exit 1;
 
 #  Get the set of lexicon units without noises
-perl -nae 'shift @F; foreach my $w (@F) {print $w . "\n"}' $dst_dir/lexicon2_raw_nosil.txt | sort -u > $dst_dir/units_nosil.txt
+#perl -nae 'shift @F; foreach my $w (@F) {print $w . "\n"}' $dst_dir/lexicon2_raw_nosil.txt | sort -u > $dst_dir/units_nosil.txt
 
 # Add special noises words & characters into the lexicon.  To be consistent with the blank <blk>,
 # we add "< >" to the noises characters
@@ -60,9 +60,10 @@ perl -nae 'shift @F; foreach my $w (@F) {print $w . "\n"}' $dst_dir/lexicon2_raw
  cat - $dst_dir/lexicon2_raw_nosil.txt | sort | uniq > $dst_dir/lexicon.txt || exit 1;
 
 #  The complete set of lexicon units, indexed by numbers starting from 1
-(echo '<NOISE>'; echo '<SPOKEN_NOISE>'; echo '<SPACE>'; echo '<UNK>'; ) | cat - $dst_dir/units_nosil.txt | awk '{print $1 " " NR}' > $dst_dir/units.txt
+(echo '<NOISE>'; echo '<SPOKEN_NOISE>'; echo '<SPACE>'; echo '<UNK>'; ) | cat - tokens/units_nosil.txt | awk '{print $1 " " NR}' > $dst_dir/units.txt
 
 # Convert character sequences into the corresponding sequences of units indices, encoded by units.txt
+[[ -x utils/sym2int.pl ]] || exit 2;
 utils/sym2int.pl -f 2- $dst_dir/units.txt < $dst_dir/lexicon.txt > $dst_dir/lexicon_numbers.txt
 
 echo "Phoneme-based dictionary preparation succeeded"

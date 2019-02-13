@@ -20,7 +20,7 @@
 dict_type="phn"        # the type of lexicon, either "phn" or "char"
 space_char="<SPACE>"   # the character you have used to represent spaces
 
-. utils/parse_options.sh 
+. utils/parse_options.sh
 
 if [ $# -ne 3 ]; then 
   echo "usage: utils/ctc_compile_dict_token.sh <dict-src-dir> <tmp-dir> <lang-dir>"

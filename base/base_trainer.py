@@ -78,7 +78,7 @@ class BaseTrainer:
 
             self.stop_gpu_usage_logging = threading.Event()
 
-            threading.Thread(target=lambda: every(1, self.log_gpu_usage, logger, self.stop_gpu_usage_logging)).start()
+            threading.Thread(target=lambda: every(30, self.log_gpu_usage, logger, self.stop_gpu_usage_logging)).start()
 
     def log_gpu_usage(self):
         if nvidia_smi_enabled:
@@ -113,9 +113,9 @@ class BaseTrainer:
         for epoch in range(self.start_epoch, self.epochs):
             logger.info('----- Epoch {} / {} -----'.format(format(epoch, "03d"), format(self.epochs, "03d")))
 
+            self.tensorboard_logger.set_step(self.global_step, 'epoch_info')
             with Timer("elapsed_time_epoch", [self.tensorboard_logger, logger], self.global_step) as t:
                 result_log = self._train_epoch(epoch)
-            self.tensorboard_logger.set_step(self.global_step, 'train')
 
             for lr_scheduler_name in self.lr_schedulers:
                 self.tensorboard_logger.add_scalar("lr_{}".format(lr_scheduler_name),

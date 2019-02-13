@@ -20,49 +20,46 @@
 
 . ./path.sh || exit 1;
 
-if [ $# -ne 3 ]; then
-  echo "Usage: $0 <lang-dir> <lm-dir> <lm-dir-tmp>"
-  echo "e.g.: data/lang data/lm data/lm_tmp"
+if [ $# -ne 4 ]; then
+  echo "Usage: $0 <lang-dir> <arpa-lm-path> <out_dir> <lm-dir-tmp>"
+  echo "e.g.: data/lang ...lm.arpa out_dir data/lm_tmp"
   exit 1
 fi
 
 langdir=$1
-lmdir=$2
-tmpdir=$3
+#lmdir=$2
+arpa_lm=$2
+out_dir=$3
+tmpdir=$4
 mkdir -p $tmpdir
 
 # Adapted from the kaldi-trunk librespeech script local/format_lms.sh
-echo "Preparing language models for testing, may take some time ... "
-for lm_suffix in tgsmall tgmed ; do  ###tglarge fglarge ; do
-    test=${langdir}_test_${lm_suffix}
-    mkdir -p $test
-    cp ${langdir}/words.txt $test || exit 1;
+#echo "Preparing language models for testing, may take some time ... "
+#for lm_suffix in tgsmall tgmed ; do  ###tglarge fglarge ; do
+#test=${langdir}_test_${lm_suffix}
+mkdir -p $out_dir
+cp ${langdir}/words.txt $out_dir || exit 1;
 
-    echo "-----------------------------------------"
-    echo "Working on " $lm_suffix;
-    echo "-----------------------------------------"
+#echo "-----------------------------------------"
+#echo "Working on " $lm_suffix;
+#echo "-----------------------------------------"
 
-    gunzip -c $lmdir/lm_${lm_suffix}.arpa.gz | \
-     utils/find_arpa_oovs.pl $test/words.txt  > $tmpdir/oovs_${lm_suffix}.txt
+cat $arpa_lm | \
+ utils/find_arpa_oovs.pl $out_dir/words.txt  > $tmpdir/oovs.txt
 
-    # grep -v '<s> <s>' because the LM seems to have some strange and useless
-    # stuff in it with multiple <s>'s in the history.
-    gunzip -c $lmdir/lm_${lm_suffix}.arpa.gz | \
-      grep -v '<s> <s>' | \
-      grep -v '</s> <s>' | \
-      grep -v '</s> </s>' | \
-      arpa2fst - | fstprint | \
-      utils/remove_oovs.pl $tmpdir/oovs_${lm_suffix}.txt | \
-      utils/eps2disambig.pl | utils/s2eps.pl | fstcompile --isymbols=$test/words.txt \
-        --osymbols=$test/words.txt  --keep_isymbols=false --keep_osymbols=false | \
-       fstrmepsilon | fstarcsort --sort_type=ilabel > $test/G.fst
-    
-    # Compose the final decoding graph. The composition of L.fst and G.fst is determinized and
-    # minimized.
-    fsttablecompose ${langdir}/L.fst $test/G.fst | fstdeterminizestar --use-log=true | \
-      fstminimizeencoded | fstarcsort --sort_type=ilabel > $tmpdir/LG.fst || exit 1;
-    fsttablecompose ${langdir}/T.fst $tmpdir/LG.fst > $test/TLG.fst || exit 1;
-done
+cat $arpa_lm | \
+  arpa2fst - | fstprint | \
+  utils/remove_oovs.pl $tmpdir/oovs.txt | \
+  utils/eps2disambig.pl | utils/s2eps.pl | fstcompile --isymbols=$out_dir/words.txt \
+    --osymbols=$out_dir/words.txt  --keep_isymbols=false --keep_osymbols=false | \
+   fstrmepsilon | fstarcsort --sort_type=ilabel > $out_dir/G.fst
+
+# Compose the final decoding graph. The composition of L.fst and G.fst is determinized and
+# minimized.
+fsttablecompose ${langdir}/L.fst $out_dir/G.fst | fstdeterminizestar --use-log=true | \
+  fstminimizeencoded | fstarcsort --sort_type=ilabel > $tmpdir/LG.fst || exit 1;
+fsttablecompose ${langdir}/T.fst $tmpdir/LG.fst > $out_dir/TLG.fst || exit 1;
+#done
 
 echo "Composing decoding graph TLG.fst succeeded"
-rm -r $tmpdir
+#rm -r $tmpdir
