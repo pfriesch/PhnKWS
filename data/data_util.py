@@ -14,12 +14,17 @@ def load_counts(class_counts_file):
     return counts
 
 
-def split_chunks(seq, size):
+def split_chunks(seq, size, overfit_small_batch):
+    assert len(seq) > 0
+    if overfit_small_batch:
+        seq = seq[:10]
+        return [seq]
     newseq = []
+    chunk = 0
     for chunk in range(len(seq) // size):
         newseq.append(seq[chunk * size:chunk * size + size])
-    newseq.append(seq[chunk * size + size:])
-
+    if len(seq[chunk * size + size:]) > 0:
+        newseq.append(seq[chunk * size + size:])
     return newseq
 
 

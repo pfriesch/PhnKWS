@@ -35,9 +35,13 @@ def setup_run(config):
     return model, loss, metrics, optimizers, config, lr_schedulers
 
 
-def main(config_path, resume_path):
+def main(config_path, resume_path, overfit_small_batch):
     config = read_json(config_path)
     check_config(config)
+
+    if overfit_small_batch:
+        config['exp']['num_workers'] = 0
+
 
     # if resume_path:
     # TODO
@@ -85,7 +89,8 @@ def main(config_path, resume_path):
                       resume_path=resume_path,
                       config=config,
                       do_validation=True,
-                      lr_schedulers=lr_schedulers)
+                      lr_schedulers=lr_schedulers,
+                      overfit_small_batch=overfit_small_batch)
     trainer.train()
 
 
@@ -97,9 +102,11 @@ if __name__ == '__main__':
                         help='path to latest checkpoint (default: None)')
     parser.add_argument('-d', '--device', default=None, type=str,
                         help='indices of GPUs to enable (default: all)')
+    parser.add_argument('-o', '--overfit', action='store_true',
+                        help='overfit_small_batch / debug mode')
     args = parser.parse_args()
 
     if args.device:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.device
 
-    main(args.config, args.resume)
+    main(args.config, args.resume, args.overfit)

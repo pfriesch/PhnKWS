@@ -80,6 +80,6 @@ class Timer:
         self.interval = self.end - self.start
         for logger in self.loggers:
             if isinstance(logger, WriterTensorboardX):
-                logger.add_scalar(self.name, self.interval, global_step=self.global_step)
+                logger.add_scalar(self.name, self.interval, global_step=self.global_step, mode="info")
             elif isinstance(logger, Logger):
                 logger.debug("{} took {:.5f}s".format(self.name, self.interval))

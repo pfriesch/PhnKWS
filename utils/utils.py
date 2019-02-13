@@ -70,18 +70,31 @@ def check_environment():
     run_shell("which copy-feats")
 
 
-def run_shell(cmd):
+def run_shell(cmd, pipefail=True):
+    """
+
+
+    :param cmd:
+    :param pipefail:    From bash man: If pipefail is enabled, the pipeline's return status is
+     the value of the last (rightmost) command to exit with a non-zero status, or zero if all
+     commands exit successfully.
+    :return:
+    """
     logger.debug("RUN: {}".format(cmd))
     if cmd.split(" ")[0].endswith(".sh"):
         if not (os.path.isfile(cmd.split(" ")[0]) and os.access(cmd.split(" ")[0], os.X_OK)):
             logger.warn("{} does not exist or is not runnable!".format(cmd.split(" ")[0]))
 
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    if pipefail:
+        cmd = 'set -o pipefail; ' + cmd
+
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, executable='/bin/bash')
 
     (output, err) = p.communicate()
     return_code = p.wait()
     if return_code > 0:
-        logger.error("Call: {} had nonzero return code: {}, stderr: {}".format(cmd, return_code, err))
+        logger.error(
+            "Call: {} had nonzero return code: {}, stdout: {} stderr: {}".format(cmd, return_code, output, err))
         raise RuntimeError("Call: {} had nonzero return code: {}, stderr: {}".format(cmd, return_code, err))
     # logger.warn("ERROR: {}".format(err.decode("utf-8")))
 

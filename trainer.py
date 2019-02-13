@@ -20,17 +20,17 @@ from utils.logger_config import logger
 class Trainer(BaseTrainer):
 
     def __init__(self, model, loss, metrics, optimizers, resume_path, config, do_validation,
-                 lr_schedulers):
+                 lr_schedulers, overfit_small_batch):
         super(Trainer, self).__init__(model, loss, metrics, optimizers, lr_schedulers, resume_path, config)
         self.config = config
         self.do_validation = do_validation
         self.log_step = int(np.sqrt(config['training']['batch_size_train']))
+        self.overfit_small_batch = overfit_small_batch
 
     def _eval_metrics(self, output, target):
         acc_metrics = {}
         for metric in self.metrics:
             acc_metrics[metric] = self.metrics[metric](output, target)
-            self.tensorboard_logger.add_scalar(metric, acc_metrics[metric])
         return acc_metrics
 
     def _train_epoch(self, epoch):
@@ -50,10 +50,8 @@ class Trainer(BaseTrainer):
             The metrics in log must have the key 'metrics'.
         """
         self.model.train()
+        self.tensorboard_logger.set_step(self.global_step, 'train')
         tr_data = self.config['data_use']['train_with']
-
-        train_loss = 0
-        train_metrics = {metric: 0 for metric in self.metrics}
 
         dataset = KaldiDataset(self.config['exp']['cache_data_root'],
                                tr_data,
@@ -66,20 +64,22 @@ class Trainer(BaseTrainer):
                                normalize_features=True,
                                phoneme_dict=self.config['data_use']['phones'],
                                split_files_max_seq_len=self.max_seq_length_train_curr,
-                               shuffle_frames=self.config['training']['shuffle_frames'])
+                               shuffle_frames=self.config['training']['shuffle_frames'],
+                               overfit_small_batch=self.overfit_small_batch)
 
         dataloader = KaldiDataLoader(dataset,
                                      self.config['training']['batch_size_train'],
                                      self.config["exp"]["n_gpu"] > 0,
                                      self.config['exp']['num_workers'])
-        if self.max_seq_length_train_curr is not None:
-            self.tensorboard_logger.add_scalar("max_seq_length_train_curr", self.max_seq_length_train_curr, epoch)
+
+        total_train_loss = 0
+        total_train_metrics = {metric: 0 for metric in self.metrics}
 
         accumulated_train_losses = {}
         accumulated_train_metrics = {}
         n_steps_chunk = 0
-        last_train_logging = time.process_time()
-        last_checkpoint = time.process_time()
+        last_train_logging = time.time()
+        last_checkpoint = time.time()
 
         n_steps_this_epoch = 0
         # TODO chunked dataloader length
@@ -116,19 +116,22 @@ class Trainer(BaseTrainer):
                     if _loss not in accumulated_train_losses:
                         accumulated_train_losses[_loss] = 0
                     accumulated_train_losses[_loss] += loss_value
+                total_train_loss += loss["loss_final"]
 
                 _train_metrics = self._eval_metrics(output, targets)
                 for metric, metric_value in _train_metrics.items():
                     if metric not in accumulated_train_metrics:
                         accumulated_train_metrics[metric] = 0
                     accumulated_train_metrics[metric] += metric_value
+                    total_train_metrics[metric] += metric_value
                 #
                 pbar.set_description('T e:{} l: {:.4f}'.format(epoch,
                                                                loss["loss_final"].item()))
                 pbar.update()
 
-                # Log training every minute
-                if (time.process_time() - last_train_logging) > 60:
+                # Log training every 30s and smoothe since its the average
+                if (time.time() - last_train_logging) > 30:
+                    last_train_logging = time.time()
                     self.tensorboard_logger.set_step(self.global_step, 'train')
                     for _loss, loss_value in accumulated_train_losses.items():
                         self.tensorboard_logger.add_scalar(_loss, loss_value / n_steps_chunk)
@@ -150,20 +153,21 @@ class Trainer(BaseTrainer):
                     accumulated_train_metrics = {}
                     n_steps_chunk = 0
 
-                    if (time.process_time() - last_checkpoint) > self.config['exp']['checkpoint_interval_seconds']:
-                        pass  # TODO add saving checkpoint
+                    if (time.time() - last_checkpoint) > self.config['exp']['checkpoint_interval_seconds']:
+                        logger.warn("checkpoint_interval_seconds not implemented")
+                        # TODO add saving checkpoint
 
                 #### /Logging ####
 
         self.tensorboard_logger.set_step(epoch, 'train')
-        self.tensorboard_logger.add_scalar('train_loss_avg', train_loss / n_steps_this_epoch)
-        for metric in train_metrics:
-            self.tensorboard_logger.add_scalar(metric + "_avg", train_metrics[metric] / n_steps_this_epoch)
+        self.tensorboard_logger.add_scalar('train_loss_avg', total_train_loss / n_steps_this_epoch)
+        for metric in total_train_metrics:
+            self.tensorboard_logger.add_scalar(metric + "_avg", total_train_metrics[metric] / n_steps_this_epoch)
 
-        log = {'train_loss_avg': train_loss / n_steps_this_epoch,
+        log = {'train_loss_avg': total_train_loss / n_steps_this_epoch,
                'train_metrics_avg':
-                   {metric: train_metrics[metric] / n_steps_this_epoch
-                    for metric in train_metrics}}
+                   {metric: total_train_metrics[metric] / n_steps_this_epoch
+                    for metric in total_train_metrics}}
         if self.do_validation:
             valid_log = self._valid_epoch(epoch)
             log.update(valid_log)

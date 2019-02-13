@@ -14,7 +14,7 @@ import torch
 from tqdm import tqdm
 
 from data.data_util import load_features, split_chunks, load_labels, splits_by_seqlen, apply_context_single_feat
-from data.phoneme_dicts.phoneme_dict import load_phoneme_dict
+from data.phoneme_dicts.phoneme_dict import load_phoneme_dict, get_phoneme_dict, PhonemeDict
 from utils.logger_config import logger
 
 
@@ -41,9 +41,17 @@ class KaldiDataset(data.Dataset):
                  phoneme_dict=None,  # e.g. kaldi/egs/librispeech/s5/data/lang/phones.txt
 
                  split_files_max_seq_len=100,
-                 shuffle_frames=False
+                 shuffle_frames=False,
+                 overfit_small_batch=False
 
                  ):
+        self.overfit_small_batch = overfit_small_batch
+        if isinstance(phoneme_dict, str) and os.path.exists(phoneme_dict):
+            phoneme_dict = get_phoneme_dict(phoneme_dict,
+                                            stress_marks=True, word_position_dependency=False)
+        if not isinstance(phoneme_dict, PhonemeDict):
+            raise ValueError(f"Got {phoneme_dict} for phoneme_dict, expected path to \"phones.txt\" or PhonemeDict")
+
         self.aligned_labels = {}
 
         for label_name in label_dict:
@@ -212,6 +220,7 @@ class KaldiDataset(data.Dataset):
             with open(os.path.join(self.dataset_path, self.info_filename), "r") as f:
                 _info = json.load(f)
 
+                # TODO overfit
             if ("feature_dict" not in _info
                     or "label_dict" not in _info
                     or "max_sample_len" not in _info
@@ -220,7 +229,8 @@ class KaldiDataset(data.Dataset):
                     or "normalize_features" not in _info
                     or "phoneme_dict" not in _info
                     or "split_files_max_sample_len" not in _info
-                    or "shuffle_frames" not in _info):
+                    or "shuffle_frames" not in _info
+                    or "overfit_small_batch" not in _info):
                 return False
 
             if (feature_dict != _info["feature_dict"]
@@ -231,7 +241,8 @@ class KaldiDataset(data.Dataset):
                     or self.normalize_features != _info["normalize_features"]
                     or self.phoneme_dict != load_phoneme_dict(*_info["phoneme_dict"])
                     or self.split_files_max_sample_len != _info["split_files_max_sample_len"]
-                    or self.shuffle_frames != _info["shuffle_frames"]):
+                    or self.shuffle_frames != _info["shuffle_frames"]
+                    or self.overfit_small_batch != _info["overfit_small_batch"]):
 
                 return False
             else:
@@ -250,6 +261,7 @@ class KaldiDataset(data.Dataset):
                        "phoneme_dict": self.phoneme_dict,
                        "split_files_max_sample_len": self.split_files_max_sample_len,
                        "shuffle_frames": self.shuffle_frames,
+                       "overfit_small_batch": self.overfit_small_batch,
                        "feature_dict": feature_dict,
                        "label_dict": label_dict}, f)
 
@@ -314,7 +326,7 @@ class KaldiDataset(data.Dataset):
             lines = f.readlines()
         feat_list = lines
         random.shuffle(feat_list)
-        file_chunks = list(split_chunks(feat_list, self.chunk_size))
+        file_chunks = list(split_chunks(feat_list, self.chunk_size, self.overfit_small_batch))
 
         self.max_len_per_chunk = [0] * len(file_chunks)
         self.min_len_per_chunk = [sys.maxsize] * len(file_chunks)
