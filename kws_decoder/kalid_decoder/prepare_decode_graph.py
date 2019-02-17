@@ -39,7 +39,6 @@ def make_kaldi_decoding_graph(keywords, out_dir):
 
     keywords = [kw.upper() for kw in keywords]
 
-    keyword_pron = {}
     lines = ["!SIL SIL\n",
              "<SPOKEN_NOISE> SPN\n",
              f"{UNK_WORD} SPN\n"]
@@ -56,22 +55,7 @@ def make_kaldi_decoding_graph(keywords, out_dir):
                 pronounceiation = _line[1]
 
             if word in keywords:
-                # TODO add support for multiple pronounciations
-                if word not in keyword_pron:
-                    # assert word not in keyword_pron, f"{word} already in keywords: {keywords}"
-                    keyword_pron[word] = pronounceiation.strip()
-                    lines.append(line)
-                else:
-                    for i in range(1, 11):
-                        # logger.warn(f"Disregarding alternative pronounciation for {word} of {pronounceiation.strip()}")
-                        # print("")
-                        alt_pronounceiation_word = word + "_" + str(i)
-                        if alt_pronounceiation_word not in keyword_pron:
-                            keyword_pron[alt_pronounceiation_word] = pronounceiation.strip()
-                            lines.append(f"{alt_pronounceiation_word}\t{pronounceiation}\n")
-                            break
-
-                    assert i < 10  # TODO handle case
+                lines.append(line)
 
     with open(f"{in_dir}/lexicon.txt", "w", encoding="utf-8") as f:
         f.writelines(sorted(lines))
