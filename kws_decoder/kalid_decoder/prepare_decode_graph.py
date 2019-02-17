@@ -1,47 +1,45 @@
 import os
 import shutil
 
-from kws_decoder.arpa_utils import make_kw_arpa, UNK_WORD
-from kws_decoder.kalid_decoder.build_fst_sh import build_kw_grammar_fst
-from utils.logger_config import logger
+from kws_decoder.kalid_decoder.kaldi_const import SIL_SYM, UNK_SYM, SPN_SYM
+from kws_decoder.kalid_decoder.build_fst import build_kw_grammar_fst
 from utils.utils import run_shell
 
 KALDI_DIR = "/mnt/data/libs/kaldi"
 
 
-def make_kaldi_decoding_graph(keywords, out_dir):
-    # assert os.getcwd().endswith("kalid_decoder")  # TODO handle the relative folders
+def check_andsetup__dirs(out_dir, train_graph_dir, train_dict_folder, lexicon_path):
+    assert os.path.exists(f"{train_graph_dir}/final.mdl")
+    assert os.path.exists(f"{train_graph_dir}/tree")
+    # assert os.path.exists(f"{train_graph_dir}/frame_subsampling_factor") #TODO frame_subsampling_factor has to be defined here
 
-    train_graph_dir = f"{KALDI_DIR}/egs/librispeech/s5/exp/tri4b"
-    train_dict_folder = f"{KALDI_DIR}/egs/librispeech/s5/data/local/dict_nosp"
-    lexicon_path = f"{KALDI_DIR}/egs/librispeech/s5/data/local/lm/librispeech-lexicon.txt"
-
-    in_dir = os.path.join(out_dir, "in_tmp")
-    if not os.path.isdir(in_dir):
-        os.makedirs(in_dir)
-    tmpdir = os.path.join(out_dir, "tmp")
-    if not os.path.isdir(tmpdir):
-        os.makedirs(tmpdir)
+    lang_in_tmp = os.path.join(out_dir, "lang_in_tmp")
+    if not os.path.isdir(lang_in_tmp):
+        os.makedirs(lang_in_tmp)
+    lang_tmp = os.path.join(out_dir, "lang_tmp")
+    if not os.path.isdir(lang_tmp):
+        os.makedirs(lang_tmp)
     final_lang_dir = os.path.join(out_dir, "lang")
     if not os.path.isdir(final_lang_dir):
         os.makedirs(final_lang_dir)
 
-    if not hasattr(logger, "logger"):
-        logger.configure_logger(tmpdir)
-
     for static_file in ["extra_questions.txt", "nonsilence_phones.txt", "optional_silence.txt", "silence_phones.txt"]:
-        if not os.path.exists(f"{in_dir}/{static_file}"):
-            shutil.copy(f"{train_dict_folder}/{static_file}", f"{in_dir}/{static_file}")
+        if not os.path.exists(f"{lang_in_tmp}/{static_file}"):
+            shutil.copy(f"{train_dict_folder}/{static_file}", f"{lang_in_tmp}/{static_file}")
 
-    libri_lexicon = f"{in_dir}/librispeech-lexicon.txt"
+    libri_lexicon = f"{lang_in_tmp}/librispeech-lexicon.txt"
     if not os.path.exists(libri_lexicon):
         shutil.copy(lexicon_path, libri_lexicon)
 
+    return libri_lexicon, lang_in_tmp, lang_tmp, final_lang_dir
+
+
+def filter_lexicon(keywords, libri_lexicon, out_folder):
     keywords = [kw.upper() for kw in keywords]
 
-    lines = ["!SIL SIL\n",
-             "<SPOKEN_NOISE> SPN\n",
-             f"{UNK_WORD} SPN\n"]
+    lines = [f"{SIL_SYM} SIL\n",
+             f"{SPN_SYM} SPN\n",
+             f"{UNK_SYM} SPN\n"]
 
     with open(libri_lexicon, "r", encoding="utf-8") as f:
         for line in f:
@@ -57,12 +55,25 @@ def make_kaldi_decoding_graph(keywords, out_dir):
             if word in keywords:
                 lines.append(line)
 
-    with open(f"{in_dir}/lexicon.txt", "w", encoding="utf-8") as f:
+    with open(f"{out_folder}/lexicon.txt", "w", encoding="utf-8") as f:
         f.writelines(sorted(lines))
+
+
+def make_kaldi_decoding_graph(keywords, out_dir,
+                              train_graph_dir=f"{KALDI_DIR}/egs/librispeech/s5/exp/tri4b",
+                              train_dict_folder=f"{KALDI_DIR}/egs/librispeech/s5/data/local/dict_nosp",
+                              lexicon_path=f"{KALDI_DIR}/egs/librispeech/s5/data/local/lm/librispeech-lexicon.txt",
+                              draw_G_L_fsts=True):
+    libri_lexicon, lang_in_tmp, lang_tmp, final_lang_dir = \
+        check_andsetup__dirs(out_dir, train_graph_dir, train_dict_folder, lexicon_path)
 
     if not os.path.exists(os.path.join(out_dir, "utils/prepare_lang.sh")):
         os.symlink(f"{KALDI_DIR}/egs/wsj/s5/utils", os.path.join(out_dir, "utils"))
         os.symlink(f"{KALDI_DIR}/egs/wsj/s5/steps", os.path.join(out_dir, "steps"))
+
+    filter_lexicon(keywords, libri_lexicon, out_folder=lang_in_tmp)
+
+    # TODO explore unk fst
 
     # unk_fst_dir = os.path.join(out_dir, "unk_fst")
     # if not os.path.isdir(unk_fst_dir):
@@ -74,8 +85,13 @@ def make_kaldi_decoding_graph(keywords, out_dir):
     ## using bigram only and num-ngrams is only 3336
     # num_extra_ngrams=1000
 
+    # run_shell(
+    #     f"{out_dir}/utils/lang/make_unk_lm.sh --num_extra_ngrams 1000 --ngram-order 2 --cmd utils/run.pl {lang_in_tmp} {unk_fst_dir}")
+
+    # TODO alternative simple phone loop
+
     cwd = os.getcwd()
-    os.chdir(out_dir)
+    os.chdir(out_dir)  # necessary because the kaldi scripts expect it
 
     if not os.path.exists("path.sh"):
         with open("path.sh", "w") as f:
@@ -84,38 +100,22 @@ def make_kaldi_decoding_graph(keywords, out_dir):
                                     """. $KALDI_ROOT/tools/config/common_path.sh""",
                                     """export LC_ALL=C""", ""]))
 
-    # run_shell(
-    #     f"{out_dir}/utils/lang/make_unk_lm.sh --num_extra_ngrams 1000 --ngram-order 2 --cmd utils/run.pl {in_dir} {unk_fst_dir}")
-
-    # TODO alternative simple phone loop
-
     prepare_lang_script = f"{out_dir}/utils/prepare_lang.sh"
-    # run_shell(f"{prepare_lang_script} --unk-fst {unk_fst_dir}/unk_fst.txt {in_dir} \"<UNK>\" {tmpdir} {final_lang_dir}")
-    run_shell(f"{prepare_lang_script} {in_dir} \"<UNK>\" {tmpdir} {final_lang_dir}")
+    # run_shell(f"{prepare_lang_script} --unk-fst {unk_fst_dir}/unk_fst.txt {lang_in_tmp} \"{unk_sym}\" {lang_tmp} {final_lang_dir}")
+    run_shell(f"{prepare_lang_script} {lang_in_tmp} \"{UNK_SYM}\" {lang_tmp} {final_lang_dir}")
 
-    # if viz_model:#TODO add flag
-    run_shell(
-        f"fstdraw --isymbols={final_lang_dir}/phones.txt --osymbols={final_lang_dir}/words.txt {final_lang_dir}/L.fst | dot -Tpdf -o{out_dir}/L.pdf")
-
-    # Grammar
-
-    # arpa_str = make_kw_arpa(keywords)
-    # with open(f"{out_dir}/keyword.arpa", "w", encoding="utf-8") as f:
-    #     f.writelines(arpa_str)
+    if draw_G_L_fsts:
+        run_shell(
+            f"fstdraw --isymbols={final_lang_dir}/phones.txt "
+            + f"--osymbols={final_lang_dir}/words.txt {final_lang_dir}/L.fst | dot -Tpdf -o{out_dir}/L.pdf")
 
     grammar_fst_path = build_kw_grammar_fst(keywords, words_file=f"{final_lang_dir}/words.txt")
     shutil.copy(grammar_fst_path, f"{final_lang_dir}/G.fst")
-    # try:
-    #     run_shell(
-    #         f"cat {out_dir}/keyword.arpa | arpa2fst --disambig-symbol=#0 --read-symbol-table={final_lang_dir}/words.txt - {final_lang_dir}/G.fst")
-    # except RuntimeError:
-    #     with open(f"{out_dir}/keyword.arpa", "r") as f:
-    #         print("".join(f.readlines()))
-    #     raise
 
-    # if viz_model:#TODO add flag
-    run_shell(
-        f"fstdraw --isymbols={final_lang_dir}/words.txt --osymbols={final_lang_dir}/words.txt {final_lang_dir}/G.fst | dot -Tpdf -o{out_dir}/G.pdf")
+    if draw_G_L_fsts:
+        run_shell(
+            f"fstdraw --isymbols={final_lang_dir}/words.txt "
+            + f"--osymbols={final_lang_dir}/words.txt {final_lang_dir}/G.fst | dot -Tpdf -o{out_dir}/G.pdf")
 
     run_shell(f"{out_dir}/utils/validate_lang.pl --skip-determinization-check {final_lang_dir}")
 

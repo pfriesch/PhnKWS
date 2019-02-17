@@ -1,0 +1,4 @@
+EPS_SYM = "<eps>"
+SIL_SYM = "!SIL"
+UNK_SYM = "<UNK>"
+SPN_SYM = "<SPOKEN_NOISE>"

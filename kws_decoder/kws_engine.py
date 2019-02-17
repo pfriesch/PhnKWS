@@ -1,5 +1,6 @@
 import os
 import shutil
+import tempfile
 
 import torch
 
@@ -51,10 +52,8 @@ class KWSEngine(Engine):
 
     def __init__(self, keywords, sensitivity, model_path) -> None:
         super().__init__()
-        self.tmp_dir = "/mnt/data/pytorch-kaldi/tmp"
-        if os.path.isdir(self.tmp_dir):
-            shutil.rmtree(self.tmp_dir)
-        os.makedirs(self.tmp_dir)
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        # TODO debug mode
 
         logger.configure_logger(self.tmp_dir)
         check_environment()
@@ -63,7 +62,7 @@ class KWSEngine(Engine):
         self.keywords = keywords
         self.sensitivity = sensitivity
 
-        self.decoder = BaseDecoder(model_path, keywords, self.tmp_dir)
+        self.decoder = BaseDecoder(model_path, keywords, self.tmp_dir.name)
 
     def process_batch(self, wav_files):
         _wav_files = set()
@@ -82,7 +81,7 @@ class KWSEngine(Engine):
         return result
 
     def release(self):
-        pass
+        self.tmp_dir.cleanup()
 
     def __str__(self):
         pass
@@ -133,7 +132,6 @@ class KWSEngine(Engine):
         #### /utt2spk
         return tmp_scp, spk2utt_path, utt2spk_path
 
-
 # def plot_output_phonemes(model_logits):
 #     for filename, logits in model_logits.items():
 #         #### P1
@@ -154,4 +152,3 @@ class KWSEngine(Engine):
 #             axs[i].plot(logits[:, :, i].squeeze())
 #         # fig.tight_layout()
 #         plt.savefig("max_20.png")
-

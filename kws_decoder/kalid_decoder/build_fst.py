@@ -1,38 +1,10 @@
-import itertools
 import os
 import shutil
 from glob import glob
 
-from utils.utils import run_shell, check_environment
+from kws_decoder.kalid_decoder.kaldi_const import EPS_SYM, SIL_SYM, UNK_SYM, SPN_SYM
+from utils.utils import run_shell
 
-
-# #KWS_001
-# 0	1	72070	72070
-# 1	2	117093	117093
-# 2
-#
-# KWS_002
-# 0	1	156223	156223
-# 1	2	198047	198047
-# 2
-#
-# KWS_003
-# 0	1	33224	33224
-# 1
-#
-# KWS_004
-# 0	1	185382	185382
-# 1
-#
-# KWS_005
-# 0	1	194651	194651
-# 1	2	62931	62931
-# 2
-#
-# KWS_006
-# 0	1	49768	49768
-# 1	2	40836	40836
-# 2
 
 def write_fst(kw, keyword_fst_folder, word_map):
     w = word_map
@@ -53,25 +25,20 @@ def build_kw_grammar_fst(keywords, words_file):
         # expect each kw to be a list of words
         keywords = [kw.split(" ") for kw in keywords]
 
-    eps_sym = "<eps>"
-    sil_sym = "!SIL"
-    unk_sym = "<UNK>"
-    spn_sym = "<SPOKEN_NOISE>"
-
     with open(words_file, "r") as f:
         word_map = f.readlines()
         word_map = dict([line.strip().split(" ", 1) for line in word_map])
-        assert eps_sym in word_map
-        assert sil_sym in word_map
-        assert unk_sym in word_map
-        assert spn_sym in word_map
+        assert EPS_SYM in word_map
+        assert SIL_SYM in word_map
+        assert UNK_SYM in word_map
+        assert SPN_SYM in word_map
 
     keyword_fst_folder = "keyword_fsts"
     if os.path.isdir(keyword_fst_folder):
         shutil.rmtree(keyword_fst_folder)
     os.makedirs(keyword_fst_folder)
 
-    write_fst([unk_sym], keyword_fst_folder, word_map)
+    write_fst([UNK_SYM], keyword_fst_folder, word_map)
 
     for kw in keywords:
         write_fst(kw, keyword_fst_folder, word_map)
