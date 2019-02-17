@@ -19,7 +19,7 @@ def check_config(config):
 
 def setup_run(config):
     set_seed(config['exp']['seed'])
-    config = get_dataset_metadata(config)
+    config, decoding_norm_data = get_dataset_metadata(config)
 
     model = model_init(config)
 
@@ -32,7 +32,7 @@ def setup_run(config):
 
     loss = loss_init(config)
 
-    return model, loss, metrics, optimizers, config, lr_schedulers
+    return model, loss, metrics, optimizers, config, lr_schedulers, decoding_norm_data
 
 
 def main(config_path, resume_path, overfit_small_batch):
@@ -41,7 +41,6 @@ def main(config_path, resume_path, overfit_small_batch):
 
     if overfit_small_batch:
         config['exp']['num_workers'] = 0
-
 
     # if resume_path:
     # TODO
@@ -65,6 +64,8 @@ def main(config_path, resume_path, overfit_small_batch):
 
     set_seed(config['exp']['seed'])
 
+    config['exp']['save_dir'] = os.path.abspath(config['exp']['save_dir'])
+
     # Output folder creation
     out_folder = os.path.join(config['exp']['save_dir'], config['exp']['name'])
     if not os.path.exists(out_folder):
@@ -83,13 +84,11 @@ def main(config_path, resume_path, overfit_small_batch):
     logger.info("Experiment name : {}".format(out_folder))
     logger.info("tensorboard : tensorboard --logdir {}".format(os.path.abspath(out_folder)))
 
-    model, loss, metrics, optimizers, config, lr_schedulers = setup_run(config)
+    model, loss, metrics, optimizers, config, lr_schedulers, decoding_norm_data = setup_run(config)
 
-    trainer = Trainer(model, loss, metrics, optimizers,
-                      resume_path=resume_path,
-                      config=config,
+    trainer = Trainer(model, loss, metrics, optimizers, lr_schedulers, decoding_norm_data,
+                      resume_path, config,
                       do_validation=True,
-                      lr_schedulers=lr_schedulers,
                       overfit_small_batch=overfit_small_batch)
     trainer.train()
 

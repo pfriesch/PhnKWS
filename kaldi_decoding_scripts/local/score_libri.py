@@ -21,7 +21,8 @@ def score(data, lang_or_graph, dir,
     int2sym_script = os.path.join(decoing_scripts_folder, "utils/int2sym.pl")
     assert os.path.exists(int2sym_script)
     assert os.access(int2sym_script, os.X_OK)
-    os.makedirs(os.path.join(dir, "scoring", "log"))
+    if not os.path.isdir(os.path.join(dir, "scoring", "log")):
+        os.makedirs(os.path.join(dir, "scoring", "log"))
 
     run_shell(f"cat {data}/text | sed 's:<NOISE>::g' | sed 's:<SPOKEN_NOISE>::g' > {dir}/scoring/test_filt.txt")
 

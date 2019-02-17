@@ -7,46 +7,77 @@ from data import kaldi_io
 
 class Logger(object):
 
+    def __init__(self) -> None:
+        super().__init__()
+        self.configure_logger(out_folder=None)
+
     def configure_logger(self, out_folder):
-        name = 'default'
-        log_path = os.path.join(out_folder, 'log.log')
-        logging.config.dictConfig({
-            'version': 1,
-            'formatters': {
-                'default': {'format': '%(asctime)s [%(levelname)s] %(message)s', 'datefmt': '%Y-%m-%d %H:%M:%S'},
-                'brief': {'format': "[%(levelname)s]  %(message)s",
-                          "class": "utils.logger_format.ColoredFormatter"}
-            },
-            'handlers': {
-                'console': {
-                    'level': 'DEBUG',
-                    'class': 'logging.StreamHandler',
-                    'formatter': 'brief',
-                    'stream': 'ext://sys.stdout'
+        if out_folder is not None:
+            name = 'default'
+            log_path = os.path.join(out_folder, 'log.log')
+            logging.config.dictConfig({
+                'version': 1,
+                'formatters': {
+                    'default': {'format': '%(asctime)s [%(levelname)s] %(message)s', 'datefmt': '%Y-%m-%d %H:%M:%S'},
+                    'brief': {'format': "[%(levelname)s]  %(message)s",
+                              "class": "utils.logger_format.ColoredFormatter"}
                 },
-                'file': {
-                    'level': 'DEBUG',
-                    'class': 'logging.handlers.RotatingFileHandler',
-                    'formatter': 'default',
-                    'filename': log_path,
-                }
-            },
-            # matplotlib logs to the root logger too, in debug mode
-            # 'root': {
-            #     'level': 'DEBUG',
-            #     'handlers': ['console', 'file']
-            #
-            # },
-            'loggers': {
-                'default': {
-                    'level': 'DEBUG',
-                    'handlers': ['console', 'file']
-                }
-            },
-            'disable_existing_loggers': False
-        })
-        self.logger = logging.getLogger(name)
-        kaldi_io.logger = self
+                'handlers': {
+                    'console': {
+                        'level': 'DEBUG',
+                        'class': 'logging.StreamHandler',
+                        'formatter': 'brief',
+                        'stream': 'ext://sys.stdout'
+                    },
+                    'file': {
+                        'level': 'DEBUG',
+                        'class': 'logging.handlers.RotatingFileHandler',
+                        'formatter': 'default',
+                        'filename': log_path,
+                    }
+                },
+                # matplotlib logs to the root logger too, in debug mode
+                # 'root': {
+                #     'level': 'DEBUG',
+                #     'handlers': ['console', 'file']
+                #
+                # },
+                'loggers': {
+                    'default': {
+                        'level': 'DEBUG',
+                        'handlers': ['console', 'file']
+                    }
+                },
+                'disable_existing_loggers': False
+            })
+            self.logger = logging.getLogger(name)
+            kaldi_io.logger = self
+        else:
+            name = 'default'
+            logging.config.dictConfig({
+                'version': 1,
+                'formatters': {
+                    'brief': {'format': "[%(levelname)s]  %(message)s",
+                              "class": "utils.logger_format.ColoredFormatter"}
+                },
+                'handlers': {
+                    'console': {
+                        'level': 'DEBUG',
+                        'class': 'logging.StreamHandler',
+                        'formatter': 'brief',
+                        'stream': 'ext://sys.stdout'
+                    }
+                },
+                'loggers': {
+                    'default': {
+                        'level': 'DEBUG',
+                        'handlers': ['console']
+                    }
+                },
+                'disable_existing_loggers': False
+            })
+            self.logger = logging.getLogger(name)
+            kaldi_io.logger = self
 
     def debug(self, msg, *args, **kwargs):
         self.logger.debug(msg, *args, **kwargs)

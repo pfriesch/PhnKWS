@@ -2,13 +2,17 @@ import os
 import json
 
 import torch
+import numpy as np
+from tqdm import tqdm
 
 from base.utils import resume_checkpoint
-from data.data_util import apply_context_single_feat, load_counts
+from data.data_util import apply_context_single_feat
+from kaldi_decoding_scripts.decode_dnn_custom_graph import decode
+from kws_decoder.kalid_decoder.prepare_decode_graph import make_kaldi_decoding_graph
 from nn_.registries.model_registry import model_init
+from trainer import KaldiOutputWriter
 from utils.logger_config import logger
-from utils.util import ensure_dir, folder_to_checkpoint
-import numpy as np
+from utils.util import ensure_dir
 
 
 class BaseDecoder:
@@ -16,9 +20,11 @@ class BaseDecoder:
     Base class for all decoders
     """
 
-    def __init__(self, model_path):
+    def __init__(self, model_path, keywords, tmpdir):
         assert model_path.endswith(".pth")
         self.config = torch.load(model_path, map_location='cpu')['config']
+        # TODO remove
+        # self.config['exp']['save_dir'] = "/mnt/data/pytorch-kaldi/exp_TIMIT_TDNN_FBANK"
 
         self.model = model_init(self.config)
         # TODO GPU decoding
@@ -36,28 +42,55 @@ class BaseDecoder:
         with open(config_save_path, 'w') as f:
             json.dump(self.config, f, indent=4, sort_keys=False)
 
-        resume_checkpoint(model_path, self.model, logger)
+        self.epoch, self.global_step, self.decoding_norm_data = resume_checkpoint(model_path, self.model, logger)
 
-    def is_keyword(self, input_features, keyword, sensitivity):
-        output = self.model(input_features)
-        output_label = 'out_cd'
-        assert output_label in output
-        output = output[output_label]
+        graph_dir = make_kaldi_decoding_graph(keywords, tmpdir)
+        self.graph_path = os.path.join(graph_dir, "HCLG.fst")
+        self.words_path = os.path.join(graph_dir, "words.txt")
+        self.alignment_model_path = os.path.join(graph_dir, "final.mdl")
 
-        output = output.detach().numpy()
+    def is_keyword_batch(self, input_features, sensitivity):
+        post_files = []
 
-        if self.config['test'][output_label]['normalize_posteriors']:
-            # read the config file
-            counts = load_counts(
-                self.config['test'][output_label]['normalize_with_counts_from_file'])
-            output = output - np.log(counts / np.sum(counts))
+        with KaldiOutputWriter(self.out_dir, "keyword", self.epoch, self.config) as writer:
+            output_label = 'out_cd'
+            post_files.append(writer.post_file[output_label].name)
+            for sample_name in tqdm(input_features, desc="computing acoustic features:"):
+                input_feature = {"fbank": self.preprocess_feat(input_features[sample_name])}
+                output = self.model(input_feature)
+                assert output_label in output
+                output = output[output_label]
 
-        output = np.exp(output)
-        return output
+                output = output.detach().squeeze(1).numpy()
+
+                if self.config['test'][output_label]['normalize_posteriors']:
+                    # read the config file
+                    counts = self.decoding_norm_data[output_label]["normalize_with_counts"]
+                    output = output - np.log(counts / np.sum(counts))
+
+                output = np.exp(output)
+
+                assert len(output.shape) == 2
+                writer.write_mat(output_label, output.squeeze(), sample_name)
+        self.config['decoding']['scoring_type'] = 'just_transcript'
+        #### DECODING ####
+        logger.debug("Decoding...")
+        result = decode(**self.config['decoding'],
+                        alignment_model_path=self.alignment_model_path,
+                        words_path=self.words_path,
+                        graph_path=self.graph_path,
+                        out_folder=self.out_dir,
+                        featstrings=post_files)
+
+        #TODO filter result
+
+        return result
 
     def preprocess_feat(self, feat):
         assert len(feat.shape) == 2
         # length, num_feats = feat.shape
-        feat_context = apply_context_single_feat(feat, self.model.context_left, self.model.context_right)
+        feat_context = apply_context_single_feat(feat, self.model.context_left, self.model.context_right,
+                                                 start_idx=self.model.context_left,
+                                                 end_idx=len(feat) - self.model.context_right)
 
         return torch.from_numpy(feat_context).to(dtype=torch.float32).unsqueeze(1)

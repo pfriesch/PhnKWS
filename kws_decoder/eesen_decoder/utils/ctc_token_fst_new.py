@@ -76,7 +76,7 @@ if __name__ == '__main__':
     add_lex_disambig_tool_path = "asr_egs/librispeech/utils/add_lex_disambig.pl"
 
     ndisambig = run_shell(f"{add_lex_disambig_tool_path} {keyword_lexicon_p_path} {keyword_lexicon_p_disambig_path}")
-    ndisambig = int(ndisambig.decode("utf-8").strip())
+    ndisambig = int(ndisambig.strip())
     ndisambig += 1
 
     make_lexicon_fst_tool_path = "asr_egs/librispeech/utils/make_lexicon_fst.pl"

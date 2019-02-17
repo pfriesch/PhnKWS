@@ -98,14 +98,6 @@ class KaldiDataset(data.Dataset):
             os.path.join(self.dataset_path, "chunk_{:04d}.pyt".format(self.cached_pt)))
 
     def __getitem__(self, index):
-        """
-        Args:
-            index (int): Index
-
-        Returns:
-            sample (dict):
-        """
-
         if self.shuffle_frames:
             # Reason for not just doing a big matrix with all samples and skipping the following mess:
             # * Since we want to save disk space it is not feasible to precompute the context windows and append
@@ -163,6 +155,7 @@ class KaldiDataset(data.Dataset):
         # elif self.split_files_max_sample_len:
         else:
             #     context left    context right
+            #           v            v
             #         |---|         |-|
             #          _ _ _ _ _ _ _ _
             #         |   |         | |
@@ -175,8 +168,8 @@ class KaldiDataset(data.Dataset):
 
             _samples_per_chunk_cumulative = np.cumsum(self.samples_per_chunk)
             chunk_idx = bisect.bisect_right(_samples_per_chunk_cumulative, index)
-            if not (_samples_per_chunk_cumulative[chunk_idx - 1] <= index < _samples_per_chunk_cumulative[
-                chunk_idx] or 0 <= index < _samples_per_chunk_cumulative[0]):
+            if not (_samples_per_chunk_cumulative[chunk_idx - 1] <= index <
+                    _samples_per_chunk_cumulative[chunk_idx] or 0 <= index < _samples_per_chunk_cumulative[0]):
                 assert _samples_per_chunk_cumulative[chunk_idx - 1] <= index < _samples_per_chunk_cumulative[
                     chunk_idx] or 0 <= index < _samples_per_chunk_cumulative[0], \
                     f"{_samples_per_chunk_cumulative[chunk_idx - 1]} <= {index} < " \
@@ -412,6 +405,8 @@ class KaldiDataset(data.Dataset):
                     if self.split_files_max_sample_len:
                         sample_splits = splits_by_seqlen(samples_list, self.split_files_max_sample_len,
                                                          self.left_context, self.right_context)
+                    else:
+                        raise NotImplementedError
 
                 for sample_id, start_idx, end_idx in sample_splits:
                     self.max_len_per_chunk[chnk_id] = (end_idx - start_idx) \
@@ -491,7 +486,7 @@ def apply_context(sample, start_idx, end_idx, context_left, context_right, align
 
     features = {}
     for feature_name in sample['features']:
-        if any([not aligned_labels[label_name] for label_name in sample['labels']]):
+        if all([not aligned_labels[label_name] for label_name in sample['labels']]):
             assert len(sample['features'][feature_name]) == end_idx - start_idx + context_left + context_right, \
                 f"{len(sample['features'][feature_name])} {end_idx} {start_idx} {context_left} {context_right}"
         features[feature_name] = \

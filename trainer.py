@@ -19,9 +19,10 @@ from utils.logger_config import logger
 
 class Trainer(BaseTrainer):
 
-    def __init__(self, model, loss, metrics, optimizers, resume_path, config, do_validation,
-                 lr_schedulers, overfit_small_batch):
-        super(Trainer, self).__init__(model, loss, metrics, optimizers, lr_schedulers, resume_path, config)
+    def __init__(self, model, loss, metrics, optimizers, lr_schedulers, decoding_norm_data, resume_path, config,
+                 do_validation, overfit_small_batch):
+        super(Trainer, self).__init__(model, loss, metrics, optimizers, lr_schedulers, decoding_norm_data,
+                                      resume_path, config)
         self.config = config
         self.do_validation = do_validation
         self.log_step = int(np.sqrt(config['training']['batch_size_train']))
@@ -430,15 +431,15 @@ class Trainer(BaseTrainer):
 
 class KaldiOutputWriter:
 
-    def __init__(self, out_folder, test_data, epoch, config):
+    def __init__(self, out_folder, data_name, epoch, config):
         super().__init__()
         self.out_folder = out_folder
-        self.test_data = test_data
+        self.data_name = data_name
         self.epoch = epoch
         self.config = config
 
     def __enter__(self):
-        base_file_name = '{}/exp_files/forward_{}_ep{:03d}'.format(self.out_folder, self.test_data, self.epoch)
+        base_file_name = '{}/exp_files/forward_{}_ep{:03d}'.format(self.out_folder, self.data_name, self.epoch)
         self.post_file = {}
         for out_name in self.config['test'].keys():
             if self.config['test'][out_name]['require_decoding']:

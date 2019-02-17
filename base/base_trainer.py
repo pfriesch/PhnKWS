@@ -17,8 +17,9 @@ class BaseTrainer:
     Base class for all trainers
     """
 
-    def __init__(self, model, loss, metrics, optimizers, lr_schedulers, resume_path, config):
+    def __init__(self, model, loss, metrics, optimizers, lr_schedulers, decoding_norm_data, resume_path, config):
         self.config = config
+        self.decoding_norm_data = decoding_norm_data
 
         # setup GPU device if available, move model into configured device
         self.device, device_ids = self._prepare_device(config['exp']['n_gpu'])
@@ -68,8 +69,10 @@ class BaseTrainer:
             json.dump(config, f, indent=4, sort_keys=False)
 
         if resume_path:
-            self.start_epoch, self.global_step = resume_checkpoint(resume_path, model, logger, optimizers,
-                                                                   lr_schedulers)
+            self.start_epoch, self.global_step, decoding_norm_data = \
+                resume_checkpoint(resume_path, model, logger, optimizers, lr_schedulers)
+            assert decoding_norm_data == self.decoding_norm_data
+
         self.device = 'cpu'
         if nvidia_smi_enabled:
             self.device = 'cuda:0'
@@ -201,6 +204,7 @@ class BaseTrainer:
             'optimizers': {opti_name: self.optimizers[opti_name].state_dict() for opti_name in self.optimizers},
             'lr_schedulers': {lr_sched_name: self.lr_schedulers[lr_sched_name].state_dict()
                               for lr_sched_name in self.lr_schedulers},
+            'decoding_norm_data': self.decoding_norm_data,
             'monitor_best': self.mnt_best,
             'config': self.config
         }

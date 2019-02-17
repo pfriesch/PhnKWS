@@ -1,14 +1,15 @@
 import os
+import shutil
+
 import torch
-from os.path import join as join_path
 
 from base.base_decoder import BaseDecoder
 from data import kaldi_io
+from kws_decoder.kalid_decoder.prepare_decode_graph import make_kaldi_decoding_graph
 from utils.logger_config import logger
 from utils.utils import run_shell, check_environment
 from ww_benchmark.engine import Engine
 import numpy as np
-
 import matplotlib.pyplot as plt
 
 
@@ -48,28 +49,37 @@ def get_kaldi_feats(scp_file, out_dir, spk2utt, utt2spk):
 
 class KWSEngine(Engine):
 
-    def __init__(self, keyword, sensitivity, model_path) -> None:
+    def __init__(self, keywords, sensitivity, model_path) -> None:
         super().__init__()
         self.tmp_dir = "/mnt/data/pytorch-kaldi/tmp"
+        if os.path.isdir(self.tmp_dir):
+            shutil.rmtree(self.tmp_dir)
+        os.makedirs(self.tmp_dir)
+
         logger.configure_logger(self.tmp_dir)
         check_environment()
 
-        self.keyword = keyword
+        assert isinstance(keywords, list)
+        self.keywords = keywords
         self.sensitivity = sensitivity
 
-        self.decoder = BaseDecoder(model_path)
+        self.decoder = BaseDecoder(model_path, keywords, self.tmp_dir)
 
-    def process(self, wav_files):
+    def process_batch(self, wav_files):
+        _wav_files = set()
         for file in wav_files:
             assert os.path.abspath(file)
+            if file in _wav_files:
+                logger.warn(f"Duplicate file {file}, ignoring...")
+            else:
+                _wav_files.add(file)
+        wav_files = list(_wav_files)
 
         tmp_scp, spk2utt_path, utt2spk_path = self.preppare_tmp_files(wav_files, self.tmp_dir)
         feats = get_kaldi_feats(tmp_scp, self.tmp_dir, spk2utt_path, utt2spk_path)
 
-        return {filename:
-                    self.decoder.is_keyword({"fbank": self.decoder.preprocess_feat(feat)},
-                                            self.keyword, self.sensitivity)
-                for filename, feat in feats.items()}
+        result = self.decoder.is_keyword_batch(feats, self.sensitivity)
+        return result
 
     def release(self):
         pass
@@ -92,14 +102,17 @@ class KWSEngine(Engine):
     @staticmethod
     def preppare_tmp_files(files, tmp_dir):
         # [(speaker, file_id, path]
-        files = [(os.path.basename(file).split("_")[0], os.path.basename(file)[:-4], file) for file in files]
+        # TODO add noise for context of model
+        files = [(os.path.basename(file).split("_")[0],
+                  "_".join(file.rsplit("/", 2)[1:])
+                  [:-4], file) for file in files]
 
-        tmp_scp = join_path(tmp_dir, "tmp.scp")
+        tmp_scp = os.path.join(tmp_dir, "tmp.scp")
         with open(tmp_scp, "w") as f:
             f.writelines([f"{file_id} {path}\n" for speaker, file_id, path in files])
 
         #### spk2utt
-        spk2utt_path = join_path(tmp_dir, "spk2utt")
+        spk2utt_path = os.path.join(tmp_dir, "spk2utt")
         spk2utt = {}
         for speaker, file_id, path in files:
             if speaker in spk2utt:
@@ -111,7 +124,7 @@ class KWSEngine(Engine):
         #### /spk2utt
 
         #### utt2spk
-        utt2spk_path = join_path(tmp_dir, "utt2spk")
+        utt2spk_path = os.path.join(tmp_dir, "utt2spk")
         utt2spk = {}
         for speaker, file_id, path in files:
             utt2spk[file_id] = speaker
@@ -121,39 +134,24 @@ class KWSEngine(Engine):
         return tmp_scp, spk2utt_path, utt2spk_path
 
 
-def plot_output_phonemes(model_logits):
-    for filename, logits in model_logits.items():
-        #### P1
+# def plot_output_phonemes(model_logits):
+#     for filename, logits in model_logits.items():
+#         #### P1
+#
+#         # just_max_val = logits.max(axis=2)[:, 0]
+#         # fig, axs = plt.subplots(1, 1)
+#         # axs.plot(just_max_val)
+#         # fig.tight_layout()
+#         # plt.savefig("just_max_val.png")
+#
+#         #### P2
+#
+#         max_20 = sorted(logits.argmax(axis=2).squeeze(), reverse=True)[:20]
+#         log_max_20 = logits[:, :, max_20]
+#
+#         fig, axs = plt.subplots(20, 1)
+#         for i in range(20):
+#             axs[i].plot(logits[:, :, i].squeeze())
+#         # fig.tight_layout()
+#         plt.savefig("max_20.png")
 
-        # just_max_val = logits.max(axis=2)[:, 0]
-        # fig, axs = plt.subplots(1, 1)
-        # axs.plot(just_max_val)
-        # fig.tight_layout()
-        # plt.savefig("just_max_val.png")
-
-        #### P2
-
-        max_20 = sorted(logits.argmax(axis=2).squeeze(), reverse=True)[:20]
-        log_max_20 = logits[:, :, max_20]
-
-        fig, axs = plt.subplots(20, 1)
-        for i in range(20):
-            axs[i].plot(logits[:, :, i].squeeze())
-        # fig.tight_layout()
-        plt.savefig("max_20.png")
-
-
-def test():
-    engine = KWSEngine("", 0.0,
-                       "/mnt/data/pytorch-kaldi/exp/libri_TDNN_fbank_20190205_025557/checkpoints/checkpoint-epoch9.pth")
-
-    data_folder = "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/speech_commands_v0.02"
-
-    files = [join_path(data_folder, "bed/20a0d54b_nohash_0.wav"),
-             join_path(data_folder, "bed/1ed557b9_nohash_0.wav")]
-    model_logits = engine.process(files)
-    plot_output_phonemes(model_logits)
-
-
-if __name__ == '__main__':
-    test()

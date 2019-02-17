@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import matplotlib
 
+from data.data_util import load_counts
 from utils.logger_config import logger
 
 matplotlib.use('agg')
@@ -44,11 +45,25 @@ def write_json(_dict, path, overwrite=False):
 
 def check_environment():
     assert os.environ['KALDI_ROOT']
+    assert os.path.isdir(os.environ['KALDI_ROOT'])
     KALDI_ROOT = os.environ['KALDI_ROOT']
-    PATH = os.environ['PATH']
+    os.environ['PATH'] = f"{KALDI_ROOT}/src/bin/" \
+                         + f":{KALDI_ROOT}/tools/openfst/bin/" \
+                         + f":{KALDI_ROOT}/tools/irstlm/bin/" \
+                         + f":{KALDI_ROOT}/src/fstbin/" \
+                         + f":{KALDI_ROOT}/src/gmmbin/" \
+                         + f":{KALDI_ROOT}/src/featbin/" \
+                         + f":{KALDI_ROOT}/src/lm/" \
+                         + f":{KALDI_ROOT}/src/lmbin/" \
+                         + f":{KALDI_ROOT}/src/sgmmbin/" \
+                         + f":{KALDI_ROOT}/src/sgmm2bin/" \
+                         + f":{KALDI_ROOT}/src/fgmmbin/" \
+                         + f":{KALDI_ROOT}/src/latbin/" \
+                         + f":{KALDI_ROOT}/src/nnetbin/" \
+                         + f":{KALDI_ROOT}/src/nnet2bin/" \
+                         + f":{KALDI_ROOT}/src/kwsbin" \
+                         + f":{os.environ['PATH']}"
     # TODO find better method
-    run_shell(
-        f"export PATH={KALDI_ROOT}/src/bin/:{KALDI_ROOT}/tools/openfst/bin/:{KALDI_ROOT}/tools/irstlm/bin/:{KALDI_ROOT}/src/fstbin/:{KALDI_ROOT}/src/gmmbin/:{KALDI_ROOT}/src/featbin/:{KALDI_ROOT}/src/lm/:{KALDI_ROOT}/src/lmbin/:{KALDI_ROOT}/src/sgmmbin/:{KALDI_ROOT}/src/sgmm2bin/:{KALDI_ROOT}/src/fgmmbin/:{KALDI_ROOT}/src/latbin/:{KALDI_ROOT}/src/nnetbin/:{KALDI_ROOT}/src/nnet2bin/:{KALDI_ROOT}/src/kwsbin:{PATH}")
 
     run_shell("which hmm-info")
     run_shell("which lattice-align-phones")
@@ -69,6 +84,11 @@ def check_environment():
     run_shell("which compute-fbank-feats")
     run_shell("which copy-feats")
 
+    # Decoding
+    run_shell("which lattice-best-path")
+    run_shell("which lattice-add-penalty")
+    run_shell("which lattice-scale")
+
 
 def run_shell(cmd, pipefail=True):
     """
@@ -88,21 +108,26 @@ def run_shell(cmd, pipefail=True):
     if pipefail:
         cmd = 'set -o pipefail; ' + cmd
 
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, executable='/bin/bash')
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, executable='/bin/bash',
+                         env=os.environ.copy())
 
     (output, err) = p.communicate()
+    output = output.decode("utf-8")
+    err = err.decode("utf-8")
     return_code = p.wait()
     if return_code > 0:
         logger.error(
-            "Call: {} had nonzero return code: {}, stdout: {} stderr: {}".format(cmd, return_code, output, err))
+            "Call:  \n{}\n{}\n{}\nReturn Code: {}\nstdout: {}\nstderr: {}"
+                .format("".join(["-"] * 73), cmd, "".join(["-"] * 80), return_code, output, err))
         raise RuntimeError("Call: {} had nonzero return code: {}, stderr: {}".format(cmd, return_code, err))
-    # logger.warn("ERROR: {}".format(err.decode("utf-8")))
+    # logger.warn("ERROR: {}".format(err))
 
-    logger.debug("OUTPUT: {}".format(output.decode("utf-8")))
+    logger.debug("OUTPUT: {}".format(output))
     return output
 
 
 def get_dataset_metadata(config):
+    decoding_norm_data = {}
     if 'test' in config:
         train_dataset_lab = config['datasets'][config['data_use']['train_with']]['labels']
         N_out_lab = {}
@@ -124,7 +149,8 @@ def get_dataset_metadata(config):
                     cmd = "analyze-counts --print-args=False --verbose=0 --binary=false --counts-dim=" + str(
                         N_out) + " \"ark:ali-to-pdf " + folder_lab_count + "/final.mdl \\\"ark:gunzip -c " + folder_lab_count + "/ali.*.gz |\\\" ark:- |\" " + count_file_path
                     run_shell(cmd)
-                    config['test'][forward_out]['normalize_with_counts_from_file'] = count_file_path
+
+                    decoding_norm_data[forward_out]["normalize_with_counts"] = load_counts(count_file_path)
                     # kaldi labels are indexed at 1
                     # we use 0 for padding or blank label
                     config['arch']['args']['lab_cd_num'] = N_out
@@ -137,4 +163,4 @@ def get_dataset_metadata(config):
     if "lab_mono_num" in config['arch']['args']:
         config['arch']['args']['lab_mono_num'] += 1
 
-    return config
+    return config, decoding_norm_data

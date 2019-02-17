@@ -3,37 +3,37 @@ import os
 from glob import glob
 import re
 
-from kaldi_decoding_scripts.local.score import score as score
-from kaldi_decoding_scripts.local.score_basic import score as score_basic
-from kaldi_decoding_scripts.local.score_libri import score as score_libri
+from tqdm import tqdm
+
 from kaldi_decoding_scripts.local.just_transcript import get_transcripts
 from utils.utils import run_shell
 from utils.logger_config import logger
 
 
-def decode(alidir,
-           data,
-           graphdir,
+def decode(alignment_model_path,
+           words_path,
+           graph_path,
            out_folder,
            featstrings,
-           min_active=200,
-           max_active=7000,
-           max_mem=50000000,
-           beam=13.0,
-           latbeam=8.0,
-           acwt=0.2,
+           min_active=20,
+           max_active=700,
+           max_mem=500000,
+           beam=5.0,
+           latbeam=5.0,
+           acwt=1.0,
            max_arcs=-1.0,
            scoring_type="std",  # none, std & basic so far
            scoring_opts=None,
            norm_vars=False,
            **kwargs):
+    out_folder = f"{out_folder}/exp_files"
     # TODO remove
     if scoring_opts == '"--min-lmwt 1 --max-lmwt 10"':
         scoring_opts = {"min_lmwt": 1, "max_lmwt": 10}
     if scoring_opts is None:
         scoring_opts = {"min_lmwt": 1, "max_lmwt": 10}
     assert isinstance(featstrings, list)
-    num_threads = 1
+    num_threads = 2  # TODO more threads
     assert out_folder[-1] != '/'
     srcdir = os.path.dirname(out_folder)
 
@@ -47,34 +47,58 @@ def decode(alidir,
     with open(os.path.join(out_folder, "num_jobs"), "w") as f:
         f.write(str(num_jobs))
 
-    assert os.path.exists(os.path.join(graphdir, "HCLG.fst"))
+    # assert os.path.exists(os.path.join(graphdir, "HCLG.fst"))
+    assert graph_path.endswith("HCLG.fst")
+    assert words_path.endswith("words.txt")
+    assert alignment_model_path.endswith("final.mdl")
 
-    JOB = 1
-    for ck_data in featstrings:
+    # TODO should we really just delete these files?
+    if len(glob(f"{out_folder}/lat.*.gz")) > 0:
+        for file in glob(f"{out_folder}/lat.*.gz"):
+            os.remove(file)
+    if len(glob(f"{out_folder}/log/decode.*.log")) > 0:
+        for file in glob(f"{out_folder}/log/decode.*.log"):
+            os.remove(file)
+
+    chnk_id = 0
+    for ck_data in tqdm(featstrings, desc="lattice generation chunk:"):
+        assert not os.path.exists(f"{out_folder}/lat.{chnk_id}.gz")
+        assert not os.path.exists(f"{out_folder}/log/decode.{chnk_id}.log")
         finalfeats = f"ark,s,cs: cat {ck_data} |"
-        cmd = f'latgen-faster-mapped{thread_string} --min-active={min_active} ' + \
-              f'--max-active={max_active} --max-mem={max_mem} ' + \
-              f'--beam={beam} --lattice-beam={latbeam} ' + \
-              f'--acoustic-scale={acwt} --allow-partial=true ' + \
-              f'--word-symbol-table={graphdir}/words.txt {alidir}/final.mdl ' + \
-              f'{graphdir}/HCLG.fst ' + \
-              f'\"{finalfeats}\" \"ark:|gzip -c > {out_folder}/lat.{JOB}.gz\" &> {out_folder}/log/decode.{JOB}.log'
+        cmd = f'latgen-faster-mapped{thread_string} --min-active={min_active} ' \
+              + f'--max-active={max_active} --max-mem={max_mem} ' \
+              + f'--beam={beam} --lattice-beam={latbeam} ' \
+              + f'--acoustic-scale={acwt}' \
+              + f' --allow-partial=true ' \
+              + f'--word-symbol-table={words_path} {alignment_model_path} ' \
+              + f'{graph_path} ' \
+              + f'\"{finalfeats}\" \"ark:|gzip -c > {out_folder}/lat.{chnk_id}.gz\" &> {out_folder}/log/decode.{chnk_id}.log'
         run_shell(cmd)
-        JOB += 1
+        chnk_id += 1
 
-    copy(os.path.join(alidir, "final.mdl"), srcdir)
+        # TODO display the generated lattice for keywords
 
-    if scoring_type != "none":
-        if scoring_type == "std":
-            score(data, graphdir, out_folder, num_jobs, **scoring_opts)
-        elif scoring_type == "basic":
-            score_basic(data, graphdir, out_folder, num_jobs, **scoring_opts)
-        elif scoring_type == "libri":
-            score_libri(data, graphdir, out_folder, **scoring_opts)
-        elif scoring_type == "just_transcript":
-            return get_transcripts(data, graphdir, out_folder)
-        else:
-            raise ValueError
+    copy(alignment_model_path, srcdir)
+    transcripts_best, transcripts, lattice_confidence, lm_posterior, acoustic_posterior = get_transcripts(words_path,
+                                                                                                          out_folder)
+
+    for t in transcripts_best:
+        assert transcripts_best[t] == transcripts[t], f"{t}: {transcripts_best[t]} =!= {transcripts[t]}"
+
+    assert len(transcripts) == len(lattice_confidence)
+    transcripts = dict(transcripts)
+    lattice_confidence = dict(lattice_confidence)
+    lm_posterior = dict(lm_posterior)
+    acoustic_posterior = dict(acoustic_posterior)
+    result = {}
+    for sample_id in transcripts:
+        _lattice_confidence = lattice_confidence[sample_id] \
+            if 10000000000.0 != lattice_confidence[sample_id] else float("inf")
+        _lm_posterior = lm_posterior[sample_id]  # TODO normalize
+        _acoustic_posterior = acoustic_posterior[sample_id]  # TODO normalize
+        result[sample_id] = (transcripts[sample_id], _lattice_confidence, _lm_posterior, _acoustic_posterior)
+
+    return result
 
 
 def best_wer(decoding_dir, scoring_type):

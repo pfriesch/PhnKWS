@@ -26,7 +26,7 @@ def model_init(config):
                           lab_cd_num=config['arch']['args']['lab_cd_num'],
                           lab_mono_num=config['arch']['args']['lab_mono_num'])
 
-    elif arch_name == "TDNN_cd_mono_TIMIT":
+    elif arch_name == "TDNN_cd_mono_TIMIT" or arch_name == "TDNN_cd_mono":
         net = TDNN_cd_mono_TIMIT(input_feat_length=config['arch']['args']['input_feat_length'],
                                  input_feat_name=config['arch']['args']['input_feat_name'],
                                  lab_cd_num=config['arch']['args']['lab_cd_num'],
