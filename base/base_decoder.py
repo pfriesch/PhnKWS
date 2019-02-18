@@ -24,7 +24,7 @@ class BaseDecoder:
         assert model_path.endswith(".pth")
         self.config = torch.load(model_path, map_location='cpu')['config']
         # TODO remove
-        # self.config['exp']['save_dir'] = "/mnt/data/pytorch-kaldi/exp_TIMIT_TDNN_FBANK"
+        # self.config['exp']['save_dir'] = "/mnt/data/pytorch-kaldi/exp_TIMIT_MLP_FBANK"
 
         self.model = model_init(self.config)
         # TODO GPU decoding

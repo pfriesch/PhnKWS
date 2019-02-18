@@ -19,9 +19,10 @@ from utils.logger_config import logger
 
 class Trainer(BaseTrainer):
 
-    def __init__(self, model, loss, metrics, optimizers, lr_schedulers, decoding_norm_data, resume_path, config,
+    def __init__(self, model, loss, metrics, optimizers, lr_schedulers,
+                 resume_path, config,
                  do_validation, overfit_small_batch):
-        super(Trainer, self).__init__(model, loss, metrics, optimizers, lr_schedulers, decoding_norm_data,
+        super(Trainer, self).__init__(model, loss, metrics, optimizers, lr_schedulers,
                                       resume_path, config)
         self.config = config
         self.do_validation = do_validation
@@ -52,18 +53,19 @@ class Trainer(BaseTrainer):
         """
         self.model.train()
         self.tensorboard_logger.set_step(self.global_step, 'train')
-        tr_data = self.config['data_use']['train_with']
+        tr_data = self.config['dataset']['data_use']['train_with']
+        _all_feats = self.config['dataset']['dataset_definition']['datasets'][tr_data]['features']
+        _all_labs = self.config['dataset']['dataset_definition']['datasets'][tr_data]['labels']
 
-        dataset = KaldiDataset(self.config['exp']['cache_data_root'],
-                               tr_data,
-                               self.config['datasets'][tr_data]['features'],
-                               self.config['datasets'][tr_data]['labels'],
+        dataset = KaldiDataset(self.config['exp']['data_cache_root'], tr_data,
+                               {feat: _all_feats[feat] for feat in self.config['dataset']['features_use']},
+                               {lab: _all_labs[lab] for lab in self.config['dataset']['labels_use']},
                                self.device,
                                self.config['training']['max_seq_length_train'],
                                self.model.context_left,
                                self.model.context_right,
                                normalize_features=True,
-                               phoneme_dict=self.config['data_use']['phones'],
+                               phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
                                split_files_max_seq_len=self.max_seq_length_train_curr,
                                shuffle_frames=self.config['training']['shuffle_frames'],
                                overfit_small_batch=self.overfit_small_batch)
@@ -183,21 +185,23 @@ class Trainer(BaseTrainer):
             The validation metrics in log must have the key 'val_metrics'.
         """
         self.model.eval()
-        valid_data = self.config['data_use']['valid_with']
 
         valid_loss = 0
         valid_metrics = {metric: 0 for metric in self.metrics}
 
-        dataset = KaldiDataset(self.config['exp']['cache_data_root'],
+        valid_data = self.config['dataset']['data_use']['valid_with']
+        _all_feats = self.config['dataset']['dataset_definition']['datasets'][valid_data]['features']
+        _all_labs = self.config['dataset']['dataset_definition']['datasets'][valid_data]['labels']
+        dataset = KaldiDataset(self.config['exp']['data_cache_root'],
                                valid_data,
-                               self.config['datasets'][valid_data]['features'],
-                               self.config['datasets'][valid_data]['labels'],
+                               {feat: _all_feats[feat] for feat in self.config['dataset']['features_use']},
+                               {lab: _all_labs[lab] for lab in self.config['dataset']['labels_use']},
                                self.device,
                                self.config['training']['max_seq_length_valid'],
                                self.model.context_left,
                                self.model.context_right,
                                normalize_features=True,
-                               phoneme_dict=self.config['data_use']['phones'],
+                               phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
                                split_files_max_seq_len=self.max_seq_length_train_curr,
                                shuffle_frames=self.config['training']['shuffle_frames'])
 
@@ -251,19 +255,21 @@ class Trainer(BaseTrainer):
         batch_size = 1
         max_seq_length = -1
 
-        test_data = self.config['data_use']['test_with']
         out_folder = os.path.join(self.config['exp']['save_dir'], self.config['exp']['name'])
 
-        dataset = KaldiDataset(self.config['exp']['cache_data_root'],
+        test_data = self.config['dataset']['data_use']['test_with']
+        _all_feats = self.config['dataset']['dataset_definition']['datasets'][test_data]['features']
+        _all_labs = self.config['dataset']['dataset_definition']['datasets'][test_data]['labels']
+        dataset = KaldiDataset(self.config['exp']['data_cache_root'],
                                test_data,
-                               self.config['datasets'][test_data]['features'],
-                               self.config['datasets'][test_data]['labels'],
+                               {feat: _all_feats[feat] for feat in self.config['dataset']['features_use']},
+                               {lab: _all_labs[lab] for lab in self.config['dataset']['labels_use']},
                                self.device,
                                max_seq_length,
                                self.model.context_left,
                                self.model.context_right,
                                normalize_features=True,
-                               phoneme_dict=self.config['data_use']['phones'],
+                               phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
                                split_files_max_seq_len=self.max_seq_length_train_curr,
                                shuffle_frames=self.config['training']['shuffle_frames'])
 
@@ -306,20 +312,23 @@ class Trainer(BaseTrainer):
         batch_size = 1
         max_seq_length = -1
 
-        test_data = self.config['data_use']['test_with']
         out_folder = os.path.join(self.config['exp']['save_dir'], self.config['exp']['name'])
 
         test_metrics = {metric: 0 for metric in self.metrics}
 
-        dataset = KaldiDataset(self.config['exp']['cache_data_root'],
+        test_data = self.config['dataset']['data_use']['test_with']
+        _all_feats = self.config['dataset']['dataset_definition']['datasets'][test_data]['features']
+        _all_labs = self.config['dataset']['dataset_definition']['datasets'][test_data]['labels']
+        dataset = KaldiDataset(self.config['exp']['data_cache_root'],
                                test_data,
-                               self.config['datasets'][test_data]['features'],
-                               self.config['datasets'][test_data]['labels'],
+                               {feat: _all_feats[feat] for feat in self.config['dataset']['features_use']},
+                               {lab: _all_labs[lab] for lab in self.config['dataset']['labels_use']},
+                               self.device,
                                max_seq_length,
                                self.model.context_left,
                                self.model.context_right,
                                normalize_features=True,
-                               phoneme_dict=self.config['data_use']['phones'],
+                               phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
                                split_files_max_seq_len=self.max_seq_length_train_curr,
                                shuffle_frames=self.config['training']['shuffle_frames'])
 

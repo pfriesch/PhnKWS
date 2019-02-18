@@ -45,7 +45,7 @@ _lab_dict_cd_phn = {
 
 def test_unaligned(tmpdir):
     logger.configure_logger(out_folder=tmpdir)
-    dataset = KaldiDataset(cache_data_root=tmpdir,
+    dataset = KaldiDataset(data_cache_root=tmpdir,
                            dataset_name="TIMIT_tr",
                            feature_dict=_feature_dict,
                            label_dict=_lab_dict_phn,
@@ -69,7 +69,7 @@ def test_unaligned(tmpdir):
 def test_force_aligned_sequential(tmpdir):
     logger.configure_logger(out_folder=tmpdir)
 
-    dataset = KaldiDataset(cache_data_root=tmpdir,
+    dataset = KaldiDataset(data_cache_root=tmpdir,
                            dataset_name="TIMIT_tr",
                            feature_dict=_feature_dict,
                            label_dict=_lab_dict_cd_phn,
@@ -95,7 +95,7 @@ def test_force_aligned_sequential(tmpdir):
 def test_force_aligned_shuffle_frames(tmpdir):
     logger.configure_logger(out_folder=tmpdir)
 
-    dataset = KaldiDataset(cache_data_root=tmpdir,
+    dataset = KaldiDataset(data_cache_root=tmpdir,
                            dataset_name="TIMIT_tr",
                            feature_dict=_feature_dict,
                            label_dict=_lab_dict_cd_phn,
@@ -121,7 +121,7 @@ def test_force_aligned_shuffle_frames(tmpdir):
 def test_unaligned_no_context(tmpdir):
     logger.configure_logger(out_folder=tmpdir)
 
-    dataset = KaldiDataset(cache_data_root=tmpdir,
+    dataset = KaldiDataset(data_cache_root=tmpdir,
                            dataset_name="TIMIT_tr",
                            feature_dict=_feature_dict,
                            label_dict=_lab_dict_phn,
@@ -147,7 +147,7 @@ def test_unaligned_no_context(tmpdir):
 def test_force_aligned_sequential_no_context(tmpdir):
     logger.configure_logger(out_folder=tmpdir)
 
-    dataset = KaldiDataset(cache_data_root=tmpdir,
+    dataset = KaldiDataset(data_cache_root=tmpdir,
                            dataset_name="TIMIT_tr",
                            feature_dict=_feature_dict,
                            label_dict=_lab_dict_cd_phn,
@@ -173,7 +173,7 @@ def test_force_aligned_sequential_no_context(tmpdir):
 def test_force_aligned_shuffle_frames_no_context(tmpdir):
     logger.configure_logger(out_folder=tmpdir)
 
-    dataset = KaldiDataset(cache_data_root=tmpdir,
+    dataset = KaldiDataset(data_cache_root=tmpdir,
                            dataset_name="TIMIT_tr",
                            feature_dict=_feature_dict,
                            label_dict=_lab_dict_cd_phn,

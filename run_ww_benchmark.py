@@ -84,7 +84,7 @@ def run_detection(engine):
 
 
 def run(
-        model="/mnt/data/pytorch-kaldi/exp_TIMIT_TDNN_FBANK/TIMIT_TDNN_fbank_20190202_170357r-_20190202_174619r-_20190202_183621",
+        model="/mnt/data/pytorch-kaldi/exp_TIMIT_MLP_FBANK/TIMIT_MLP_fbank_20190202_170357r-_20190202_174619r-_20190202_183621",
         keyword='alexa',
         common_voice_directory="/mnt/data/pytorch-kaldi/bench_data/cv_corpus_v1",
         alexa_directory="/mnt/data/pytorch-kaldi/bench_data/alexa",

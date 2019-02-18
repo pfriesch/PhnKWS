@@ -1,23 +1,26 @@
 {
-  "exp": {
-    "save_dir": "../exp",
-    "name": "TIMIT_TDNN_fbank",
-    "seed": 2234,
-    "n_gpu": 1,
-    "prefetch_to_gpu": true,
-    "n_epochs_tr": 24,
-    "save_period": 1,
-    "cache_data_root": "/mnt/data/pytorch-kaldi/data",
-    "checkpoint_interval_seconds": 600, //Every 10 mins
-    "num_workers": 8
+  "data_info": {
+    "features": {
+      "fbank": {
+        "input_feat_length": 40
+      }
+    },
+    "labels": {
+      "lab_cd": {
+        "num_lab": null,
+        "lab_count_file": null
+      },
+      "lab_mono": {
+        "num_lab": null,
+        "lab_count_file": null
+      },
+      "lab_phn": {
+        "num_lab": null,
+        "lab_count_file": null
+      }
+    }
   },
-  "data_use": {
-    "phones": "/mnt/data/libs/kaldi/egs/timit/s5/data/lang/phones.txt",
-    //todo allow multiple inputs
-    "train_with": "TIMIT_tr",
-    "valid_with": "TIMIT_dev",
-    "test_with": "TIMIT_test"
-  },
+  "phn_mapping_file": "/mnt/data/libs/kaldi/egs/timit/s5/data/lang/phones.txt",
   "datasets": {
     "TIMIT_tr": {
       "features": {
@@ -37,6 +40,13 @@
         "lab_mono": {
           "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
           "label_opts": "ali-to-phones --per-frame=true",
+          "lab_count_file": "none",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        },
+        "lab_phn": {
+          "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
+          "label_opts": "ali-to-phones",
           "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
@@ -64,6 +74,13 @@
           "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        },
+        "lab_phn": {
+          "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
+          "label_opts": "ali-to-phones",
+          "lab_count_file": "none",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
       }
     },
@@ -88,73 +105,35 @@
           "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
+        },
+        "lab_phn": {
+          "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
+          "label_opts": "ali-to-phones",
+          "lab_count_file": "none",
+          "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
+          "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
       }
     }
   },
-  "training": {
-    "batch_size_train": 1,
-    "max_seq_length_train": 1000,
-    "shuffle_frames": false,
-    "increase_seq_length_train": false,
-    "start_seq_len_train": 100,
-    "multply_factor_seq_len_train": 2,
-    "batch_size_valid": 1,
-    "max_seq_length_valid": 1000,
-    "sort_by_feat": "fbank",
-    "clip_grad_norm": -1,
-    "optimizer": {
-      "type": "adam",
-      "args": {
-        "lr": 0.001
-      }
-    },
-    "lr_scheduler": {
-      "arch_halving_factor": 0.5,
-      "arch_improvement_threshold": 0.001
-    }
-  },
-  "arch": {
-    "name": "TDNN_cd_mono_TIMIT",
-    "framewise_labels": true,
-    "args": {
-      "input_feat_length": 40,
-      "input_feat_name": "fbank",
-      "lab_mono_num": 48
-    },
-    "loss": {
-      "name": "CE_mtl_mono_cd",
-      "args": {
-        "weight_mono": 1.0
-      }
-    },
-    "metrics": [
-      "acc_lab_cd",
-      "err_lab_cd",
-      "acc_lab_mono",
-      "err_lab_mono"
-    ]
-  },
   "test": {
-    "out_cd": {
-      "normalize_posteriors": true,
-      "normalize_with_counts_from": "lab_cd",
-      "save_out_file": true,
-      "require_decoding": true
+    "out_mono": {
+      //      "normalize_posteriors": true,
+      //      "normalize_with_counts_from": "lab_mono",
+      "save_out_file": true
+      //      "require_decoding": true
     }
   },
   "decoding": {
     "min_active": 200,
     "max_active": 7000,
     "max_mem": 50000000,
-    "beam": 13.0,
-    "latbeam": 8.0,
-    "acwt": 0.2,
+    "beam": 20.0,
+    "latbeam": 12.0,
+    "acwt": 0.10,
     "max_arcs": -1.0,
-    "scoring_type": "std",
-    "scoring_opts": {"min_lmwt": 1, "max_lmwt": 10},
+    "scoring_type": "libri",
+    "scoring_opts": {"min_lmwt": 4, "max_lmwt": 23},
     "norm_vars": false
-  },
-  "kws_decoding": {
   }
 }

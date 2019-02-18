@@ -14,7 +14,7 @@ import torch
 from tqdm import tqdm
 
 from data.data_util import load_features, split_chunks, load_labels, splits_by_seqlen, apply_context_single_feat
-from data.phoneme_dicts.phoneme_dict import load_phoneme_dict, get_phoneme_dict, PhonemeDict
+from data.phoneme_dict import load_phoneme_dict, get_phoneme_dict, PhonemeDict
 from utils.logger_config import logger
 
 
@@ -29,7 +29,7 @@ class KaldiDataset(data.Dataset):
     dataset_prefix = "kaldi"
     info_filename = "info.json"
 
-    def __init__(self, cache_data_root,
+    def __init__(self, data_cache_root,
                  dataset_name,
                  feature_dict,
                  label_dict,
@@ -72,7 +72,7 @@ class KaldiDataset(data.Dataset):
             assert max_sample_len is False or \
                    max_sample_len is None
 
-        self.cache_data_root = os.path.expanduser(cache_data_root)
+        self.data_cache_root = os.path.expanduser(data_cache_root)
         self.chunk_size = 100  # 1000 for TIMIT & 100 for libri
         self.samples_per_chunk = None
         self.max_len_per_chunk = None
@@ -87,7 +87,7 @@ class KaldiDataset(data.Dataset):
 
         self.normalize_features = normalize_features
 
-        self.dataset_path = os.path.join(self.cache_data_root, self.dataset_prefix, "processed", dataset_name)
+        self.dataset_path = os.path.join(self.data_cache_root, self.dataset_prefix, "processed", dataset_name)
         if not self._check_exists(feature_dict, label_dict):
             self._convert_from_kaldi_format(feature_dict, label_dict)
         if not self._check_exists(feature_dict, label_dict):
@@ -299,6 +299,25 @@ class KaldiDataset(data.Dataset):
 
                         all_labels_loaded[lable_name][sample_id] = tmp_labels
 
+            max_label = max([all_labels_loaded[lable_name][l].max() for l in all_labels_loaded[lable_name]])
+            min_label = min([all_labels_loaded[lable_name][l].min() for l in all_labels_loaded[lable_name]])
+            logger.debug(
+                f"Max label: {max_label}")
+            logger.debug(
+                f"min label: {min_label}")
+
+            if min_label > 0:
+                logger.warn(f"label {lable_name} does not seem to be indexed from 0 -> making it indexed from 0")
+                for l in all_labels_loaded[lable_name]:
+                    all_labels_loaded[lable_name][l] = all_labels_loaded[lable_name][l] - 1
+
+                max_label = max([all_labels_loaded[lable_name][l].max() for l in all_labels_loaded[lable_name]])
+                min_label = min([all_labels_loaded[lable_name][l].min() for l in all_labels_loaded[lable_name]])
+                logger.debug(
+                    f"Max label new : {max_label}")
+                logger.debug(
+                    f"min label new: {min_label}")
+
         return all_labels_loaded
 
     def _convert_from_kaldi_format(self, feature_dict, label_dict):
@@ -463,7 +482,7 @@ def apply_context(sample, start_idx, end_idx, context_left, context_right, align
 
         - Like in production, we continously predict a frame with context
         - one frame and context corresponds to one out value, no confusion
-        - TDNN possible
+        - MLP possible
         - easier to reason about
         - less confusion with wired effects of padding etc
 

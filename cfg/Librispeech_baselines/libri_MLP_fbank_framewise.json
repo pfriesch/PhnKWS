@@ -1,0 +1,61 @@
+{
+  "exp": {
+    "save_dir": "../exp",
+    "name": "libri_MLP_fbank",
+    "seed": 2234,
+    "n_gpu": 1,
+    "prefetch_to_gpu": true,
+    "n_epochs_tr": 24,
+    "save_period": 1,
+    "data_cache_root": "/mnt/data/pytorch-kaldi/data_cache",
+    "num_workers": 4
+  },
+  "dataset": {
+    "name": "librispeech",
+    "data_use": {
+      "train_with": "train_clean_100",
+      "valid_with": "dev_clean",
+      "test_with": "test_clean"
+    },
+    "features_use": ["fbank"],
+    "labels_use": ["lab_cd", "lab_mono"]
+  },
+  "training": {
+    "batch_size_train": 8,
+    "batch_size_valid": 8,
+    "max_seq_length_train": 1000,
+    "increase_seq_length_train": true,
+    "start_seq_len_train": 100,
+    "multply_factor_seq_len_train": 2,
+    "max_seq_length_valid": 1000,
+    "shuffle_frames": false,
+    "sort_by_feat": "fbank",
+    "clip_grad_norm": -1,
+    "optimizer": {
+      "type": "adam",
+      "args": {
+        "lr": 0.008
+      }
+    },
+    "lr_scheduler": {
+      "arch_halving_factor": 0.5,
+      "arch_improvement_threshold": 0.001
+    }
+  },
+  "arch": {
+    "name": "MLP_mtl",
+    "framewise_labels": false,
+    "loss": {
+      "name": "CE_mtl_mono_cd",
+      "args": {
+        "weight_mono": 1.0
+      }
+    },
+    "metrics": [
+      "acc_lab_cd",
+      "err_lab_cd",
+      "acc_lab_mono",
+      "err_lab_mono"
+    ]
+  }
+}

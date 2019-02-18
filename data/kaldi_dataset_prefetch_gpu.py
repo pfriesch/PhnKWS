@@ -427,7 +427,7 @@ def apply_context(sample, context_left, context_right, aligned_labels):
 
         - Like in production, we continously predict a frame with context
         - one frame and context corresponds to one out value, no confusion
-        - TDNN possible
+        - MLP possible
         - easier to reason about
         - less confusion with wired effects of padding etc
 

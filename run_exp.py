@@ -2,6 +2,7 @@ import os
 import argparse
 import datetime
 
+from cfg.dataset_definition.get_dataset_definition import get_dataset_definition
 from nn_ import model_init, optimizer_init, lr_scheduler_init, metrics_init, loss_init
 from utils.logger_config import logger
 from utils.nvidia_smi import nvidia_smi_enabled
@@ -9,7 +10,6 @@ from utils.util import code_versioning
 from utils.utils import set_seed
 from trainer import Trainer
 from utils.utils import check_environment, read_json
-from utils.utils import get_dataset_metadata
 
 
 def check_config(config):
@@ -19,7 +19,8 @@ def check_config(config):
 
 def setup_run(config):
     set_seed(config['exp']['seed'])
-    config, decoding_norm_data = get_dataset_metadata(config)
+    dataset_definition = get_dataset_definition(config['dataset']['name'], config['dataset']['data_use']['train_with'])
+    config['dataset']['dataset_definition'] = dataset_definition
 
     model = model_init(config)
 
@@ -32,7 +33,7 @@ def setup_run(config):
 
     loss = loss_init(config)
 
-    return model, loss, metrics, optimizers, config, lr_schedulers, decoding_norm_data
+    return model, loss, metrics, optimizers, config, lr_schedulers
 
 
 def main(config_path, resume_path, overfit_small_batch):
@@ -84,9 +85,9 @@ def main(config_path, resume_path, overfit_small_batch):
     logger.info("Experiment name : {}".format(out_folder))
     logger.info("tensorboard : tensorboard --logdir {}".format(os.path.abspath(out_folder)))
 
-    model, loss, metrics, optimizers, config, lr_schedulers, decoding_norm_data = setup_run(config)
+    model, loss, metrics, optimizers, config, lr_schedulers = setup_run(config)
 
-    trainer = Trainer(model, loss, metrics, optimizers, lr_schedulers, decoding_norm_data,
+    trainer = Trainer(model, loss, metrics, optimizers, lr_schedulers,
                       resume_path, config,
                       do_validation=True,
                       overfit_small_batch=overfit_small_batch)

@@ -3,16 +3,16 @@ from base.base_model import BaseModel
 from nn_.net_modules.MLP import MLP
 
 
-class TDNN_cd(BaseModel):
-    def __init__(self, input_feat_length, input_feat_name, lab_cd_num):
-        super(TDNN_cd, self).__init__()
+class MLP(BaseModel):
+    def __init__(self, input_feat_length, input_feat_name, lab_num):
+        super(MLP, self).__init__()
         self.input_feat_name = input_feat_name
         self.input_feat_length = input_feat_length
         self.context_left = 5
         self.context_right = 5
 
-        self.tdnn = MLP(input_feat_length * (self.context_left + self.context_right + 1),
-                        dnn_lay=[1024, 1024, 1024, 1024, 1024, lab_cd_num],
+        self.MLP = MLP(input_feat_length * (self.context_left + self.context_right + 1),
+                        dnn_lay=[1024, 1024, 1024, 1024, 1024, lab_num],
                         dnn_drop=[0.15, 0.15, 0.15, 0.15, 0.15, 0.0],
                         dnn_use_laynorm_inp=False,
                         dnn_use_batchnorm_inp=False,
@@ -48,13 +48,13 @@ class TDNN_cd(BaseModel):
         else:
             raise ValueError
 
-        out_dnn = self.tdnn(x)
+        out_dnn = self.MLP(x)
 
         if sequence_input:
-            out_cd = out_dnn.view(T, batch, -1)
+            out_mono = out_dnn.view(T, batch, -1)
         elif not sequence_input:
-            out_cd = out_dnn.view(batch, -1)
+            out_mono = out_dnn.view(batch, -1)
         else:
             raise ValueError
 
-        return {'out_cd': out_cd}
+        return {'out_mono': out_mono}

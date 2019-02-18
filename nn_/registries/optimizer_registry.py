@@ -4,8 +4,8 @@ from torch import optim
 def optimizer_init(config, model):
     optimizers = {}
     if config['training']['optimizer']['type'] == 'CE_triple_rmsprop_cfg':
-        trainable_params_tdnn = filter(lambda p: p.requires_grad, model.tdnn.parameters())
-        optimizers['tdnn'] = optim.SGD(trainable_params_tdnn,
+        trainable_params_MLP = filter(lambda p: p.requires_grad, model.MLP.parameters())
+        optimizers['MLP'] = optim.SGD(trainable_params_MLP,
                                        lr=0.08,
                                        weight_decay=0.0,
                                        momentum=0)

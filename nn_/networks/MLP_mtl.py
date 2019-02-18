@@ -3,24 +3,24 @@ from base.base_model import BaseModel
 from nn_.net_modules.MLP import MLP
 
 
-class TDNN_cd_mono(BaseModel):
+class MLP_mtl(BaseModel):
     def __init__(self, input_feat_length, input_feat_name, lab_cd_num, lab_mono_num):
-        super(TDNN_cd_mono, self).__init__()
+        super(MLP_mtl, self).__init__()
         self.input_feat_name = input_feat_name
         self.input_feat_length = input_feat_length
         self.context_left = 5
         self.context_right = 5
 
-        self.tdnn = MLP(input_feat_length * (self.context_left + self.context_right + 1),
-                        dnn_lay=[1024, 1024, 1024, 1024, 1024],
-                        dnn_drop=[0.15, 0.15, 0.15, 0.15, 0.15],
-                        dnn_use_laynorm_inp=False,
-                        dnn_use_batchnorm_inp=False,
-                        dnn_use_batchnorm=[True, True, True, True, True],
-                        dnn_use_laynorm=[False, False, False, False, False],
-                        dnn_act=['relu', 'relu', 'relu', 'relu', 'relu'])
+        self.MLP = MLP(input_feat_length * (self.context_left + self.context_right + 1),
+                       dnn_lay=[1024, 1024, 1024, 1024, 1024],
+                       dnn_drop=[0.15, 0.15, 0.15, 0.15, 0.15],
+                       dnn_use_laynorm_inp=False,
+                       dnn_use_batchnorm_inp=False,
+                       dnn_use_batchnorm=[True, True, True, True, True],
+                       dnn_use_laynorm=[False, False, False, False, False],
+                       dnn_act=['relu', 'relu', 'relu', 'relu', 'relu'])
 
-        self.linear_lab_cd = MLP(self.tdnn.out_dim,
+        self.linear_lab_cd = MLP(self.MLP.out_dim,
                                  dnn_lay=[lab_cd_num],
                                  dnn_drop=[0.0],
                                  dnn_use_laynorm_inp=False,
@@ -29,7 +29,7 @@ class TDNN_cd_mono(BaseModel):
                                  dnn_use_laynorm=[False],
                                  dnn_act=["log_softmax"])
 
-        self.linear_lab_mono = MLP(self.tdnn.out_dim,
+        self.linear_lab_mono = MLP(self.MLP.out_dim,
                                    dnn_lay=[lab_mono_num],
                                    dnn_drop=[0.0],
                                    dnn_use_laynorm_inp=False,
@@ -64,7 +64,7 @@ class TDNN_cd_mono(BaseModel):
             assert context == self.context_left + self.context_right + 1
             x = x.view(batch, feats * context)
 
-        out_dnn = self.tdnn(x)
+        out_dnn = self.MLP(x)
 
         out_cd = self.linear_lab_cd(out_dnn)
         out_mono = self.linear_lab_mono(out_dnn)
