@@ -25,7 +25,7 @@ def lr_scheduler_init(config, optimizers):
         lr_schedulers[opti_name] = ReduceLROnPlateau(optimizers[opti_name],
                                                      mode='min',
                                                      factor=config['training']['lr_scheduler']['arch_halving_factor'],
-                                                     patience=1,
+                                                     patience=config['training']['lr_scheduler']['patience'],
                                                      verbose=True,
                                                      threshold=config['training']['lr_scheduler'][
                                                          'arch_improvement_threshold'],

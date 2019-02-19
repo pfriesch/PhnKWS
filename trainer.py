@@ -76,7 +76,7 @@ class Trainer(BaseTrainer):
                                      self.config['exp']['num_workers'])
 
         assert len(dataset) >= self.config['training']['batch_size_train'], \
-            f"Length of dataset {len(dataset)} too small " \
+            f"Length of train dataset {len(dataset)} too small " \
             + f"for batch_size of {self.config['training']['batch_size_train']}"
 
         total_train_loss = 0
@@ -101,7 +101,8 @@ class Trainer(BaseTrainer):
                 #         .format(lab_dnn.max().cpu().numpy(), out.shape[1], lab_dnn.min().cpu().numpy())
 
                 inputs = self.to_device(inputs)
-                targets = self.to_device(targets)
+                if "lab_phn" not in targets:
+                    targets = self.to_device(targets)
 
                 for opti in self.optimizers.values():
                     opti.zero_grad()
@@ -125,12 +126,13 @@ class Trainer(BaseTrainer):
                     accumulated_train_losses[_loss] += loss_value
                 total_train_loss += loss["loss_final"]
 
-                _train_metrics = self._eval_metrics(output, targets)
-                for metric, metric_value in _train_metrics.items():
-                    if metric not in accumulated_train_metrics:
-                        accumulated_train_metrics[metric] = 0
-                    accumulated_train_metrics[metric] += metric_value
-                    total_train_metrics[metric] += metric_value
+                if self.config['exp']['compute_train_metrics']:
+                    _train_metrics = self._eval_metrics(output, targets)
+                    for metric, metric_value in _train_metrics.items():
+                        if metric not in accumulated_train_metrics:
+                            accumulated_train_metrics[metric] = 0
+                        accumulated_train_metrics[metric] += metric_value
+                        total_train_metrics[metric] += metric_value
                 #
                 pbar.set_description('T e:{} l: {:.4f}'.format(epoch,
                                                                loss["loss_final"].item()))
@@ -142,22 +144,24 @@ class Trainer(BaseTrainer):
                     self.tensorboard_logger.set_step(self.global_step, 'train')
                     for _loss, loss_value in accumulated_train_losses.items():
                         self.tensorboard_logger.add_scalar(_loss, loss_value / n_steps_chunk)
-                    for metric, metric_value in accumulated_train_metrics.items():
-                        self.tensorboard_logger.add_scalar(metric, metric_value / n_steps_chunk)
+                    if self.config['exp']['compute_train_metrics']:
+                        for metric, metric_value in accumulated_train_metrics.items():
+                            self.tensorboard_logger.add_scalar(metric, metric_value / n_steps_chunk)
 
                     most_recent_inputs = inputs
                     for feat_name in most_recent_inputs:
-                        if isinstance(most_recent_inputs[feat_name], dict) and 'sequence_lengths' in most_recent_inputs[
-                            feat_name]:
+                        if isinstance(most_recent_inputs[feat_name], dict) \
+                                and 'sequence_lengths' in most_recent_inputs[feat_name]:
                             total_padding = torch.sum(
-                                (torch.ones_like(most_recent_inputs[feat_name]['sequence_lengths']) *
-                                 most_recent_inputs[feat_name]['sequence_lengths'][0]) - most_recent_inputs[feat_name][
-                                    'sequence_lengths'])
+                                (torch.ones_like(most_recent_inputs[feat_name]['sequence_lengths'])
+                                 * most_recent_inputs[feat_name]['sequence_lengths'][0])
+                                - most_recent_inputs[feat_name]['sequence_lengths'])
                             self.tensorboard_logger.add_scalar('total_padding_{}'.format(feat_name),
                                                                total_padding.item())
 
                     accumulated_train_losses = {}
-                    accumulated_train_metrics = {}
+                    if self.config['exp']['compute_train_metrics']:
+                        accumulated_train_metrics = {}
                     n_steps_chunk = 0
 
                     if (time.time() - last_checkpoint) > self.config['exp']['checkpoint_interval_seconds']:
@@ -169,13 +173,18 @@ class Trainer(BaseTrainer):
         if n_steps_this_epoch > 0:
             self.tensorboard_logger.set_step(epoch, 'train')
             self.tensorboard_logger.add_scalar('train_loss_avg', total_train_loss / n_steps_this_epoch)
-            for metric in total_train_metrics:
-                self.tensorboard_logger.add_scalar(metric + "_avg", total_train_metrics[metric] / n_steps_this_epoch)
+            if self.config['exp']['compute_train_metrics']:
+                for metric in total_train_metrics:
+                    self.tensorboard_logger.add_scalar(metric + "_avg",
+                                                       total_train_metrics[metric] / n_steps_this_epoch)
 
-            log = {'train_loss_avg': total_train_loss / n_steps_this_epoch,
-                   'train_metrics_avg':
-                       {metric: total_train_metrics[metric] / n_steps_this_epoch
-                        for metric in total_train_metrics}}
+            if self.config['exp']['compute_train_metrics']:
+                log = {'train_loss_avg': total_train_loss / n_steps_this_epoch,
+                       'train_metrics_avg':
+                           {metric: total_train_metrics[metric] / n_steps_this_epoch
+                            for metric in total_train_metrics}}
+            else:
+                log = {'train_loss_avg': total_train_loss / n_steps_this_epoch}
             if self.do_validation:
                 valid_log = self._valid_epoch(epoch)
                 log.update(valid_log)
@@ -209,13 +218,17 @@ class Trainer(BaseTrainer):
                                self.model.context_right,
                                normalize_features=True,
                                phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
-                               max_seq_length=self.max_seq_length_train_curr,
+                               max_seq_length=self.config['training']['max_seq_length_valid'],
                                shuffle_frames=self.config['training']['shuffle_frames'])
 
         dataloader = KaldiDataLoader(dataset,
                                      self.config['training']['batch_size_valid'],
                                      self.config["exp"]["n_gpu"] > 0,
                                      self.config['exp']['num_workers'])
+
+        assert len(dataset) >= self.config['training']['batch_size_valid'], \
+            f"Length of valid dataset {len(dataset)} too small " \
+            + f"for batch_size of {self.config['training']['batch_size_valid']}"
 
         n_steps_this_epoch = 0
         with tqdm(disable=not logger.isEnabledFor(logging.INFO), total=len(dataloader)) as pbar:
@@ -224,7 +237,8 @@ class Trainer(BaseTrainer):
                 n_steps_this_epoch += 1
 
                 inputs = self.to_device(inputs)
-                targets = self.to_device(targets)
+                if "lab_phn" not in targets:
+                    targets = self.to_device(targets)
 
                 output = self.model(inputs)
                 loss = self.loss(output, targets)
@@ -291,7 +305,8 @@ class Trainer(BaseTrainer):
             pbar.set_description('E e:{}    '.format(epoch))
             for batch_idx, (_, inputs, targets) in tqdm(enumerate(dataloader)):
                 inputs = self.to_device(inputs)
-                targets = self.to_device(targets)
+                if "lab_phn" not in targets:
+                    targets = self.to_device(targets)
 
                 output = self.model(inputs)
 
@@ -350,7 +365,8 @@ class Trainer(BaseTrainer):
                 pbar.set_description('E e:{}    '.format(epoch))
                 for batch_idx, (sample_names, inputs, targets) in tqdm(enumerate(dataloader)):
                     inputs = self.to_device(inputs)
-                    targets = self.to_device(targets)
+                    if "lab_phn" not in targets:
+                        targets = self.to_device(targets)
 
                     output = self.model(inputs)
 

@@ -16,6 +16,10 @@ def collate_fn_simple(sample_list):
 
 
 def collate_fn_zero_pad(sample_list, feat_padding='repeat'):
+    # TODO compare padding methods
+    # feat repeat padding see: https://github.com/SeanNaren/deepspeech.pytorch/issues/312
+    # mostly used when batchnorm is used in the model
+
     fea_keys = list(sample_list[0][1].keys())
     lab_keys = list(sample_list[0][2].keys())
 
@@ -44,7 +48,20 @@ def collate_fn_zero_pad(sample_list, feat_padding='repeat'):
             if feat_padding == 'repeat':
                 padding_left = len(fea_dict[fea]) - _len_feat
                 if padding_left > 0:
-                    fea_dict[fea][_len_feat:, _idx, :, :] = sample[1][fea][:padding_left]
+                    total_padded = 0
+                    while (total_padded < padding_left):
+                        # if fea_dict[fea][_len_feat:, _idx, :, :].shape != sample[1][fea][:padding_left].shape:
+                        #         print(fea_dict[fea][_len_feat:, _idx, :, :].shape, sample[1][fea][:padding_left].shape)
+                        if len(fea_dict[fea][_len_feat:, _idx, :, :]) > len(sample[1][fea]):
+                            fea_dict[fea][
+                            _len_feat + total_padded:_len_feat + total_padded + len(sample[1][fea]),
+                            _idx, :, :] = \
+                                sample[1][fea][:padding_left - total_padded]
+                            total_padded += len(sample[1][fea])
+
+                        else:
+                            fea_dict[fea][_len_feat:, _idx, :, :] = sample[1][fea][:padding_left]
+                            total_padded += len(sample[1][fea][:padding_left])
 
         for lab in lab_keys:
             lab_dict[lab][_idx] = sample[2][lab]

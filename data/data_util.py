@@ -92,12 +92,18 @@ def filter_by_seqlen(samples_list, max_sequence_length, context_left, context_ri
     filtered_sample_list = []
 
     num_removed = 0
+    min_len = float('inf')
 
     for sample in samples_list:
         filename, sample_dict = sample
 
         assert len(sample_dict["features"]) == 1  # TODO multi feature
         for feature_name in sample_dict["features"]:
+            if min_len > len(sample_dict["features"][feature_name]) - (
+                    context_left + context_right):
+                # just for logging purposes
+                min_len = len(sample_dict["features"][feature_name]) - (
+                        context_left + context_right)
             if len(sample_dict["features"][feature_name]) - (
                     context_left + context_right) <= max_sequence_length and max_sequence_length > 0:
                 start_idx = context_left
@@ -106,7 +112,7 @@ def filter_by_seqlen(samples_list, max_sequence_length, context_left, context_ri
             else:
                 num_removed += 1
 
-    return filtered_sample_list
+    return filtered_sample_list, min_len
 
 
 def splits_by_seqlen(samples_list, max_sequence_length, context_left, context_right):

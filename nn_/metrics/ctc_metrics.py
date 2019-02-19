@@ -10,7 +10,7 @@ class PhnErrorRate(Module):
     def __init__(self, vocabulary_size):
         super().__init__()
         # WARINIG dont use chr(0)
-        vocabulary_size += 1 #TODO unify blank label stuff
+        vocabulary_size += 1  # TODO unify blank label stuff
         self.vocabulary = [chr(c) for c in list(range(65, 65 + 58)) + list(range(65 + 58 + 69, 65 + 58 + 69 + 500))][
                           :vocabulary_size]
         self.decoder = ctcdecode.CTCBeamDecoder(self.vocabulary, log_probs_input=True, beam_width=1)
@@ -32,7 +32,7 @@ class PhnErrorRate(Module):
         _logits = logits.permute(1, 0, 2)
         assert _logits.shape[0] == batch_size
 
-        beam_result, beam_scores, timesteps, out_seq_len = self.decoder.decode(_logits, target_sequence_lengths)
+        beam_result, beam_scores, timesteps, out_seq_len = self.decoder.decode(_logits)
 
         curr_idx = 0
         all_labels = []
@@ -51,7 +51,8 @@ class PhnErrorRate(Module):
                 per = cer(_decoded, labels, ignore_case=True, remove_space=True)
                 per_all.append(per)
             else:
-                logger.debug("Skip metric since the decoded string is of length 0.")
+                pass  # TODO
+                # logger.debug("Skip metric since the decoded string is of length 0.")
 
         if len(per_all) > 0:
             return np.mean(per_all)

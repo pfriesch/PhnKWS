@@ -40,6 +40,7 @@ def code_versioning():
     branches = subprocess.check_output(['git', 'branch']).decode("utf-8").split("\n")
     current_branch = [b for b in branches if b.startswith("*")][0].split(" ")[1]
     assert current_branch == 'runs_log'
+    assert not os.path.exists(".git/index.lock")
 
     subprocess.check_output(['git', 'add', '--all'])
     _diff = subprocess.check_output(['git', 'status'])
@@ -82,4 +83,4 @@ class Timer:
             if isinstance(logger, WriterTensorboardX):
                 logger.add_scalar(self.name, self.interval, global_step=self.global_step, mode="info")
             elif isinstance(logger, Logger):
-                logger.debug("{} took {:.5f}s".format(self.name, self.interval))
+                logger.debug("{} took {:.2f}s".format(self.name, self.interval))

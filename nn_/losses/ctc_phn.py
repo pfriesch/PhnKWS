@@ -11,6 +11,9 @@ def check_cudnn_cond(targets, target_sequence_lengths, input_sequence_lengths):
         "CuDNN expects input_sequence_lengths to be all of the same length"
     assert all(target_sequence_lengths <= 256), "CuDNN expects targets shorter or equal to 256"
     assert targets.dtype == torch.int32, "CuDNN expects targets to be in32"
+    assert targets.device.type == "cpu", "CuDNN expects targets to on the CPU"
+    assert target_sequence_lengths.device.type == "cpu", "CuDNN expects target_sequence_lengths to on the CPU"
+    assert input_sequence_lengths.device.type == "cpu", "CuDNN expects input_sequence_lengths to on the CPU"
 
 
 class CTCPhnLoss(nn.Module):

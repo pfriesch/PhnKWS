@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """This module provides functions to calculate error rate in different level.
 e.g. wer for word-level, cer for char-level.
 """

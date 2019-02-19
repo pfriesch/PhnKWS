@@ -23,11 +23,11 @@
   "training": {
     "batch_size_train": 8,
     "batch_size_valid": 8,
-    "max_seq_length_train": 1000,
+    "max_seq_length_train": 2000,
     "increase_seq_length_train": true,
-    "start_seq_len_train": 100,
+    "start_seq_len_train": 200,
     "multply_factor_seq_len_train": 2,
-    "max_seq_length_valid": 1000,
+    "max_seq_length_valid": 2000,
     "shuffle_frames": false,
     "sort_by_feat": "fbank",
     "clip_grad_norm": -1,
@@ -38,15 +38,16 @@
       }
     },
     "lr_scheduler": {
+      "patience": 1,
       "arch_halving_factor": 0.5,
       "arch_improvement_threshold": 0.001
     }
   },
   "arch": {
-    "name": "MLP_mtl",
+    "name": "MLP",
     "framewise_labels": false,
     "loss": {
-      "name": "CTC_mtl",
+      "name": "CTC",
       "args": {
         "weight_mono": 1.0
       }

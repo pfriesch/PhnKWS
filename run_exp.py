@@ -1,6 +1,7 @@
 import os
 import argparse
 import datetime
+import torch
 
 from cfg.dataset_definition.get_dataset_definition import get_dataset_definition
 from nn_ import model_init, optimizer_init, lr_scheduler_init, metrics_init, loss_init
@@ -19,6 +20,8 @@ def check_config(config):
 
 def setup_run(config):
     set_seed(config['exp']['seed'])
+    torch.backends.cudnn.deterministic = True
+
     dataset_definition = get_dataset_definition(config['dataset']['name'], config['dataset']['data_use']['train_with'])
     config['dataset']['dataset_definition'] = dataset_definition
 

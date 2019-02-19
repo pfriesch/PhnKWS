@@ -55,6 +55,9 @@ class KaldiDataset(data.Dataset):
 
         self.aligned_labels = {}
 
+        if max_sample_len < 0 or max_seq_length is None:
+            max_seq_length = float("inf")
+
         for label_name in label_dict:
             if label_dict[label_name]["label_opts"] == "ali-to-phones --per-frame=true" or \
                     label_dict[label_name]["label_opts"] == "ali-to-pdf":
@@ -357,7 +360,7 @@ class KaldiDataset(data.Dataset):
         self.max_len_per_chunk = [0] * len(file_chunks)
         self.min_len_per_chunk = [sys.maxsize] * len(file_chunks)
         self.samples_per_chunk = []
-        for chnk_id, file_chnk in tqdm(list(enumerate(file_chunks))):
+        for chnk_id, file_chnk in tqdm(list(enumerate(file_chunks))):  # TODO do threaded
             file_names = [feat.split(" ")[0] for feat in file_chnk]
 
             chnk_prefix = os.path.join(self.dataset_path, "chunk_{:04d}".format(chnk_id))
@@ -427,10 +430,10 @@ class KaldiDataset(data.Dataset):
                 if any([not self.aligned_labels[label_name] for label_name in self.aligned_labels]):
                     # unaligned labels
                     assert self.split_files_max_sample_len is None
-                    sample_splits = filter_by_seqlen(samples_list, self.max_seq_length,
-                                                     self.left_context, self.right_context)
+                    sample_splits, min_len = filter_by_seqlen(samples_list, self.max_seq_length,
+                                                              self.left_context, self.right_context)
                     logger.info(f"Used samples {len(sample_splits)}/{len(samples_list)} "
-                                + f"for a max seq length of {self.max_seq_length}")
+                                + f"for a max seq length of {self.max_seq_length} (min length was {min_len})")
 
                 elif any([not self.aligned_labels[label_name] for label_name in self.aligned_labels]) \
                         or not self.split_files_max_sample_len:

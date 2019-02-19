@@ -38,6 +38,7 @@
       }
     },
     "lr_scheduler": {
+      "patience": 1,
       "arch_halving_factor": 0.5,
       "arch_improvement_threshold": 0.001
     }
