@@ -66,7 +66,7 @@ class Trainer(BaseTrainer):
                                self.model.context_right,
                                normalize_features=True,
                                phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
-                               max_seq_length=self.max_seq_length_train_curr,
+                               max_seq_len=self.max_seq_length_train_curr,
                                shuffle_frames=self.config['training']['shuffle_frames'],
                                overfit_small_batch=self.overfit_small_batch)
 
@@ -218,7 +218,7 @@ class Trainer(BaseTrainer):
                                self.model.context_right,
                                normalize_features=True,
                                phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
-                               max_seq_length=self.config['training']['max_seq_length_valid'],
+                               max_seq_len=self.config['training']['max_seq_length_valid'],
                                shuffle_frames=self.config['training']['shuffle_frames'])
 
         dataloader = KaldiDataLoader(dataset,
@@ -263,73 +263,6 @@ class Trainer(BaseTrainer):
                                   valid_metrics}}
 
     def _eval_epoch(self, epoch):
-
-        if 'test' in self.config:
-            result_decode = self._eval_epoch_kaldi_decode(epoch)
-        else:
-            result_decode = self._eval_epoch_ctc_decode(epoch)
-        result_kws = self._eval_kws(epoch)
-        return {"result_decode": result_decode, "result_kws": result_kws}
-
-    def _eval_epoch_ctc_decode(self, epoch):
-        self.model.eval()
-        batch_size = 1
-        max_seq_length = -1
-
-        out_folder = os.path.join(self.config['exp']['save_dir'], self.config['exp']['name'])
-
-        test_data = self.config['dataset']['data_use']['test_with']
-        _all_feats = self.config['dataset']['dataset_definition']['datasets'][test_data]['features']
-        _all_labs = self.config['dataset']['dataset_definition']['datasets'][test_data]['labels']
-        dataset = KaldiDataset(self.config['exp']['data_cache_root'],
-                               test_data,
-                               {feat: _all_feats[feat] for feat in self.config['dataset']['features_use']},
-                               {lab: _all_labs[lab] for lab in self.config['dataset']['labels_use']},
-                               self.device,
-                               max_seq_length,
-                               self.model.context_left,
-                               self.model.context_right,
-                               normalize_features=True,
-                               phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
-                               max_seq_length=self.max_seq_length_train_curr,
-                               shuffle_frames=self.config['training']['shuffle_frames'])
-
-        dataloader = KaldiDataLoader(dataset,
-                                     batch_size,
-                                     self.config["exp"]["n_gpu"] > 0,
-                                     self.config['exp']['num_workers'])
-
-        test_metrics = {metric: 0 for metric in self.metrics}
-
-        with tqdm(total=len(dataloader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
-            pbar.set_description('E e:{}    '.format(epoch))
-            for batch_idx, (_, inputs, targets) in tqdm(enumerate(dataloader)):
-                inputs = self.to_device(inputs)
-                if "lab_phn" not in targets:
-                    targets = self.to_device(targets)
-
-                output = self.model(inputs)
-
-                #### Logging ####
-                _eval_metrics = self._eval_metrics(output, targets)
-                test_metrics = {metric: test_metrics[metric] + metric_value for
-                                metric, metric_value
-                                in _eval_metrics.items()}
-                pbar.set_description(
-                    'E e:{} a: {:.4f} '.format(epoch, test_metrics[self.config['arch']['metrics'][0]]))
-                pbar.update()
-                #### /Logging ####
-
-        logger.critical("Done decoding... TODO implement with lm decoding")
-
-        self.tensorboard_logger.set_step(self.global_step, 'test')
-        for metric in test_metrics:
-            self.tensorboard_logger.add_scalar(metric, test_metrics[metric] / len(dataloader))
-
-        return {'test_metrics': {metric: test_metrics[metric] / len(dataloader) for metric in
-                                 test_metrics}}
-
-    def _eval_epoch_kaldi_decode(self, epoch):
         self.model.eval()
         batch_size = 1
         max_seq_length = -1
@@ -351,7 +284,7 @@ class Trainer(BaseTrainer):
                                self.model.context_right,
                                normalize_features=True,
                                phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
-                               split_files_max_seq_len=self.max_seq_length_train_curr,
+                               max_seq_len=max_seq_length,
                                shuffle_frames=self.config['training']['shuffle_frames'])
 
         dataloader = KaldiDataLoader(dataset,
@@ -359,20 +292,37 @@ class Trainer(BaseTrainer):
                                      self.config["exp"]["n_gpu"] > 0,
                                      self.config['exp']['num_workers'])
 
-        with KaldiOutputWriter(out_folder, test_data, epoch, self.config) as writer:
+        assert len(dataset) >= batch_size, \
+            f"Length of valid dataset {len(dataset)} too small " \
+            + f"for batch_size of {batch_size}"
 
-            with tqdm(total=len(dataloader), disable=not logger.isEnabledFor(logging.INFO)) as pbar:
+        n_steps_this_epoch = 0
+        warned_size = False
+        with KaldiOutputWriter(out_folder, test_data, self.model.out_names, epoch, self.config) as writer:
+            with tqdm(disable=not logger.isEnabledFor(logging.INFO), total=len(dataloader)) as pbar:
                 pbar.set_description('E e:{}    '.format(epoch))
-                for batch_idx, (sample_names, inputs, targets) in tqdm(enumerate(dataloader)):
+                for batch_idx, (sample_names, inputs, targets) in enumerate(dataloader):
+                    n_steps_this_epoch += 1
+
                     inputs = self.to_device(inputs)
                     if "lab_phn" not in targets:
                         targets = self.to_device(targets)
 
                     output = self.model(inputs)
 
+                    #### Logging ####
+                    _eval_metrics = self._eval_metrics(output, targets)
+                    test_metrics = {metric: test_metrics[metric] + metric_value for
+                                    metric, metric_value
+                                    in _eval_metrics.items()}
+
+                    pbar.set_description('E e:{}           '.format(epoch))
+                    pbar.update()
+                    #### /Logging ####
+
                     warned_label = False
                     for output_label in output:
-                        if output_label in self.config['test'].keys():
+                        if output_label in self.model.out_names:
                             # squeeze that batch
                             output[output_label] = output[output_label].squeeze(1)
                             # remove blank/padding 0th dim
@@ -384,30 +334,25 @@ class Trainer(BaseTrainer):
                             if len(out_save.shape) == 3 and out_save.shape[0] == 1:
                                 out_save = out_save.squeeze(0)
 
-                            if output_label in self.config['test'] and \
-                                    self.config['test'][output_label]['normalize_posteriors']:
+                            if self.config['dataset']['dataset_definition']['decoding']['normalize_posteriors']:
                                 # read the config file
-                                counts = load_counts(
-                                    self.config['test'][output_label]['normalize_with_counts_from_file'])
+                                counts = self.config['dataset']['dataset_definition'] \
+                                    ['data_info']['labels']['lab_phn']['lab_count']
+                                if out_save.shape[-1] == len(counts) - 1:
+                                    if not warned_size:
+                                        logger.info(
+                                            f"Counts length is {len(counts)} but output has size {out_save.shape[-1]}."
+                                            + f" Assuming that counts is 1 indexed")
+                                        warned_size = True
+                                    counts = counts[1:]
+                                # Normalize by output count
                                 out_save = out_save - np.log(counts / np.sum(counts))
 
-                                # save the output
-                                # data_name = file ids
-                                # out save shape <class 'tuple'>: (124, 1944)
-                                # post_file dict out_dnn2: buffered wirter
                             assert len(out_save.shape) == 2
                             assert len(sample_names) == 1
                             writer.write_mat(output_label, out_save.squeeze(), sample_names[0])
 
-                            #### Logging ####
-                            _test_metrics = self._eval_metrics(output, targets)
-                            test_metrics = {metric: test_metrics[metric] + metric_value for
-                                            metric, metric_value
-                                            in _test_metrics.items()}
 
-                            pbar.set_description('E e:{}           '.format(epoch))
-                            pbar.update()
-                            #### /Logging ####
                         else:
                             if not warned_label:
                                 logger.debug("Skipping saving forward for decoding for key {}".format(output_label))
@@ -422,23 +367,30 @@ class Trainer(BaseTrainer):
 
         decoding_results = []
         #### DECODING ####
-        for out_lab in self.config['test']:
+        for out_lab in self.model.out_names:
 
             # forward_data_lst = self.config['data_use']['test_with'] #TODO multiple forward sets
-            forward_data_lst = [self.config['data_use']['test_with']]
+            forward_data_lst = [self.config['dataset']['data_use']['test_with']]
             # forward_dec_outs = self.config['test'][out_lab]['require_decoding']
 
             for data in forward_data_lst:
                 logger.debug('Decoding {} output {}'.format(data, out_lab))
 
-                lab_field = self.config['datasets'][data]['labels']['lab_cd']
+                if out_lab == 'out_cd':
+                    _label = 'lab_cd'
+                elif out_lab == 'out_phn':
+                    _label = 'lab_phn'
+                else:
+                    raise NotImplementedError(out_lab)
+
+                lab_field = self.config['dataset']['dataset_definition']['datasets'][data]['labels'][_label]
 
                 out_folder = os.path.abspath(out_folder)
                 out_dec_folder = '{}/decode_{}_{}'.format(out_folder, data, out_lab)
 
                 files_dec_list = glob('{}/exp_files/forward_{}_ep*_{}_to_decode.ark'.format(out_folder, data, out_lab))
 
-                decode(**self.config['decoding'],
+                decode(**self.config['dataset']['dataset_definition']['decoding'],
                        alidir=os.path.abspath(lab_field['label_folder']),
                        data=os.path.abspath(lab_field['lab_data_folder']),
                        graphdir=os.path.abspath(lab_field['lab_graph']),
@@ -465,27 +417,24 @@ class Trainer(BaseTrainer):
 
 class KaldiOutputWriter:
 
-    def __init__(self, out_folder, data_name, epoch, config):
+    def __init__(self, out_folder, data_name, output_names, epoch, config):
         super().__init__()
         self.out_folder = out_folder
         self.data_name = data_name
         self.epoch = epoch
         self.config = config
+        self.output_names = output_names
 
     def __enter__(self):
-        base_file_name = '{}/exp_files/forward_{}_ep{:03d}'.format(self.out_folder, self.data_name, self.epoch)
+        base_file_name = '{}/exp_files/logits_{}_ep{:03d}'.format(self.out_folder, self.data_name, self.epoch)
         self.post_file = {}
-        for out_name in self.config['test'].keys():
-            if self.config['test'][out_name]['require_decoding']:
-                out_file = '{}_{}_to_decode.ark'.format(base_file_name, out_name)
-            else:
-                out_file = '{}_{}.ark'.format(base_file_name, out_name)
-
+        for out_name in self.output_names:
+            out_file = '{}_{}.ark'.format(base_file_name, out_name)
             self.post_file[out_name] = kaldi_io.open_or_fd(out_file, 'wb')
         return self
 
     def __exit__(self, *args):
-        for out_name in self.config['test'].keys():
+        for out_name in self.output_names:
             self.post_file[out_name].close()
 
     def write_mat(self, out_name, out_save, sample_name):

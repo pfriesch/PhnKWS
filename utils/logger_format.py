@@ -1,5 +1,7 @@
 from copy import copy
 from logging import Formatter
+import logging
+import tqdm
 
 # used in logger.py
 
@@ -28,3 +30,18 @@ class ColoredFormatter(Formatter):
             .format(PREFIX, seq, levelname, SUFFIX)
         colored_record.levelname = colored_levelname
         return Formatter.format(self, colored_record)
+
+
+class TqdmLoggingHandler(logging.Handler):
+    def __init__(self, level=logging.NOTSET):
+        super().__init__(level)
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            tqdm.tqdm.write(msg)
+            self.flush()
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except:
+            self.handleError(record)

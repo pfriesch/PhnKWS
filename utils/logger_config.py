@@ -19,15 +19,14 @@ class Logger(object):
                 'version': 1,
                 'formatters': {
                     'default': {'format': '%(asctime)s [%(levelname)s] %(message)s', 'datefmt': '%Y-%m-%d %H:%M:%S'},
-                    'brief': {'format': "[%(levelname)s]  %(message)s",
+                    'brief': {'format': "%(asctime)s [%(levelname)s] %(message)s", 'datefmt': '%H:%M:%S',
                               "class": "utils.logger_format.ColoredFormatter"}
                 },
                 'handlers': {
                     'console': {
                         'level': 'DEBUG',
-                        'class': 'logging.StreamHandler',
-                        'formatter': 'brief',
-                        'stream': 'ext://sys.stdout'
+                        'class': 'utils.logger_format.TqdmLoggingHandler',
+                        'formatter': 'brief'
                     },
                     'file': {
                         'level': 'DEBUG',
@@ -63,9 +62,8 @@ class Logger(object):
                 'handlers': {
                     'console': {
                         'level': 'DEBUG',
-                        'class': 'logging.StreamHandler',
-                        'formatter': 'brief',
-                        'stream': 'ext://sys.stdout'
+                        'class': 'utils.logger_format.TqdmLoggingHandler',
+                        'formatter': 'brief'
                     }
                 },
                 'loggers': {

@@ -116,15 +116,8 @@
       }
     }
   },
-  "test": {
-    "out_mono": {
-      //      "normalize_posteriors": true,
-      //      "normalize_with_counts_from": "lab_mono",
-      "save_out_file": true
-      //      "require_decoding": true
-    }
-  },
   "decoding": {
+    "normalize_posteriors": true,
     "min_active": 200,
     "max_active": 7000,
     "max_mem": 50000000,

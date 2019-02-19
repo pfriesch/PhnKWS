@@ -20,6 +20,8 @@ class MLPNet(BaseModel):
                        dnn_use_laynorm=[False, False, False, False, False, False],
                        dnn_act=['relu', 'relu', 'relu', 'relu', 'relu', 'log_softmax'])
 
+        self.out_names = ['out_phn']
+
     def forward(self, x):
         x = x[self.input_feat_name]
 
@@ -57,4 +59,4 @@ class MLPNet(BaseModel):
         else:
             raise ValueError
 
-        return {'out_phn': out_phn}
+        return {self.out_names[0]: out_phn}
