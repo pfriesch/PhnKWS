@@ -15,7 +15,7 @@ def loss_init(config):
         return MonoLoss()
     elif loss_name == 'ctc_mtl_mono_cd':
         return CTCMtlMonoCDLoss()
-    elif loss_name == 'ctc_phn':
+    elif loss_name == 'CTC':
         return CTCPhnLoss()
 
     else:

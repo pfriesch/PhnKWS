@@ -13,7 +13,8 @@ import torch.utils.data as data
 import torch
 from tqdm import tqdm
 
-from data.data_util import load_features, split_chunks, load_labels, splits_by_seqlen, apply_context_single_feat
+from data.data_util import load_features, split_chunks, load_labels, splits_by_seqlen, apply_context_single_feat, \
+    filter_by_seqlen
 from data.phoneme_dict import load_phoneme_dict, get_phoneme_dict, PhonemeDict
 from utils.logger_config import logger
 
@@ -40,7 +41,7 @@ class KaldiDataset(data.Dataset):
                  normalize_features=True,
                  phoneme_dict=None,  # e.g. kaldi/egs/librispeech/s5/data/lang/phones.txt
 
-                 split_files_max_seq_len=100,
+                 max_seq_length=100,
                  shuffle_frames=False,
                  overfit_small_batch=False
 
@@ -58,12 +59,13 @@ class KaldiDataset(data.Dataset):
             if label_dict[label_name]["label_opts"] == "ali-to-phones --per-frame=true" or \
                     label_dict[label_name]["label_opts"] == "ali-to-pdf":
                 self.aligned_labels[label_name] = True
+                split_files_max_seq_len = max_seq_length
 
-            if label_dict[label_name]["label_opts"] == "ali-to-phones":
+            elif label_dict[label_name]["label_opts"] == "ali-to-phones":
                 self.aligned_labels[label_name] = False
-                assert split_files_max_seq_len is False or \
-                       split_files_max_seq_len is None or split_files_max_seq_len < 1, \
-                    "Can't split the files without aligned labels."
+                split_files_max_seq_len = None
+            else:
+                raise NotImplementedError
 
         self.shuffle_frames = shuffle_frames
         if self.shuffle_frames:
@@ -79,11 +81,13 @@ class KaldiDataset(data.Dataset):
         self.min_len_per_chunk = None
         self.cached_pt = 0
         self.split_files_max_sample_len = split_files_max_seq_len
+        self.max_seq_length = max_seq_length
         self.max_sample_len = max_sample_len
         self.min_sample_len = 0  # TODO ?
         self.left_context = left_context
         self.right_context = right_context
         self.phoneme_dict = phoneme_dict
+        self.label_index_from = 1  # TODO ?
 
         self.normalize_features = normalize_features
 
@@ -222,6 +226,7 @@ class KaldiDataset(data.Dataset):
                     or "normalize_features" not in _info
                     or "phoneme_dict" not in _info
                     or "split_files_max_sample_len" not in _info
+                    or "max_seq_length" not in _info
                     or "shuffle_frames" not in _info
                     or "overfit_small_batch" not in _info):
                 return False
@@ -234,6 +239,7 @@ class KaldiDataset(data.Dataset):
                     or self.normalize_features != _info["normalize_features"]
                     or self.phoneme_dict != load_phoneme_dict(*_info["phoneme_dict"])
                     or self.split_files_max_sample_len != _info["split_files_max_sample_len"]
+                    or self.max_seq_length != _info["max_seq_length"]
                     or self.shuffle_frames != _info["shuffle_frames"]
                     or self.overfit_small_batch != _info["overfit_small_batch"]):
 
@@ -253,6 +259,7 @@ class KaldiDataset(data.Dataset):
                        "normalize_features": self.normalize_features,
                        "phoneme_dict": self.phoneme_dict,
                        "split_files_max_sample_len": self.split_files_max_sample_len,
+                       "max_seq_length": self.max_seq_length,
                        "shuffle_frames": self.shuffle_frames,
                        "overfit_small_batch": self.overfit_small_batch,
                        "feature_dict": feature_dict,
@@ -265,6 +272,7 @@ class KaldiDataset(data.Dataset):
             self.max_len_per_chunk = _info["max_len_per_chunk"]
             self.min_len_per_chunk = _info["min_len_per_chunk"]
             self.split_files_max_sample_len = _info["split_files_max_sample_len"]
+            self.max_seq_length = _info["max_seq_length"]
             assert self.chunk_size == _info["chunk_size"]
             self.max_sample_len = _info["max_sample_len"]
             self.left_context = _info["left_context"]
@@ -275,7 +283,7 @@ class KaldiDataset(data.Dataset):
             self.feature_dict = _info["feature_dict"]
             self.label_dict = _info["label_dict"]
 
-    def _load_labels(self, label_dict):
+    def _load_labels(self, label_dict, label_index_from):
         all_labels_loaded = {}
 
         for lable_name in label_dict:
@@ -318,6 +326,12 @@ class KaldiDataset(data.Dataset):
                 logger.debug(
                     f"min label new: {min_label}")
 
+            if label_index_from != 0:
+                assert label_index_from > 0
+                all_labels_loaded[lable_name] = {filename:
+                                                     all_labels_loaded[lable_name][filename] + label_index_from
+                                                 for filename in all_labels_loaded[lable_name]}
+
         return all_labels_loaded
 
     def _convert_from_kaldi_format(self, feature_dict, label_dict):
@@ -332,7 +346,7 @@ class KaldiDataset(data.Dataset):
             else:
                 raise
 
-        all_labels_loaded = self._load_labels(label_dict)
+        all_labels_loaded = self._load_labels(label_dict, self.label_index_from)
 
         with open(feature_dict[main_feat]["feature_lst_path"], "r") as f:
             lines = f.readlines()
@@ -412,9 +426,13 @@ class KaldiDataset(data.Dataset):
             if not self.shuffle_frames:
                 if any([not self.aligned_labels[label_name] for label_name in self.aligned_labels]):
                     # unaligned labels
-                    assert not self.split_files_max_sample_len
+                    assert self.split_files_max_sample_len is None
+                    sample_splits = filter_by_seqlen(samples_list, self.max_seq_length,
+                                                     self.left_context, self.right_context)
+                    logger.info(f"Used samples {len(sample_splits)}/{len(samples_list)} "
+                                + f"for a max seq length of {self.max_seq_length}")
 
-                if any([not self.aligned_labels[label_name] for label_name in self.aligned_labels]) \
+                elif any([not self.aligned_labels[label_name] for label_name in self.aligned_labels]) \
                         or not self.split_files_max_sample_len:
                     sample_splits = [
                         (filename, self.left_context, len(sample_dict["features"][main_feat]) - self.right_context)
@@ -467,6 +485,9 @@ class KaldiDataset(data.Dataset):
             )
             # TODO add warning when files get too big -> choose different chunk size
 
+        assert len(self) > 0, \
+            f"No sample with a max seq length of {self.max_seq_length} in the dataset! " \
+            + f"Try to choose a higher max seq length to start with"
         self._write_info(feature_dict, label_dict)
         logger.info('Done extracting kaldi features!')
 

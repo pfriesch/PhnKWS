@@ -3,10 +3,10 @@ from torch.nn.utils import weight_norm
 import torch.nn.functional as F
 
 from base.base_model import BaseModel
-from modules.net_modules.GCNN import GCNN
+from nn_.net_modules.GCNN import GCNN
 
 
-class GCNN_cd_mono(BaseModel):
+class GCNN_cd_mono_Net(BaseModel):
 
     def __init__(self, num_input_feats,
                  input_feat_name,
@@ -15,7 +15,7 @@ class GCNN_cd_mono(BaseModel):
                  N_filters,
                  kernel_sizes,
                  dropout):
-        super(GCNN_cd_mono, self).__init__()
+        super(GCNN_cd_mono_Net, self).__init__()
         self.input_feat_name = input_feat_name
         self.num_input_feats = num_input_feats
 

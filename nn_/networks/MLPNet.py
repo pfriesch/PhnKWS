@@ -3,22 +3,22 @@ from base.base_model import BaseModel
 from nn_.net_modules.MLP import MLP
 
 
-class MLP(BaseModel):
-    def __init__(self, input_feat_length, input_feat_name, lab_num):
-        super(MLP, self).__init__()
+class MLPNet(BaseModel):
+    def __init__(self, input_feat_length, input_feat_name, lab_mono_num):
+        super(MLPNet, self).__init__()
         self.input_feat_name = input_feat_name
         self.input_feat_length = input_feat_length
         self.context_left = 5
         self.context_right = 5
 
         self.MLP = MLP(input_feat_length * (self.context_left + self.context_right + 1),
-                        dnn_lay=[1024, 1024, 1024, 1024, 1024, lab_num],
-                        dnn_drop=[0.15, 0.15, 0.15, 0.15, 0.15, 0.0],
-                        dnn_use_laynorm_inp=False,
-                        dnn_use_batchnorm_inp=False,
-                        dnn_use_batchnorm=[True, True, True, True, True, False],
-                        dnn_use_laynorm=[False, False, False, False, False, False],
-                        dnn_act=['relu', 'relu', 'relu', 'relu', 'relu', 'log_softmax'])
+                       dnn_lay=[1024, 1024, 1024, 1024, 1024, lab_mono_num],
+                       dnn_drop=[0.15, 0.15, 0.15, 0.15, 0.15, 0.0],
+                       dnn_use_laynorm_inp=False,
+                       dnn_use_batchnorm_inp=False,
+                       dnn_use_batchnorm=[True, True, True, True, True, False],
+                       dnn_use_laynorm=[False, False, False, False, False, False],
+                       dnn_act=['relu', 'relu', 'relu', 'relu', 'relu', 'log_softmax'])
 
     def forward(self, x):
         x = x[self.input_feat_name]
@@ -51,10 +51,10 @@ class MLP(BaseModel):
         out_dnn = self.MLP(x)
 
         if sequence_input:
-            out_mono = out_dnn.view(T, batch, -1)
+            out_phn = out_dnn.view(T, batch, -1)
         elif not sequence_input:
-            out_mono = out_dnn.view(batch, -1)
+            out_phn = out_dnn.view(batch, -1)
         else:
             raise ValueError
 
-        return {'out_mono': out_mono}
+        return {'out_phn': out_phn}

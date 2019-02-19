@@ -87,6 +87,28 @@ def load_kws(feature_dict, label_dict, kw2phn_mapping):
     return features_loaded, labels_loaded
 
 
+def filter_by_seqlen(samples_list, max_sequence_length, context_left, context_right):
+    # samples_list_splited = []
+    filtered_sample_list = []
+
+    num_removed = 0
+
+    for sample in samples_list:
+        filename, sample_dict = sample
+
+        assert len(sample_dict["features"]) == 1  # TODO multi feature
+        for feature_name in sample_dict["features"]:
+            if len(sample_dict["features"][feature_name]) - (
+                    context_left + context_right) <= max_sequence_length and max_sequence_length > 0:
+                start_idx = context_left
+                end_idx = len(sample_dict["features"][feature_name]) - context_right
+                filtered_sample_list.append((filename, start_idx, end_idx))
+            else:
+                num_removed += 1
+
+    return filtered_sample_list
+
+
 def splits_by_seqlen(samples_list, max_sequence_length, context_left, context_right):
     # TODO remove with 1/4 of max length -> add to config
     # TODO add option weather the context_size is applied to the minimum sequence length

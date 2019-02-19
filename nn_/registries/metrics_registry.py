@@ -15,7 +15,8 @@ def metrics_init(config):
         elif metric == 'err_lab_cd':
             metrics[metric] = LabCDError()
         elif metric == 'phone_error_rate':
-            metrics[metric] = PhnErrorRate(config['arch']['args']['lab_phn_num'])
+            metrics[metric] = PhnErrorRate(
+                config['dataset']['dataset_definition']['data_info']['labels']['lab_phn']['num_lab'])
         else:
             raise ValueError("Can't find the metric {}".format(metric))
     return metrics

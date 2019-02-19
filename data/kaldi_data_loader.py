@@ -15,7 +15,7 @@ def collate_fn_simple(sample_list):
     return sample_names, fea_dict, lab_dict
 
 
-def collate_fn_zero_pad(sample_list):
+def collate_fn_zero_pad(sample_list, feat_padding='repeat'):
     fea_keys = list(sample_list[0][1].keys())
     lab_keys = list(sample_list[0][2].keys())
 
@@ -29,8 +29,11 @@ def collate_fn_zero_pad(sample_list):
     sample_names = []
 
     fea_dict = {k: torch.zeros([max_length, batch_size] + list(sample_list[0][1][k].shape[1:])) for k in fea_keys}
-    lab_dict = {k: torch.full((max_length, batch_size), dtype=torch.int64, fill_value=PADDING_IGNORE_INDEX) for k in
+    lab_dict = {k: [[]] * batch_size for k in
                 lab_keys}
+    input_length = torch.zeros(batch_size, dtype=torch.int64)
+    target_length = torch.zeros(batch_size, dtype=torch.int64)
+
     for _idx, sample in enumerate(sample_list):
         _len_feat = sample[1][fea_keys[0]].shape[0]
         _len_lab = sample[2][lab_keys[0]].shape[0]
@@ -38,9 +41,30 @@ def collate_fn_zero_pad(sample_list):
         sample_names.append(sample[0])
         for fea in fea_dict:
             fea_dict[fea][:_len_feat, _idx, :, :] = sample[1][fea]
-        for lab in lab_dict:
-            lab_dict[lab][:_len_lab, _idx] = sample[2][lab]
+            if feat_padding == 'repeat':
+                padding_left = len(fea_dict[fea]) - _len_feat
+                if padding_left > 0:
+                    fea_dict[fea][_len_feat:, _idx, :, :] = sample[1][fea][:padding_left]
 
+        for lab in lab_keys:
+            lab_dict[lab][_idx] = sample[2][lab]
+
+        input_length[_idx] = _len_feat
+        target_length[_idx] = _len_lab
+
+    sorting = sorted(range(len(input_length)), key=lambda k: input_length[k], reverse=True)
+    input_length = input_length[sorting]
+    target_length = target_length[sorting]
+
+    fea_dict = {k: fea_dict[k][:, sorting] for k in fea_keys}
+    lab_dict = {k: torch.cat([lab_dict[k][i] for i in sorting], dim=0) for k in lab_keys}
+
+    # .view(-1).to(dtype=torch.int32)
+
+    assert 'sample_length' not in lab_dict
+    assert 'sample_length' not in fea_dict
+    lab_dict['target_sequence_lengths'] = target_length
+    lab_dict['input_sequence_lengths'] = input_length
     return sample_names, fea_dict, lab_dict
 
 

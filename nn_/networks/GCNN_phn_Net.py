@@ -2,11 +2,11 @@ from torch import nn
 from torch.nn.utils import weight_norm
 import torch.nn.functional as F
 
-from modules.net_modules.GCNN import GCNN
 from base.base_model import BaseModel
+from nn_.net_modules.GCNN import GCNN
 
 
-class GCNN_phn(BaseModel):
+class GCNN_phn_Net(BaseModel):
 
     def __init__(self, num_input_feats,
                  input_feat_name,
@@ -14,7 +14,7 @@ class GCNN_phn(BaseModel):
                  N_filters,
                  kernel_sizes,
                  dropout):
-        super(GCNN_phn, self).__init__()
+        super(GCNN_phn_Net, self).__init__()
         self.input_feat_name = input_feat_name
         self.num_input_feats = num_input_feats
 

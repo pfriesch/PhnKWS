@@ -1,6 +1,5 @@
-from nn_.networks.MLP import MLP
-
-from nn_.networks.MLP_mtl import MLP_mtl
+from nn_.networks.MLPNet import MLPNet
+from nn_.networks.MLP_mtl_Net import MLP_mtl_Net
 
 
 def model_init(config):
@@ -32,18 +31,23 @@ def model_init(config):
         # lab_nums = [config['dataset']['dataset_definition']['data_info']['labels'] \
         #                 [lab_name]['num_lab']
         #             for lab_name in lab_names]
-        net = MLP_mtl(input_feat_length, input_feat_name,
-                      lab_cd_num=config['dataset']['dataset_definition']['data_info']['labels'] \
-                          ['lab_cd']['num_lab'],
-                      lab_mono_num=config['dataset']['dataset_definition']['data_info']['labels'] \
-                          ['lab_mono']['num_lab'])
+        if 'CTC' in config['arch']['loss']['name'] or 'ctc' in config['arch']['loss']['name']:
+            raise NotImplementedError
+
+        net = MLP_mtl_Net(input_feat_length, input_feat_name,
+                          lab_cd_num=config['dataset']['dataset_definition']['data_info']['labels'] \
+                              ['lab_cd']['num_lab'],
+                          lab_mono_num=config['dataset']['dataset_definition']['data_info']['labels'] \
+                              ['lab_mono']['num_lab'])
     elif arch_name == "MLP":
         input_feat_name = config['dataset']['features_use'][0]
         input_feat_length = config['dataset']['dataset_definition']['data_info']['features'] \
             [input_feat_name]['input_feat_length']
         lab_num = config['dataset']['dataset_definition']['data_info']['labels'] \
             [config['dataset']['labels_use'][0]]['num_lab']
-        net = MLP(input_feat_length, input_feat_name, lab_num)
+        if 'CTC' in config['arch']['loss']['name'] or 'ctc' in config['arch']['loss']['name']:
+            lab_num += 1
+        net = MLPNet(input_feat_length, input_feat_name, lab_num)
     else:
         raise ValueError("Can't find the arch {}".format(arch_name))
 

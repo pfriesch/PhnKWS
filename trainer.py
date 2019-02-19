@@ -66,7 +66,7 @@ class Trainer(BaseTrainer):
                                self.model.context_right,
                                normalize_features=True,
                                phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
-                               split_files_max_seq_len=self.max_seq_length_train_curr,
+                               max_seq_length=self.max_seq_length_train_curr,
                                shuffle_frames=self.config['training']['shuffle_frames'],
                                overfit_small_batch=self.overfit_small_batch)
 
@@ -74,6 +74,10 @@ class Trainer(BaseTrainer):
                                      self.config['training']['batch_size_train'],
                                      self.config["exp"]["n_gpu"] > 0,
                                      self.config['exp']['num_workers'])
+
+        assert len(dataset) >= self.config['training']['batch_size_train'], \
+            f"Length of dataset {len(dataset)} too small " \
+            + f"for batch_size of {self.config['training']['batch_size_train']}"
 
         total_train_loss = 0
         total_train_metrics = {metric: 0 for metric in self.metrics}
@@ -162,18 +166,21 @@ class Trainer(BaseTrainer):
 
                 #### /Logging ####
 
-        self.tensorboard_logger.set_step(epoch, 'train')
-        self.tensorboard_logger.add_scalar('train_loss_avg', total_train_loss / n_steps_this_epoch)
-        for metric in total_train_metrics:
-            self.tensorboard_logger.add_scalar(metric + "_avg", total_train_metrics[metric] / n_steps_this_epoch)
+        if n_steps_this_epoch > 0:
+            self.tensorboard_logger.set_step(epoch, 'train')
+            self.tensorboard_logger.add_scalar('train_loss_avg', total_train_loss / n_steps_this_epoch)
+            for metric in total_train_metrics:
+                self.tensorboard_logger.add_scalar(metric + "_avg", total_train_metrics[metric] / n_steps_this_epoch)
 
-        log = {'train_loss_avg': total_train_loss / n_steps_this_epoch,
-               'train_metrics_avg':
-                   {metric: total_train_metrics[metric] / n_steps_this_epoch
-                    for metric in total_train_metrics}}
-        if self.do_validation:
-            valid_log = self._valid_epoch(epoch)
-            log.update(valid_log)
+            log = {'train_loss_avg': total_train_loss / n_steps_this_epoch,
+                   'train_metrics_avg':
+                       {metric: total_train_metrics[metric] / n_steps_this_epoch
+                        for metric in total_train_metrics}}
+            if self.do_validation:
+                valid_log = self._valid_epoch(epoch)
+                log.update(valid_log)
+        else:
+            raise RuntimeError("Training epoch hat 0 batches.")
 
         return log
 
@@ -202,7 +209,7 @@ class Trainer(BaseTrainer):
                                self.model.context_right,
                                normalize_features=True,
                                phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
-                               split_files_max_seq_len=self.max_seq_length_train_curr,
+                               max_seq_length=self.max_seq_length_train_curr,
                                shuffle_frames=self.config['training']['shuffle_frames'])
 
         dataloader = KaldiDataLoader(dataset,
@@ -270,7 +277,7 @@ class Trainer(BaseTrainer):
                                self.model.context_right,
                                normalize_features=True,
                                phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
-                               split_files_max_seq_len=self.max_seq_length_train_curr,
+                               max_seq_length=self.max_seq_length_train_curr,
                                shuffle_frames=self.config['training']['shuffle_frames'])
 
         dataloader = KaldiDataLoader(dataset,
@@ -434,6 +441,8 @@ class Trainer(BaseTrainer):
     def to_device(self, data):
         if isinstance(data, dict):
             return {k: self.to_device(v) for k, v in data.items()}
+        if isinstance(data, list):
+            return [e.to(self.device) for e in data]
         else:
             return data.to(self.device)
 

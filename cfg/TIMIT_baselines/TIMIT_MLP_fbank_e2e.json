@@ -43,19 +43,16 @@
     }
   },
   "arch": {
-    "name": "MLP_mtl",
+    "name": "MLP",
     "framewise_labels": false,
     "loss": {
-      "name": "CTC_mtl",
+      "name": "CTC",
       "args": {
         "weight_mono": 1.0
       }
     },
     "metrics": [
-      "acc_lab_cd",
-      "err_lab_cd",
-      "acc_lab_mono",
-      "err_lab_mono"
+      "phone_error_rate"
     ]
   }
 }

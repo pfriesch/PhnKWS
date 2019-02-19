@@ -3,9 +3,9 @@ from base.base_model import BaseModel
 from nn_.net_modules.MLP import MLP
 
 
-class MLP_mtl(BaseModel):
+class MLP_mtl_Net(BaseModel):
     def __init__(self, input_feat_length, input_feat_name, lab_cd_num, lab_mono_num):
-        super(MLP_mtl, self).__init__()
+        super(MLP_mtl_Net, self).__init__()
         self.input_feat_name = input_feat_name
         self.input_feat_length = input_feat_length
         self.context_left = 5

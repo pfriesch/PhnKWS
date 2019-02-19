@@ -5,9 +5,9 @@ from nn_.net_modules.LSTM_cudnn import LSTM
 from nn_.net_modules.MLP import MLP
 
 
-class LSTM_phn(BaseModel):
+class LSTM_phn_Net(BaseModel):
     def __init__(self, input_feat_length, input_feat_name, lab_phn_num):
-        super(LSTM_phn, self).__init__()
+        super(LSTM_phn_Net, self).__init__()
 
         # self.lstm = LSTM(input_feat_length,
         #                  hidden_size=550,
