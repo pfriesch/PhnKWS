@@ -1,17 +1,11 @@
 import os
-import shutil
 import tempfile
-
-import torch
 
 from base.base_decoder import BaseDecoder
 from data import kaldi_io
-from kws_decoder.kalid_decoder.prepare_decode_graph import make_kaldi_decoding_graph
 from utils.logger_config import logger
 from utils.utils import run_shell, check_environment
 from ww_benchmark.engine import Engine
-import numpy as np
-import matplotlib.pyplot as plt
 
 
 # TODO kaldi feat extraction for a single file

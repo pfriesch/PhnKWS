@@ -8,7 +8,7 @@ from tqdm import tqdm
 from base.utils import resume_checkpoint
 from data.data_util import apply_context_single_feat
 from kaldi_decoding_scripts.decode_dnn_custom_graph import decode
-from kws_decoder.kalid_decoder.prepare_decode_graph import make_kaldi_decoding_graph
+from kws_decoder.kalid_decoder_kw.prepare_decode_graph import make_kaldi_decoding_graph
 from nn_.registries.model_registry import model_init
 from trainer import KaldiOutputWriter
 from utils.logger_config import logger
@@ -82,7 +82,7 @@ class BaseDecoder:
                         out_folder=self.out_dir,
                         featstrings=post_files)
 
-        #TODO filter result
+        # TODO filter result
 
         return result
 

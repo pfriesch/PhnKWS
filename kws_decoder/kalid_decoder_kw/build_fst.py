@@ -2,7 +2,7 @@ import os
 import shutil
 from glob import glob
 
-from kws_decoder.kalid_decoder.kaldi_const import EPS_SYM, SIL_SYM, UNK_SYM, SPN_SYM
+from kws_decoder.const_symbols import EPS_SYM, SIL_SYM, UNK_SYM, SPN_SYM
 from utils.utils import run_shell
 
 

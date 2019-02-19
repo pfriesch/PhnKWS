@@ -2,10 +2,9 @@ import os
 
 from utils.logger_config import logger
 from utils.utils import run_shell
-from kws_decoder.arpa_utils import make_kw_arpa, UNK_WORD
 
 
-def make_ctc_decoding_graph(keywords=['alexa', "left", "visual", "marvin"]):
+def make_ctc_decoding_graph(keywords):
     assert os.getcwd().endswith("eesen_decoder")  # TODO handle the relative folders
     eesen_utils = "utils"
     eesen_local = "local"
@@ -63,10 +62,10 @@ def make_ctc_decoding_graph(keywords=['alexa', "left", "visual", "marvin"]):
     run_shell(
         f"{eesen_utils}/ctc_compile_dict_token.sh --dict-type {dict_type} {dict_dir} {tmpdir} {final_lang_dir} ")
 
-    arpa_str = make_kw_arpa(keywords)
-    arpa_lm = f"{final_lang_dir}/keyword.arpa"
-    with open(arpa_lm, "w", encoding="utf-8") as f:
-        f.writelines(arpa_str)
+    # arpa_str = make_kw_arpa(keywords)
+    # arpa_lm = f"{final_lang_dir}/keyword.arpa"
+    # with open(arpa_lm, "w", encoding="utf-8") as f:
+    #     f.writelines(arpa_str)
 
     #
     # unk_fst_dir = "unk_fst"
