@@ -14,7 +14,10 @@ def get_phoneme_dict(phoneme_path, stress_marks=False, word_position_dependency=
         phoneme_list = f.readlines()
 
     # remove all disambiguation symbols
-    phoneme_list = [line.strip().split(" ") for line in phoneme_list if not "#" in line]
+    phoneme_list = [line.strip().split(" ") for line in phoneme_list
+                    if not "#" in line
+                    and "<eps>" not in line
+                    and "<EPS>" not in line]
 
     idx2phoneme = {int(idx): phoneme for phoneme, idx in phoneme_list}
 
@@ -34,6 +37,7 @@ def get_phoneme_dict(phoneme_path, stress_marks=False, word_position_dependency=
 
     idx2reducedIdx = {idx: phoneme2reducedIdx[phoneme] for idx, phoneme in idx2phoneme.items()}
 
+    # TODO check no <eps>
     return PhonemeDict(idx2phoneme, idx2reducedIdx, phoneme2reducedIdx)
 
 # if __name__ == '__main__':

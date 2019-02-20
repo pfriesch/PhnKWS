@@ -35,22 +35,21 @@ def main(graphdir, data, _dir,
 
     sdata = f"{data}/split{nj}"
 
-    ### Set up the features
-    logger.debug(f"feature: norm_vars({norm_vars}) add_deltas({add_deltas})")
-    feats = f"ark,s,cs:apply-cmvn --norm-vars={norm_vars} --utt2spk=ark:{sdata}/JOB/utt2spk " \
-            + f"scp:{sdata}/JOB/cmvn.scp scp:{sdata}/JOB/feats.scp ark:- |"
-    ##
-    if splice:
-        feats = f"{feats} splice-feats {splice_opts} ark:- ark:- |"
-    if add_deltas:
-        feats = f"{feats} add-deltas ark:- ark:- |"
-
-    if skip:
-        feats = f"{feats} subsample-feats --n={skip_frames} --offset={skip_offset} ark:- ark:- |"
+    # ### Set up the features
+    # logger.debug(f"feature: norm_vars({norm_vars}) add_deltas({add_deltas})")
+    # feats = f"ark,s,cs:apply-cmvn --norm-vars={norm_vars} --utt2spk=ark:{sdata}/JOB/utt2spk " \
+    #         + f"scp:{sdata}/JOB/cmvn.scp scp:{sdata}/JOB/feats.scp ark:- |"
+    # ##
+    # if splice:
+    #     feats = f"{feats} splice-feats {splice_opts} ark:- ark:- |"
+    # if add_deltas:
+    #     feats = f"{feats} add-deltas ark:- ark:- |"
+    #
+    # if skip:
+    #     feats = f"{feats} subsample-feats --n={skip_frames} --offset={skip_offset} ark:- ark:- |"
 
     # Decode for each of the acoustic scales
-    run_shell(f"net-output-extract --class-frame-counts={srcdir}/label.counts --apply-log=true {srcdir}/final.nnet " \
-              + f"\"{feats}\" ark:- | " \
+    run_shell(f"\"{feats}\" ark:- | " \
               + f"latgen-faster  --max-active={max_active} --max-mem={max_mem} --beam={beam} --lattice-beam={lattice_beam} " \
               + f"--acoustic-scale={acwt} --allow-partial=true --word-symbol-table={graphdir}/words.txt " \
               + f"{graphdir}/TLG.fst ark:- \"ark:|gzip -c > {_dir}/lat.1.gz\" ")

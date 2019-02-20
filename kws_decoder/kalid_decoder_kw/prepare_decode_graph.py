@@ -2,10 +2,10 @@ import os
 import shutil
 
 from kws_decoder.const_symbols import SIL_SYM, UNK_SYM, SPN_SYM
-from kws_decoder.kalid_decoder_kw.build_fst import build_kw_grammar_fst
+from kws_decoder.build_fst import build_kw_grammar_fst
 from utils.utils import run_shell
 
-KALDI_DIR = "/mnt/data/libs/kaldi"
+KALDI_ROOT = os.environ['KALDI_ROOT']
 
 
 def check_andsetup__dirs(out_dir, train_graph_dir, train_dict_folder, lexicon_path):
@@ -60,16 +60,16 @@ def filter_lexicon(keywords, libri_lexicon, out_folder):
 
 
 def make_kaldi_decoding_graph(keywords, out_dir,
-                              train_graph_dir=f"{KALDI_DIR}/egs/librispeech/s5/exp/tri4b",
-                              train_dict_folder=f"{KALDI_DIR}/egs/librispeech/s5/data/local/dict_nosp",
-                              lexicon_path=f"{KALDI_DIR}/egs/librispeech/s5/data/local/lm/librispeech-lexicon.txt",
+                              train_graph_dir=f"{KALDI_ROOT}/egs/librispeech/s5/exp/tri4b",
+                              train_dict_folder=f"{KALDI_ROOT}/egs/librispeech/s5/data/local/dict_nosp",
+                              lexicon_path=f"{KALDI_ROOT}/egs/librispeech/s5/data/local/lm/librispeech-lexicon.txt",
                               draw_G_L_fsts=True):
     libri_lexicon, lang_in_tmp, lang_tmp, final_lang_dir = \
         check_andsetup__dirs(out_dir, train_graph_dir, train_dict_folder, lexicon_path)
 
     if not os.path.exists(os.path.join(out_dir, "utils/prepare_lang.sh")):
-        os.symlink(f"{KALDI_DIR}/egs/wsj/s5/utils", os.path.join(out_dir, "utils"))
-        os.symlink(f"{KALDI_DIR}/egs/wsj/s5/steps", os.path.join(out_dir, "steps"))
+        os.symlink(f"{KALDI_ROOT}/egs/wsj/s5/utils", os.path.join(out_dir, "utils"))
+        os.symlink(f"{KALDI_ROOT}/egs/wsj/s5/steps", os.path.join(out_dir, "steps"))
 
     filter_lexicon(keywords, libri_lexicon, out_folder=lang_in_tmp)
 

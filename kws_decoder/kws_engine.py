@@ -1,7 +1,7 @@
 import os
 import tempfile
 
-from base.base_decoder import BaseDecoder
+from base.base_decoder import get_decoder
 from data import kaldi_io
 from utils.logger_config import logger
 from utils.utils import run_shell, check_environment
@@ -49,14 +49,14 @@ class KWSEngine(Engine):
         self.tmp_dir = tempfile.TemporaryDirectory()
         # TODO debug mode
 
-        logger.configure_logger(self.tmp_dir)
+        logger.configure_logger(self.tmp_dir.name)
         check_environment()
 
         assert isinstance(keywords, list)
         self.keywords = keywords
         self.sensitivity = sensitivity
 
-        self.decoder = BaseDecoder(model_path, keywords, self.tmp_dir.name)
+        self.decoder = get_decoder(model_path, keywords, self.tmp_dir.name)
 
     def process_batch(self, wav_files):
         _wav_files = set()

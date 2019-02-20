@@ -20,7 +20,7 @@ def check_config(config):
 
 def setup_run(config):
     set_seed(config['exp']['seed'])
-    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.deterministic = True  # Otherwise I got nans for the CTC gradient
 
     dataset_definition = get_dataset_definition(config['dataset']['name'], config['dataset']['data_use']['train_with'])
     config['dataset']['dataset_definition'] = dataset_definition
