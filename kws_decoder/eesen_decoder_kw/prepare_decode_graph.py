@@ -66,13 +66,15 @@ def filter_lexicon(keywords, libri_lexicon, out_lexicon):
         f.writelines(sorted(lines))
 
 
-def main(keywords, lexicon_path, phn2idx, draw_G_L_fsts=False):
-    tmpdir = "tmp"
+def make_ctc_decoding_graph(keywords, phn2idx, tmpdir,
+                            lexicon_path=f"{KALDI_ROOT}/egs/librispeech/s5/data/local/lm/librispeech-lexicon.txt",
+                            draw_G_L_fsts=False):
+    tmpdir = os.path.join(tmpdir, "tmp")
     if os.path.isdir(tmpdir):
         shutil.rmtree(tmpdir)
     os.makedirs(tmpdir)
 
-    graph_dir = "graph_dir"
+    graph_dir = os.path.join(tmpdir, "graph_dir")
     if os.path.isdir(graph_dir):
         shutil.rmtree(graph_dir)
     os.makedirs(graph_dir)
@@ -91,19 +93,21 @@ def main(keywords, lexicon_path, phn2idx, draw_G_L_fsts=False):
     assert os.path.exists(lexicon_path)
 
     filter_lexicon(keywords, lexicon_path, f"{tmpdir}/lexicon.txt")
-    lexicon_path = f"{tmpdir}/lexicon.txt"
 
     # Add probabilities to lexicon entries. There is in fact no point of doing this here since all the entries have 1.0.
     # But utils/make_lexicon_fst.pl requires a probabilistic version, so we just leave it as it is. 
-    # run_shell(f"perl -ape 's/(\S+\s+)(.+)/${{1}}1.0\\t$2/;' < {lexicon_path} > {tmpdir}/lexiconp.txt")
+    run_shell(f"perl -ape 's/(\S+\s+)(.+)/${{1}}1.0\\t$2/;' < {tmpdir}/lexicon.txt > {tmpdir}/lexiconp.txt")
 
     # Add disambiguation symbols to the lexicon. This is necessary for determinizing the composition of L.fst and G.fst.
     # Without these symbols, determinization will fail. 
 
-    assert os.path.exists("utils/add_lex_disambig.pl")
-    assert os.access("utils/add_lex_disambig.pl", os.X_OK)
+    eesen_utils_path = os.path.join(os.getcwd(), "kws_decoder", "eesen_utils")
+
+    assert os.path.exists(f"{eesen_utils_path}/add_lex_disambig.pl")
+    assert os.access(f"{eesen_utils_path}/add_lex_disambig.pl", os.X_OK)
     ndisambig = int(
-        run_shell(f"utils/add_lex_disambig.pl {tmpdir}/lexicon.txt {tmpdir}/lexicon_disambig.txt").strip())
+        run_shell(
+            f"{eesen_utils_path}/add_lex_disambig.pl {tmpdir}/lexiconp.txt {tmpdir}/lexiconp_disambig.txt").strip())
     assert isinstance(ndisambig, int)
     ndisambig += 1
 
@@ -136,7 +140,7 @@ def main(keywords, lexicon_path, phn2idx, draw_G_L_fsts=False):
 
     # Encode the words with indices. Will be used in lexicon and language model FST compiling.
     run_shell(f"""
-    cat {tmpdir}/lexicon.txt | awk '{{print $1}}' | sort | uniq  | awk '
+    cat {tmpdir}/lexiconp.txt | awk '{{print $1}}' | sort | uniq  | awk '
       BEGIN {{
         print "<eps> 0";
       }} 
@@ -153,7 +157,10 @@ def main(keywords, lexicon_path, phn2idx, draw_G_L_fsts=False):
     word_disambig_symbol = int(run_shell(f"grep \#0 {graph_dir}/words.txt | awk '{{print $2}}'").strip())
 
     # TODO why does piping not work?
-    lexicon_fst = run_shell(f"utils/make_lexicon_fst.pl {tmpdir}/lexicon_disambig.txt 0 \"SIL\" #{ndisambig}")
+    assert os.path.exists(f"{eesen_utils_path}/make_lexicon_fst.pl")
+    assert os.access(f"{eesen_utils_path}/make_lexicon_fst.pl", os.X_OK)
+    lexicon_fst = run_shell(
+        f"{eesen_utils_path}/make_lexicon_fst.pl --pron-probs {tmpdir}/lexiconp_disambig.txt 0 \"SIL\" #{ndisambig}")
 
     run_shell(f"echo \"{lexicon_fst}\" | "
               + f"fstcompile --isymbols={graph_dir}/tokens.txt --osymbols={graph_dir}/words.txt "
@@ -164,7 +171,7 @@ def main(keywords, lexicon_path, phn2idx, draw_G_L_fsts=False):
     if draw_G_L_fsts:
         run_shell(
             f"fstdraw --isymbols={graph_dir}/tokens.txt "
-            + f"--osymbols={graph_dir}/words.txt {graph_dir}/L.fst | dot -Tpdf -o{graph_dir}/L.pdf")
+            + f"--osymbols={graph_dir}/words.txt {graph_dir}/L.fst | dot -Tpdf -o /mnt/data/drawn_graphs/L.pdf")
 
     ########## MkGraph
 
@@ -174,22 +181,30 @@ def main(keywords, lexicon_path, phn2idx, draw_G_L_fsts=False):
     if draw_G_L_fsts:
         run_shell(
             f"fstdraw --isymbols={graph_dir}/words.txt "
-            + f"--osymbols={graph_dir}/words.txt {graph_dir}/G.fst | dot -Tpdf -o{graph_dir}/G.pdf")
+            + f"--osymbols={graph_dir}/words.txt {graph_dir}/G.fst | dot -Tpdf -o /mnt/data/drawn_graphs/G.pdf")
 
     run_shell(f"fsttablecompose {graph_dir}/L.fst {graph_dir}/G.fst | fstdeterminizestar --use-log=true | "
               + f"fstminimizeencoded | fstarcsort --sort_type=ilabel > {graph_dir}/LG.fst")
     run_shell(f"fsttablecompose {graph_dir}/T.fst {graph_dir}/LG.fst > {graph_dir}/TLG.fst")
 
+    if draw_G_L_fsts:
+        run_shell(
+            f"fstdraw --isymbols={graph_dir}/tokens.txt "
+            + f"--osymbols={graph_dir}/tokens.txt {graph_dir}/T.fst | dot -Tpdf -o /mnt/data/drawn_graphs/T.pdf")
+
+        run_shell(
+            f"fstdraw --isymbols={graph_dir}/tokens.txt "
+            + f"--osymbols={graph_dir}/words.txt {graph_dir}/TLG.fst | dot -Tpdf -o /mnt/data/drawn_graphs/TLG.pdf")
+
     return os.path.abspath(graph_dir)
 
-
-if __name__ == '__main__':
-    config = \
-        torch.load("/mnt/data/pytorch-kaldi/exp/TIMIT_MLP_fbank_20190219_172928/checkpoints/checkpoint-epoch33.pth",
-                   map_location='cpu')['config']
-    phoneme_dict = get_phoneme_dict(config['dataset']['dataset_definition']['phn_mapping_file'],
-                                    stress_marks=True, word_position_dependency=False)
-
-    print((main(keywords=['alexa', 'left', 'right'],
-                lexicon_path=f"{KALDI_ROOT}/egs/librispeech/s5/data/local/lm/librispeech-lexicon.txt",
-                phn2idx=phoneme_dict.phoneme2reducedIdx, draw_G_L_fsts=True)))
+# if __name__ == '__main__':
+#     config = \
+#         torch.load("/mnt/data/pytorch-kaldi/exp/TIMIT_MLP_fbank_20190219_172928/checkpoints/checkpoint-epoch33.pth",
+#                    map_location='cpu')['config']
+#     phoneme_dict = get_phoneme_dict(config['dataset']['dataset_definition']['phn_mapping_file'],
+#                                     stress_marks=True, word_position_dependency=False)
+#
+#     print((main(keywords=['alexa', 'left', 'right'],
+#                 lexicon_path=f"{KALDI_ROOT}/egs/librispeech/s5/data/local/lm/librispeech-lexicon.txt",
+#                 phn2idx=phoneme_dict.phoneme2reducedIdx, draw_G_L_fsts=True)))

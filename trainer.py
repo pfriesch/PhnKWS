@@ -11,7 +11,6 @@ from tqdm import tqdm
 from data.kaldi_dataset import KaldiDataset
 from base.base_trainer import BaseTrainer
 from data import kaldi_io
-from data.data_util import load_counts
 from data.kaldi_data_loader import KaldiDataLoader
 from kaldi_decoding_scripts.decode_dnn import decode, best_wer
 from utils.logger_config import logger
@@ -329,6 +328,7 @@ class Trainer(BaseTrainer):
                             if self.config["arch"]["framewise_labels"] == "shuffled_frames":
                                 out_save = output[output_label].data.cpu().numpy()
                             else:
+                                raise NotImplementedError("TODO make sure the right dimension is taken")
                                 out_save = output[output_label][:, :-1].data.cpu().numpy()
 
                             if len(out_save.shape) == 3 and out_save.shape[0] == 1:
@@ -346,7 +346,16 @@ class Trainer(BaseTrainer):
                                         warned_size = True
                                     counts = counts[1:]
                                 # Normalize by output count
-                                out_save = out_save - np.log(counts / np.sum(counts))
+                                if ctc:
+                                    blank_scale = 1.0
+                                    # TODO try different blank_scales 4.0 5.0 6.0 7.0
+                                    counts[0] /= blank_scale
+                                    # for i in range(1, 8):
+                                    #     counts[i] /= noise_scale #TODO try noise_scale for SIL SPN etc I guess
+
+                                prior = np.log(counts / np.sum(counts))
+
+                                out_save = out_save - np.log(prior)
 
                             assert len(out_save.shape) == 2
                             assert len(sample_names) == 1

@@ -14,6 +14,21 @@ from trainer import KaldiOutputWriter
 from utils.logger_config import logger
 from utils.util import ensure_dir
 
+import matplotlib.pyplot as plt
+
+
+def plot(sample_name, output, phn_dict):
+    top_phns = [x[0] for x in list(sorted(enumerate(output.max(axis=0)), key=lambda x: x[1], reverse=True))[:20]]
+
+    fig = plt.figure()
+    ax = fig.subplots()
+    for i in top_phns:
+        ax.plot(output[:, i], label=phn_dict[i])
+    ax.legend()
+    ax.set_title(sample_name)
+    fig.savefig(f"output_{sample_name}.png")
+    fig.clf()
+
 
 class KaldiDecoder:
     def __init__(self, model_path, keywords, tmpdir):
@@ -38,17 +53,22 @@ class KaldiDecoder:
         with open(config_save_path, 'w') as f:
             json.dump(self.config, f, indent=4, sort_keys=False)
 
-        self.epoch, self.global_step, self.decoding_norm_data = resume_checkpoint(model_path, self.model, logger)
+        self.epoch, self.global_step = resume_checkpoint(model_path, self.model, logger)
 
         graph_dir = make_kaldi_decoding_graph(keywords, tmpdir)
         self.graph_path = os.path.join(graph_dir, "HCLG.fst")
+        assert os.path.exists(self.graph_path)
         self.words_path = os.path.join(graph_dir, "words.txt")
+        assert os.path.exists(self.words_path)
         self.alignment_model_path = os.path.join(graph_dir, "final.mdl")
+        assert os.path.exists(self.alignment_model_path)
 
     def is_keyword_batch(self, input_features, sensitivity):
         post_files = []
 
-        with KaldiOutputWriter(self.out_dir, "keyword", self.epoch, self.config) as writer:
+        plot_num = 0
+
+        with KaldiOutputWriter(self.out_dir, "keyword", self.model.out_names, self.epoch, self.config) as writer:
             output_label = 'out_cd'
             post_files.append(writer.post_file[output_label].name)
             for sample_name in tqdm(input_features, desc="computing acoustic features:"):
@@ -65,13 +85,17 @@ class KaldiDecoder:
                     output = output - np.log(counts / np.sum(counts))
 
                 output = np.exp(output)
+                if plot_num < 5:
+                    plot(sample_name, output, self.phoneme_dict.idx2phoneme)
+                    plot_num += 1
 
                 assert len(output.shape) == 2
+                assert np.sum(np.isnan(output)) == 0, "NaN in output"
                 writer.write_mat(output_label, output.squeeze(), sample_name)
         self.config['decoding']['scoring_type'] = 'just_transcript'
         #### DECODING ####
         logger.debug("Decoding...")
-        result = decode(**self.config['decoding'],
+        result = decode(**self.config['dataset']['dataset_definition']['decoding'],
                         alignment_model_path=self.alignment_model_path,
                         words_path=self.words_path,
                         graph_path=self.graph_path,

@@ -26,7 +26,7 @@ def test():
 
     files, keywords = get_files(data_folder, "validation_list.txt")
     random.shuffle(files)
-    files = files[:200]
+    files = files[:20]
     keywords = [kw.upper() for kw in keywords]
     print(keywords)
 

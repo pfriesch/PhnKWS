@@ -61,9 +61,9 @@ def check_environment():
                          + f":{KALDI_ROOT}/src/latbin/" \
                          + f":{KALDI_ROOT}/src/nnetbin/" \
                          + f":{KALDI_ROOT}/src/nnet2bin/" \
-                         + f":{KALDI_ROOT}/src/kwsbin" \
+                         + f":{KALDI_ROOT}/src/kwsbin/" \
                          + f":{os.environ['PATH']}"
-    # TODO find better method
+    #### KALDI ####
 
     run_shell("which hmm-info")
     run_shell("which lattice-align-phones")
@@ -89,17 +89,20 @@ def check_environment():
     run_shell("which lattice-add-penalty")
     run_shell("which lattice-scale")
 
+    #### /KALDI ####
 
-def run_shell(cmd, pipefail=True):
+
+def run_shell(cmd, stdin=None, pipefail=True):
     """
-
-
     :param cmd:
+    :param stdin:
     :param pipefail:    From bash man: If pipefail is enabled, the pipeline's return status is
      the value of the last (rightmost) command to exit with a non-zero status, or zero if all
      commands exit successfully.
     :return:
     """
+    assert stdin is None or isinstance(stdin, bytes), f"Expected bytes as input for stdin, got {type(stdin)}"
+
     logger.debug("RUN: {}".format(cmd))
     if cmd.split(" ")[0].endswith(".sh"):
         if not (os.path.isfile(cmd.split(" ")[0]) and os.access(cmd.split(" ")[0], os.X_OK)):
@@ -111,7 +114,7 @@ def run_shell(cmd, pipefail=True):
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, executable='/bin/bash',
                          env=os.environ.copy())
 
-    (output, err) = p.communicate()
+    (output, err) = p.communicate(stdin)
     output = output.decode("utf-8")
     err = err.decode("utf-8")
     return_code = p.wait()
@@ -124,4 +127,3 @@ def run_shell(cmd, pipefail=True):
 
     logger.debug("OUTPUT: {}".format(output))
     return output
-

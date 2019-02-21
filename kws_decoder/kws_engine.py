@@ -68,8 +68,8 @@ class KWSEngine(Engine):
                 _wav_files.add(file)
         wav_files = list(_wav_files)
 
-        tmp_scp, spk2utt_path, utt2spk_path = self.preppare_tmp_files(wav_files, self.tmp_dir)
-        feats = get_kaldi_feats(tmp_scp, self.tmp_dir, spk2utt_path, utt2spk_path)
+        tmp_scp, spk2utt_path, utt2spk_path = self.preppare_tmp_files(wav_files, self.tmp_dir.name)
+        feats = get_kaldi_feats(tmp_scp, self.tmp_dir.name, spk2utt_path, utt2spk_path)
 
         result = self.decoder.is_keyword_batch(feats, self.sensitivity)
         return result

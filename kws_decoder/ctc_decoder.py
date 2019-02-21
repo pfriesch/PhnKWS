@@ -7,12 +7,29 @@ from tqdm import tqdm
 
 from base.utils import resume_checkpoint
 from data.data_util import apply_context_single_feat
-from kaldi_decoding_scripts.decode_dnn_custom_graph import decode
-from kws_decoder.kalid_decoder_kw.prepare_decode_graph import make_kaldi_decoding_graph
+from data.phoneme_dict import get_phoneme_dict
+from kaldi_decoding_scripts.ctc_decoding.decode_dnn_custom_graph import decode_ctc
+from kws_decoder.eesen_decoder_kw.prepare_decode_graph import make_ctc_decoding_graph
 from nn_.registries.model_registry import model_init
 from trainer import KaldiOutputWriter
 from utils.logger_config import logger
 from utils.util import ensure_dir
+
+import matplotlib.pyplot as plt
+
+
+def plot(sample_name, output, phn_dict):
+    top_phns = [x[0] for x in list(sorted(enumerate(output.max(axis=0)), key=lambda x: x[1], reverse=True))[:10]]
+
+    phn_dict[0] = "<blk>"
+    fig = plt.figure()
+    ax = fig.subplots()
+    for i in top_phns:
+        ax.plot(output[:, i], label=phn_dict[i])
+    ax.legend()
+    ax.set_title(sample_name)
+    fig.savefig(f"output_{sample_name}.png")
+    fig.clf()
 
 
 class CTCDecoder:
@@ -38,18 +55,24 @@ class CTCDecoder:
         with open(config_save_path, 'w') as f:
             json.dump(self.config, f, indent=4, sort_keys=False)
 
-        self.epoch, self.global_step, self.decoding_norm_data = resume_checkpoint(model_path, self.model, logger)
+        self.epoch, self.global_step = resume_checkpoint(model_path, self.model, logger)
 
-        graph_dir = make_kaldi_decoding_graph(keywords, tmpdir)
+        self.phoneme_dict = get_phoneme_dict(self.config['dataset']['dataset_definition']['phn_mapping_file'])
+
+        graph_dir = make_ctc_decoding_graph(keywords, self.phoneme_dict.phoneme2reducedIdx, tmpdir,
+                                            draw_G_L_fsts=True)
         self.graph_path = os.path.join(graph_dir, "TLG.fst")
+        assert os.path.exists(self.graph_path)
         self.words_path = os.path.join(graph_dir, "words.txt")
-        self.alignment_model_path = os.path.join(graph_dir, "final.mdl")
+        # self.alignment_model_path = os.path.join(graph_dir, "final.mdl")
+        # assert os.path.exists(self.alignment_model_path)
 
     def is_keyword_batch(self, input_features, sensitivity):
         post_files = []
 
-        with KaldiOutputWriter(self.out_dir, "keyword", self.epoch, self.config) as writer:
-            output_label = 'out_cd'
+
+        with KaldiOutputWriter(self.out_dir, "keyword", self.model.out_names, self.epoch, self.config) as writer:
+            output_label = 'out_phn'
             post_files.append(writer.post_file[output_label].name)
             for sample_name in tqdm(input_features, desc="computing acoustic features:"):
                 input_feature = {"fbank": self.preprocess_feat(input_features[sample_name])}
@@ -59,24 +82,34 @@ class CTCDecoder:
 
                 output = output.detach().squeeze(1).numpy()
 
-                if self.config['test'][output_label]['normalize_posteriors']:
-                    # read the config file
-                    counts = self.decoding_norm_data[output_label]["normalize_with_counts"]
-                    output = output - np.log(counts / np.sum(counts))
+                # if self.config['test'][output_label]['normalize_posteriors']:
+                counts = self.config['dataset']['dataset_definition']['data_info']['labels']['lab_phn']['lab_count']
+                # blank_scale = 1.0
+                # TODO try different blank_scales 4.0 5.0 6.0 7.0
+                # counts[0] /= blank_scale
+                # for i in range(1, 8):
+                #     counts[i] /= noise_scale #TODO try noise_scale for SIL SPN etc I guess
+
+                # prior = counts / np.sum(counts)
+
+                # output = output - np.log(prior)
 
                 output = np.exp(output)
+                if plot_num < 5:
+                    plot(sample_name, output, self.phoneme_dict.idx2phoneme)
+                    plot_num += 1
 
                 assert len(output.shape) == 2
+                assert np.sum(np.isnan(output)) == 0, "NaN in output"
                 writer.write_mat(output_label, output.squeeze(), sample_name)
         self.config['decoding']['scoring_type'] = 'just_transcript'
         #### DECODING ####
         logger.debug("Decoding...")
-        result = decode(**self.config['decoding'],
-                        alignment_model_path=self.alignment_model_path,
-                        words_path=self.words_path,
-                        graph_path=self.graph_path,
-                        out_folder=self.out_dir,
-                        featstrings=post_files)
+        result = decode_ctc(**self.config['dataset']['dataset_definition']['decoding'],
+                            words_path=self.words_path,
+                            graph_path=self.graph_path,
+                            out_folder=self.out_dir,
+                            featstrings=post_files)
 
         # TODO filter result
 
