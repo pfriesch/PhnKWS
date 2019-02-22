@@ -61,7 +61,7 @@ def setup_run(config):
     return model, loss, metrics, optimizers, config, lr_schedulers
 
 
-def main(config_path, resume_path, overfit_small_batch):
+def main(config_path, resume_path, overfit_small_batch, warm_start):
     config = read_json(config_path)
     check_config(config)
 
@@ -112,6 +112,10 @@ def main(config_path, resume_path, overfit_small_batch):
 
     model, loss, metrics, optimizers, config, lr_schedulers = setup_run(config)
 
+    if warm_start is not None:
+        assert hasattr(model, "load_warm_start")
+        model.load_warm_start(warm_start)
+
     trainer = Trainer(model, loss, metrics, optimizers, lr_schedulers,
                       resume_path, config,
                       do_validation=True,
@@ -125,6 +129,8 @@ if __name__ == '__main__':
                         help='config file path (default: None)')
     parser.add_argument('-r', '--resume', default=None, type=str,
                         help='path to latest checkpoint (default: None)')
+    parser.add_argument('-w', '--warm_start', default=None, type=str,
+                        help='path to checkpoint to load weights from for warm start (default: None)')
     parser.add_argument('-d', '--device', default=None, type=str,
                         help='indices of GPUs to enable (default: all)')
     parser.add_argument('-o', '--overfit', action='store_true',
@@ -134,4 +140,4 @@ if __name__ == '__main__':
     if args.device:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.device
 
-    main(args.config, args.resume, args.overfit)
+    main(args.config, args.resume, args.overfit, args.warm_start)

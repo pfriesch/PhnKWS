@@ -26,6 +26,8 @@ def lr_scheduler_init(config, optimizers):
                                                      mode='min',
                                                      factor=config['training']['lr_scheduler']['arch_halving_factor'],
                                                      patience=config['training']['lr_scheduler']['patience'],
+                                                     cooldown=config['training']['lr_scheduler']['cooldown'],
+                                                     min_lr=config['training']['lr_scheduler']['min_lr'],
                                                      verbose=True,
                                                      threshold=config['training']['lr_scheduler'][
                                                          'arch_improvement_threshold'],

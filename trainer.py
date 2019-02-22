@@ -182,6 +182,7 @@ class Trainer(BaseTrainer):
                     self.tensorboard_logger.add_scalar(metric + "_avg",
                                                        total_train_metrics[metric] / n_steps_this_epoch)
 
+            # TODO add this flag to vlaid since ctcdecode is fucking slow or do it async
             if self.config['exp']['compute_train_metrics']:
                 log = {'train_loss_avg': total_train_loss / n_steps_this_epoch,
                        'train_metrics_avg':

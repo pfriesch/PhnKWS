@@ -1,6 +1,9 @@
+import torch
+
 from base.base_model import BaseModel
 
 from nn_.net_modules.MLP import MLP
+from utils.logger_config import logger
 
 
 class MLPNet(BaseModel):
@@ -60,3 +63,12 @@ class MLPNet(BaseModel):
             raise ValueError
 
         return {self.out_names[0]: out_phn}
+
+    def load_warm_start(self, path_to_checkpoint):
+        checkpoint = torch.load(path_to_checkpoint, map_location='cpu')
+        _state_dict = checkpoint['state_dict']
+        _state_dict_new = {k: v for k, v in _state_dict.items() if 'MLP.layers.5' not in k}
+        _state_dict_new.update({k: v for k, v in self.state_dict().items() if 'MLP.layers.5' in k})
+
+        self.load_state_dict(_state_dict_new)
+        logger.info(f"Warm start with model from {path_to_checkpoint}")

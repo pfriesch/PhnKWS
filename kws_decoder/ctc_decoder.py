@@ -31,9 +31,13 @@ def feat_without_context(input_feat):
 
 
 def plot(sample_name, input_feat, output, phn_dict):
-    top_phns = [x[0] for x in list(sorted(enumerate(output.max(axis=0)), key=lambda x: x[1], reverse=True))[:10]]
+    top_phns = [x[0] for x in list(sorted(enumerate(output.max(axis=0)), key=lambda x: x[1], reverse=True))[:11]
+                if output[:, x[0]].max() > 0.15]
 
+    phn_dict = {k + 1: v for k, v in phn_dict.items()}
     phn_dict[0] = "<blk>"
+    assert len(phn_dict) == output.shape[1]
+
     fig = plt.figure()
     ax = fig.subplots()
     in_feat = feat_without_context(input_feat)
@@ -42,8 +46,12 @@ def plot(sample_name, input_feat, output, phn_dict):
               extent=[-(in_feat.shape[0] - output.shape[0]), in_feat.shape[0], 0, 100],
               alpha=0.5)
     for i in top_phns:
-        ax.plot(output[:, i] * 100, label=phn_dict[i])
-    ax.legend()
+        ax.plot(output[:, i] * 100)
+        if i != 0:
+            x = (output[:, i] * 100).argmax()
+            y = (output[:, i] * 100)[x]
+            ax.annotate(phn_dict[i], xy=(x, y))
+    # ax.legend()
     ax.set_title(sample_name)
     fig.savefig(f"output_{sample_name}.png")
     fig.clf()
@@ -74,7 +82,7 @@ class CTCDecoder:
 
         self.epoch, self.global_step = resume_checkpoint(model_path, self.model, logger)
 
-        self.phoneme_dict = get_phoneme_dict(self.config['dataset']['dataset_definition']['phn_mapping_file'])
+        self.phoneme_dict = self.config['dataset']['dataset_definition']['phoneme_dict']
 
         graph_dir = make_ctc_decoding_graph(keywords, self.phoneme_dict.phoneme2reducedIdx, tmpdir,
                                             draw_G_L_fsts=True)
