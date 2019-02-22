@@ -1,12 +1,17 @@
 import collections
 
-PhonemeDict = collections.namedtuple("PhonemeDict", ["idx2phoneme", "idx2reducedIdx", "phoneme2reducedIdx"])
+PhonemeDict = collections.namedtuple("PhonemeDict",
+                                     ["idx2phoneme",
+                                      "idx2reducedIdx",
+                                      "phoneme2reducedIdx",
+                                      "reducedIdx2phoneme"])
 
 
-def load_phoneme_dict(idx2phoneme, idx2reducedIdx, phoneme2reducedIdx):
+def load_phoneme_dict(idx2phoneme, idx2reducedIdx, phoneme2reducedIdx, reducedIdx2phoneme):
     idx2phoneme = {int(k): v for k, v in idx2phoneme.items()}
     idx2reducedIdx = {int(k): v for k, v in idx2reducedIdx.items()}
-    return PhonemeDict(idx2phoneme, idx2reducedIdx, phoneme2reducedIdx)
+    reducedIdx2phoneme = {int(k): v for k, v in reducedIdx2phoneme.items()}
+    return PhonemeDict(idx2phoneme, idx2reducedIdx, phoneme2reducedIdx, reducedIdx2phoneme)
 
 
 def get_phoneme_dict(phoneme_path, stress_marks=False, word_position_dependency=False):
@@ -35,10 +40,12 @@ def get_phoneme_dict(phoneme_path, stress_marks=False, word_position_dependency=
     phoneme2reducedIdx = {phoneme: idx for idx, phoneme in
                           enumerate(list(collections.OrderedDict.fromkeys(idx2phoneme.values()).keys()))}
 
+    reducedIdx2phoneme = {idx: phoneme for phoneme, idx in phoneme2reducedIdx.items()}
+
     idx2reducedIdx = {idx: phoneme2reducedIdx[phoneme] for idx, phoneme in idx2phoneme.items()}
 
     # TODO check no <eps>
-    return PhonemeDict(idx2phoneme, idx2reducedIdx, phoneme2reducedIdx)
+    return PhonemeDict(idx2phoneme, idx2reducedIdx, phoneme2reducedIdx, reducedIdx2phoneme)
 
 # if __name__ == '__main__':
 # get_dict("/mnt/data/libs/kaldi/egs/librispeech/s5/data/lang/phones.txt")

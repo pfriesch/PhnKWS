@@ -4,6 +4,7 @@ import datetime
 import torch
 
 from cfg.dataset_definition.get_dataset_definition import get_dataset_definition
+from data.phoneme_dict import get_phoneme_dict
 from nn_ import model_init, optimizer_init, lr_scheduler_init, metrics_init, loss_init
 from utils.logger_config import logger
 from utils.nvidia_smi import nvidia_smi_enabled
@@ -24,6 +25,27 @@ def setup_run(config):
 
     dataset_definition = get_dataset_definition(config['dataset']['name'], config['dataset']['data_use']['train_with'])
     config['dataset']['dataset_definition'] = dataset_definition
+
+    if 'lab_phn' in config['dataset']['labels_use'][0]:
+        if len(config['dataset']['labels_use']) == 0:
+            raise NotImplementedError("Multiple output labels not implemented for e2e/ctc")
+
+        # e2e ctc
+        phoneme_dict = get_phoneme_dict(config['dataset']['dataset_definition']['phn_mapping_file'],
+                                        stress_marks=False, word_position_dependency=False)
+        dataset_definition['data_info']['labels']['lab_phn']['num_lab'] = len(phoneme_dict.phoneme2reducedIdx)
+        lab_count_new = [0] * len(phoneme_dict.phoneme2reducedIdx)
+        for lab_idx, count in enumerate(dataset_definition['data_info']['labels']['lab_phn']['lab_count'], start=1):
+            lab_count_new[phoneme_dict.idx2reducedIdx[lab_idx]] += count
+        dataset_definition['data_info']['labels']['lab_phn']['lab_count'] = lab_count_new
+
+    else:
+        # framewise
+        phoneme_dict = get_phoneme_dict(config['dataset']['dataset_definition']['phn_mapping_file'],
+                                        stress_marks=True, word_position_dependency=True)
+
+    del config['dataset']['dataset_definition']['phn_mapping_file']
+    config['dataset']['dataset_definition']['phoneme_dict'] = phoneme_dict
 
     model = model_init(config)
 

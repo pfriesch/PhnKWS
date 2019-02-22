@@ -8,15 +8,15 @@
     "labels": {
       "lab_cd": {
         "num_lab": null,
-        "lab_count_file": null
+        "lab_count": null
       },
       "lab_mono": {
         "num_lab": null,
-        "lab_count_file": null
+        "lab_count": null
       },
       "lab_phn": {
         "num_lab": null,
-        "lab_count_file": null
+        "lab_count": null
       }
     }
   },
@@ -33,21 +33,18 @@
         "lab_cd": {
           "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
           "label_opts": "ali-to-pdf",
-          "lab_count_file": "auto",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         },
         "lab_mono": {
           "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
           "label_opts": "ali-to-phones --per-frame=true",
-          "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         },
         "lab_phn": {
           "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali",
           "label_opts": "ali-to-phones",
-          "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/train/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
@@ -64,21 +61,19 @@
         "lab_cd": {
           "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
           "label_opts": "ali-to-pdf",
-          "lab_count_file": "auto",
+          "lab_count": "auto",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         },
         "lab_mono": {
           "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
           "label_opts": "ali-to-phones --per-frame=true",
-          "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         },
         "lab_phn": {
           "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_dev",
           "label_opts": "ali-to-phones",
-          "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/dev/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }
@@ -95,21 +90,18 @@
         "lab_cd": {
           "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
           "label_opts": "ali-to-pdf",
-          "lab_count_file": "auto",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         },
         "lab_mono": {
           "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
           "label_opts": "ali-to-phones --per-frame=true",
-          "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         },
         "lab_phn": {
           "label_folder": "/mnt/data/libs/kaldi/egs/timit/s5/exp/dnn4_pretrain-dbn_dnn_ali_test",
           "label_opts": "ali-to-phones",
-          "lab_count_file": "none",
           "lab_data_folder": "/mnt/data/libs/kaldi/egs/timit/s5/data/test/",
           "lab_graph": "/mnt/data/libs/kaldi/egs/timit/s5/exp/tri3/graph"
         }

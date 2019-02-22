@@ -70,6 +70,7 @@ class CTCDecoder:
     def is_keyword_batch(self, input_features, sensitivity):
         post_files = []
 
+        plot_num = 0
 
         with KaldiOutputWriter(self.out_dir, "keyword", self.model.out_names, self.epoch, self.config) as writer:
             output_label = 'out_phn'
@@ -96,13 +97,14 @@ class CTCDecoder:
 
                 output = np.exp(output)
                 if plot_num < 5:
-                    plot(sample_name, output, self.phoneme_dict.idx2phoneme)
+                    plot(sample_name, output, {idx: phn for phn, idx in self.phoneme_dict.phoneme2reducedIdx.items()}
+                         )
                     plot_num += 1
 
                 assert len(output.shape) == 2
                 assert np.sum(np.isnan(output)) == 0, "NaN in output"
                 writer.write_mat(output_label, output.squeeze(), sample_name)
-        self.config['decoding']['scoring_type'] = 'just_transcript'
+        # self.config['decoding']['scoring_type'] = 'just_transcript'
         #### DECODING ####
         logger.debug("Decoding...")
         result = decode_ctc(**self.config['dataset']['dataset_definition']['decoding'],

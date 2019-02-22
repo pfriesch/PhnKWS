@@ -67,7 +67,7 @@ class Trainer(BaseTrainer):
                                self.model.context_left,
                                self.model.context_right,
                                normalize_features=True,
-                               phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
+                               phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
                                max_seq_len=self.max_seq_length_train_curr,
                                max_label_length=self.max_label_length,
                                shuffle_frames=self.config['training']['shuffle_frames'],
@@ -221,7 +221,7 @@ class Trainer(BaseTrainer):
                                self.model.context_left,
                                self.model.context_right,
                                normalize_features=True,
-                               phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
+                               phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
                                max_seq_len=self.config['training']['max_seq_length_valid'],
                                max_label_length=self.max_label_length,
                                shuffle_frames=self.config['training']['shuffle_frames'])
@@ -288,7 +288,7 @@ class Trainer(BaseTrainer):
                                self.model.context_left,
                                self.model.context_right,
                                normalize_features=True,
-                               phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
+                               phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
                                max_seq_len=max_seq_length,
                                max_label_length=self.max_label_length,
                                shuffle_frames=self.config['training']['shuffle_frames'])

@@ -31,7 +31,7 @@ def test():
     print(keywords)
 
     engine = KWSEngine(keywords, 0.0,
-                       "/mnt/data/pytorch-kaldi/exp/TIMIT_MLP_fbank_20190219_172928/checkpoints/checkpoint-epoch33.pth")
+                       "/mnt/data/pytorch-kaldi/exp/libri_MLP_fbank_20190221_235441/checkpoints/checkpoint-epoch23.pth")
 
     results = engine.process_batch(files)
 
