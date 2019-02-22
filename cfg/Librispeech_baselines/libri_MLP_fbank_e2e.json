@@ -10,7 +10,7 @@
     "checkpoint_interval_seconds": 10000000000000,
     "compute_train_metrics": false,
     "data_cache_root": "/mnt/data/pytorch-kaldi/data_cache",
-    "num_workers": 8
+    "num_workers": 0
   },
   "dataset": {
     "name": "librispeech",

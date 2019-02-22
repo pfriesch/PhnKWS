@@ -18,14 +18,31 @@ from utils.util import ensure_dir
 import matplotlib.pyplot as plt
 
 
-def plot(sample_name, output, phn_dict):
+def feat_without_context(input_feat):
+    _input_feat = input_feat.squeeze(1)
+    out_feat = np.zeros((_input_feat.shape[0] + _input_feat.shape[2], _input_feat.shape[1]))
+    for i in range(out_feat.shape[0]):
+        if i >= _input_feat.shape[0]:
+            out_feat[i] = _input_feat[_input_feat.shape[0] - 1, :, i - _input_feat.shape[0]]
+        else:
+            out_feat[i] = _input_feat[i, :, 0]
+
+    return out_feat
+
+
+def plot(sample_name, input_feat, output, phn_dict):
     top_phns = [x[0] for x in list(sorted(enumerate(output.max(axis=0)), key=lambda x: x[1], reverse=True))[:10]]
 
     phn_dict[0] = "<blk>"
     fig = plt.figure()
     ax = fig.subplots()
+    in_feat = feat_without_context(input_feat)
+    ax.imshow(in_feat.T, origin='lower',
+              # extent=[-(in_feat.shape[0] - output.shape[0] + 1) // 2, in_feat.shape[0], 0, 100],
+              extent=[-(in_feat.shape[0] - output.shape[0]), in_feat.shape[0], 0, 100],
+              alpha=0.5)
     for i in top_phns:
-        ax.plot(output[:, i], label=phn_dict[i])
+        ax.plot(output[:, i] * 100, label=phn_dict[i])
     ax.legend()
     ax.set_title(sample_name)
     fig.savefig(f"output_{sample_name}.png")
@@ -68,6 +85,37 @@ class CTCDecoder:
         # assert os.path.exists(self.alignment_model_path)
 
     def is_keyword_batch(self, input_features, sensitivity):
+
+        # https://stackoverflow.com/questions/15638612/calculating-mean-and-standard-deviation-of-the-data-which-does-not-fit-in-memory
+        #
+        # _, feat = next(iter(input_features.items()))
+        # _dim = feat.shape[-1]
+        #
+        # n = 0
+        # mean = np.zeros((_dim))
+        # M2 = np.zeros((_dim))
+        #
+        # for sample_name, feat in tqdm(input_features.items()):
+        #     # for i in range(10):
+        #     for i in range(feat.shape[0]):
+        #         n += 1
+        #         delta = feat[i, :] - mean
+        #         mean = mean + (delta / n)
+        #         M2 = M2 + (delta ** 2)
+        #
+        # std = np.sqrt(M2 / (n - 1))
+        # mean = torch.from_numpy(mean).to(dtype=torch.float32).unsqueeze(-1)
+        # std = torch.from_numpy(std).to(dtype=torch.float32).unsqueeze(-1)
+
+        all_samples_concat = None
+        for sample_name, feat in tqdm(input_features.items()):
+            if all_samples_concat is None:
+                all_samples_concat = feat
+            else:
+                all_samples_concat = np.concatenate((all_samples_concat, feat))
+
+        mean = torch.from_numpy(np.mean(all_samples_concat, axis=0)).to(dtype=torch.float32).unsqueeze(-1)
+        std = torch.from_numpy(np.std(all_samples_concat, axis=0)).to(dtype=torch.float32).unsqueeze(-1)
         post_files = []
 
         plot_num = 0
@@ -77,6 +125,8 @@ class CTCDecoder:
             post_files.append(writer.post_file[output_label].name)
             for sample_name in tqdm(input_features, desc="computing acoustic features:"):
                 input_feature = {"fbank": self.preprocess_feat(input_features[sample_name])}
+                # Normalize over whole chunk instead of only over a single file, which is done by applying the kaldi cmvn
+                input_feature["fbank"] = ((input_feature["fbank"] - mean) / std).unsqueeze(1)
                 output = self.model(input_feature)
                 assert output_label in output
                 output = output[output_label]
@@ -96,9 +146,8 @@ class CTCDecoder:
                 # output = output - np.log(prior)
 
                 output = np.exp(output)
-                if plot_num < 5:
-                    plot(sample_name, output, {idx: phn for phn, idx in self.phoneme_dict.phoneme2reducedIdx.items()}
-                         )
+                if plot_num < 10:
+                    plot(sample_name, input_feature["fbank"], output, self.phoneme_dict.reducedIdx2phoneme)
                     plot_num += 1
 
                 assert len(output.shape) == 2
@@ -124,4 +173,4 @@ class CTCDecoder:
                                                  start_idx=self.model.context_left,
                                                  end_idx=len(feat) - self.model.context_right)
 
-        return torch.from_numpy(feat_context).to(dtype=torch.float32).unsqueeze(1)
+        return torch.from_numpy(feat_context).to(dtype=torch.float32)

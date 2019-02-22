@@ -10,6 +10,11 @@ PhonemeDict = collections.namedtuple("PhonemeDict",
 def load_phoneme_dict(idx2phoneme, idx2reducedIdx, phoneme2reducedIdx, reducedIdx2phoneme):
     idx2phoneme = {int(k): v for k, v in idx2phoneme.items()}
     idx2reducedIdx = {int(k): v for k, v in idx2reducedIdx.items()}
+    # if reducedIdx2phoneme is None:
+    #     # TODO remove just for backwrads compability
+    #     reducedIdx2phoneme = {idx: phoneme for phoneme, idx in phoneme2reducedIdx.items()}
+    #
+    # else:
     reducedIdx2phoneme = {int(k): v for k, v in reducedIdx2phoneme.items()}
     return PhonemeDict(idx2phoneme, idx2reducedIdx, phoneme2reducedIdx, reducedIdx2phoneme)
 
