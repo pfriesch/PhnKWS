@@ -13,6 +13,7 @@ from base.base_trainer import BaseTrainer
 from data import kaldi_io
 from data.kaldi_data_loader import KaldiDataLoader
 from kaldi_decoding_scripts.decode_dnn import decode, best_wer
+from nn_.losses.ctc_phn import CTCPhnLoss
 from utils.logger_config import logger
 
 
@@ -27,6 +28,8 @@ class Trainer(BaseTrainer):
         self.do_validation = do_validation
         self.log_step = int(np.sqrt(config['training']['batch_size_train']))
         self.overfit_small_batch = overfit_small_batch
+        # Necessary for cudnn ctc function
+        self.max_label_length = 256 if isinstance(self.loss, CTCPhnLoss) else None
 
     def _eval_metrics(self, output, target):
         acc_metrics = {}
@@ -66,13 +69,15 @@ class Trainer(BaseTrainer):
                                normalize_features=True,
                                phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
                                max_seq_len=self.max_seq_length_train_curr,
+                               max_label_length=self.max_label_length,
                                shuffle_frames=self.config['training']['shuffle_frames'],
                                overfit_small_batch=self.overfit_small_batch)
 
         dataloader = KaldiDataLoader(dataset,
                                      self.config['training']['batch_size_train'],
                                      self.config["exp"]["n_gpu"] > 0,
-                                     self.config['exp']['num_workers'])
+                                     self.config['exp']['num_workers'],
+                                     shuffle=True)
 
         assert len(dataset) >= self.config['training']['batch_size_train'], \
             f"Length of train dataset {len(dataset)} too small " \
@@ -218,6 +223,7 @@ class Trainer(BaseTrainer):
                                normalize_features=True,
                                phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
                                max_seq_len=self.config['training']['max_seq_length_valid'],
+                               max_label_length=self.max_label_length,
                                shuffle_frames=self.config['training']['shuffle_frames'])
 
         dataloader = KaldiDataLoader(dataset,
@@ -284,6 +290,7 @@ class Trainer(BaseTrainer):
                                normalize_features=True,
                                phoneme_dict=self.config['dataset']['dataset_definition']['phn_mapping_file'],
                                max_seq_len=max_seq_length,
+                               max_label_length=self.max_label_length,
                                shuffle_frames=self.config['training']['shuffle_frames'])
 
         dataloader = KaldiDataLoader(dataset,

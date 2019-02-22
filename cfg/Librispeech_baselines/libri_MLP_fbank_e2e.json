@@ -10,7 +10,7 @@
     "checkpoint_interval_seconds": 10000000000000,
     "compute_train_metrics": false,
     "data_cache_root": "/mnt/data/pytorch-kaldi/data_cache",
-    "num_workers": 4
+    "num_workers": 8
   },
   "dataset": {
     "name": "librispeech",
@@ -25,11 +25,11 @@
   "training": {
     "batch_size_train": 8,
     "batch_size_valid": 8,
-    "max_seq_length_train": 2000,
+    "max_seq_length_train": 3500,
     "increase_seq_length_train": true,
-    "start_seq_len_train": 200,
-    "multply_factor_seq_len_train": 1.5,
-    "max_seq_length_valid": 2000,
+    "start_seq_len_train": 400,
+    "multply_factor_seq_len_train": 2,
+    "max_seq_length_valid": 3500,
     "shuffle_frames": false,
     "sort_by_feat": "fbank",
     "clip_grad_norm": -1,

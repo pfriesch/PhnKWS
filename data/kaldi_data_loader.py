@@ -1,7 +1,6 @@
 import torch
-from torch.utils.data import DataLoader, RandomSampler, Sampler
+from torch.utils.data import DataLoader, Sampler, SequentialSampler
 
-from data import PADDING_IGNORE_INDEX
 from data.kaldi_dataset import KaldiDataset
 
 
@@ -110,10 +109,44 @@ class StatefulRandomSampler(Sampler):
         return len(self.data_source)
 
 
+class ChunkedStatefulRandomSampler(Sampler):
+    r"""Samples elements randomly. State can be saved.
+
+    Arguments:
+        data_source (Dataset): dataset to sample from
+    """
+
+    # TODO save sate
+
+    def __init__(self, data_source):
+        assert hasattr(data_source, "samples_per_chunk")
+        self.data_source = data_source
+        samples_per_chunk = data_source.samples_per_chunk
+
+        n = len(self.data_source)
+        assert sum(samples_per_chunk) == n
+        self.permutation = []
+        total_idx = 0
+        for chunk_id, chunk_len in enumerate(samples_per_chunk):
+            for i in torch.randperm(chunk_len).tolist():
+                self.permutation.append(total_idx + i)
+            total_idx += chunk_len
+
+        self.start_idx = 0
+
+    def __iter__(self):
+        for index in self.permutation[self.start_idx:]:
+            # self.start_idx += 1
+            yield index
+
+    def __len__(self):
+        return len(self.data_source)
+
+
 class KaldiDataLoader(DataLoader):
 
     def __init__(self, dataset: KaldiDataset, batch_size, use_gpu,
-                 num_workers):
+                 num_workers, shuffle=False, ):
         self.dataset = dataset
         self.n_samples = len(self.dataset)
 
@@ -124,7 +157,10 @@ class KaldiDataLoader(DataLoader):
             _collate_fn = collate_fn_simple
         else:
             _collate_fn = collate_fn_zero_pad
-        self._sampler = StatefulRandomSampler(dataset)
+        if shuffle:
+            self._sampler = ChunkedStatefulRandomSampler(dataset)
+        else:
+            self._sampler = SequentialSampler(dataset)
 
         super(KaldiDataLoader, self).__init__(self.dataset,
                                               batch_size,
@@ -133,6 +169,3 @@ class KaldiDataLoader(DataLoader):
                                               pin_memory=pin_memory,
                                               num_workers=num_workers,
                                               drop_last=True)  # drop last because maybe batchnorm
-
-    def set_sampler_start_idx(self, index):
-        self._sampler.curr_idx = index
