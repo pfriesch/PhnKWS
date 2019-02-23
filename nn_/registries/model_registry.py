@@ -36,17 +36,17 @@ def model_init(config):
 
         net = MLP_mtl_Net(input_feat_length, input_feat_name,
                           lab_cd_num=config['dataset']['dataset_definition']['data_info']['labels'] \
-                              ['lab_cd']['num_lab'],
+                                         ['lab_cd']['num_lab'] + 1,
                           lab_mono_num=config['dataset']['dataset_definition']['data_info']['labels'] \
-                              ['lab_mono']['num_lab'])
+                                           ['lab_mono']['num_lab'] + 1)
     elif arch_name == "MLP":
         input_feat_name = config['dataset']['features_use'][0]
         input_feat_length = config['dataset']['dataset_definition']['data_info']['features'] \
             [input_feat_name]['input_feat_length']
         lab_num = config['dataset']['dataset_definition']['data_info']['labels'] \
-            [config['dataset']['labels_use'][0]]['num_lab']
-        if 'CTC' in config['arch']['loss']['name'] or 'ctc' in config['arch']['loss']['name']:
-            lab_num += 1
+                      [config['dataset']['labels_use'][0]]['num_lab'] + 1
+        # if 'CTC' in config['arch']['loss']['name'] or 'ctc' in config['arch']['loss']['name']:
+        #     lab_num += 1 #TODO
         net = MLPNet(input_feat_length, input_feat_name, lab_num)
     else:
         raise ValueError("Can't find the arch {}".format(arch_name))

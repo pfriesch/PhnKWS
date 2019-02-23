@@ -1,14 +1,16 @@
 {
   "exp": {
     "save_dir": "../exp",
-    "name": "TIMIT_MLP_fbank_framewise",
+    "name": "TIMIT_MLP_fbank_framewise_shuffle",
     "seed": 2234,
     "n_gpu": 1,
     "prefetch_to_gpu": true,
     "n_epochs_tr": 24,
     "save_period": 1,
+    "checkpoint_interval_seconds": 10000000000000,
+    "compute_train_metrics": true,
     "data_cache_root": "/mnt/data/pytorch-kaldi/data_cache",
-    "num_workers": 4
+    "num_workers": 0
   },
   "dataset": {
     "name": "TIMIT",
@@ -21,14 +23,14 @@
     "labels_use": ["lab_cd", "lab_mono"]
   },
   "training": {
-    "batch_size_train": 8,
-    "batch_size_valid": 8,
-    "max_seq_length_train": 1000,
-    "increase_seq_length_train": true,
-    "start_seq_len_train": 100,
-    "multply_factor_seq_len_train": 2,
-    "max_seq_length_valid": 1000,
-    "shuffle_frames": false,
+    "batch_size_train": 128,
+    "batch_size_valid": 128,
+    "max_seq_length_train": null,
+    "increase_seq_length_train": false,
+    "start_seq_len_train": null,
+    "multply_factor_seq_len_train": null,
+    "max_seq_length_valid": null,
+    "shuffle_frames": true,
     "sort_by_feat": "fbank",
     "clip_grad_norm": -1,
     "optimizer": {
@@ -40,12 +42,14 @@
     "lr_scheduler": {
       "patience": 3,
       "arch_halving_factor": 0.5,
-      "arch_improvement_threshold": 0.001
+      "arch_improvement_threshold": 0.001,
+      "cooldown": 3,
+      "min_lr": 0.00001
     }
   },
   "arch": {
-    "name": "MLP_mtl",
-    "framewise_labels": true,
+    "name": "WaveNet_mtl",
+    "framewise_labels": "shuffled_frames",
     "loss": {
       "name": "CE_mtl_mono_cd",
       "args": {

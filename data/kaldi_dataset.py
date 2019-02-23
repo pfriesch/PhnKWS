@@ -6,7 +6,6 @@ import os.path
 import random
 import errno
 import sys
-
 from collections import Counter
 from types import SimpleNamespace
 
@@ -17,7 +16,7 @@ from tqdm import tqdm
 
 from data.data_util import load_features, split_chunks, load_labels, splits_by_seqlen, apply_context_single_feat, \
     filter_by_seqlen
-from data.phoneme_dict import load_phoneme_dict, get_phoneme_dict, PhonemeDict
+from data.phoneme_dict import load_phoneme_dict, PhonemeDict
 from utils.logger_config import logger
 
 
@@ -31,7 +30,7 @@ class KaldiDataset(data.Dataset):
     """
     dataset_prefix = "kaldi"
     info_filename = "info.json"
-    sample_index_filename = "sample_index.json"
+    sample_index_filename = "sample_index.npz"
 
     def __init__(self, data_cache_root,
                  dataset_name,
@@ -57,9 +56,6 @@ class KaldiDataset(data.Dataset):
 
         self.state.aligned_labels = {}
 
-        if max_sample_len < 0:
-            max_sample_len = float("inf")
-
         for label_name in label_dict:
             if label_dict[label_name]["label_opts"] == "ali-to-phones --per-frame=true" or \
                     label_dict[label_name]["label_opts"] == "ali-to-pdf":
@@ -79,6 +75,8 @@ class KaldiDataset(data.Dataset):
                    max_seq_len is None
             assert max_sample_len is False or \
                    max_sample_len is None
+        if max_sample_len is None or max_sample_len < 0:
+            max_sample_len = float("inf")
 
         self.state.data_cache_root = os.path.expanduser(data_cache_root)
         self.state.chunk_size = 100  # 1000 for TIMIT & 100 for libri
@@ -115,7 +113,17 @@ class KaldiDataset(data.Dataset):
 
     @property
     def samples_per_chunk(self):
-        return list(Counter([s[0] for s in self.sample_index]).values())
+        if 'sample_index' in self.sample_index:
+            return list(Counter([s[0] for s in self.sample_index['sample_index']]).values())
+
+        else:
+            return list(Counter([s[0] for s in self.sample_index]).values())
+
+    def __len__(self):
+        if 'sample_index' in self.sample_index:
+            return len(self.sample_index['sample_index'])
+        else:
+            return len(self.sample_index)
 
     def _getitem_shuffled_frames(self, index):
         # # Reason for not just doing a big matrix with all samples and skipping the following mess:
@@ -124,7 +132,9 @@ class KaldiDataset(data.Dataset):
         # # * We also want to know the total number of frames in the dataset to return a length.
         #
 
-        chunk_idx, filename, in_sample_index = self.sample_index[index]
+        # _sample_index = self.sample_index[index]
+        chunk_idx, file_idx, in_sample_index = self.sample_index['sample_index'][index]
+        filename = self.sample_index['filenames'][file_idx]
 
         if self.cached_pt != chunk_idx:
             self.cached_pt = chunk_idx
@@ -192,9 +202,6 @@ class KaldiDataset(data.Dataset):
 
         return filename, np_dict_to_torch(features), np_dict_to_torch(lables)
 
-    def __len__(self):
-        return len(self.sample_index)
-
     def _load_labels(self, label_dict, label_index_from, max_label_length):
         all_labels_loaded = {}
 
@@ -202,7 +209,7 @@ class KaldiDataset(data.Dataset):
             all_labels_loaded[lable_name] = load_labels(label_dict[lable_name]['label_folder'],
                                                         label_dict[lable_name]['label_opts'])
 
-            if max_label_length > 0 and max_label_length is not None:
+            if max_label_length is not None and max_label_length > 0:
                 all_labels_loaded[lable_name] = \
                     {l: all_labels_loaded[lable_name][l] for l in all_labels_loaded[lable_name]
                      if len(all_labels_loaded[lable_name][l]) < max_label_length}
@@ -296,17 +303,13 @@ class KaldiDataset(data.Dataset):
 
     def _make_frames_shuffled(self, samples_list, main_feat):
         # framewise shuffled frames
-        prev_index = 0
-        samples_idices = []
-        sample_ids = []
-        # sample_id, end_idx_total
+        sample_splits = []
+        # sample_splits = [ ( file_id, end_idx_total_in_chunk)]
+
         for sample_id, data in samples_list:
-            prev_index += len(data['features'][main_feat]) - self.state.left_context - self.state.right_context
-
-            sample_ids.append(sample_id)
-            samples_idices.append(prev_index)
-
-        sample_splits = (sample_ids, samples_idices)
+            sample_splits.extend([(sample_id, i)
+                                  for i in range(
+                    len(data['features'][main_feat]) - self.state.left_context - self.state.right_context)])
 
         return sample_splits
 
@@ -455,16 +458,34 @@ class KaldiDataset(data.Dataset):
     def _write_info(self):
         with open(os.path.join(self.state.dataset_path, self.info_filename), "w") as f:
             json.dump(vars(self.state), f)
-        with open(os.path.join(self.state.dataset_path, self.sample_index_filename), "w") as f:
-            json.dump(self.sample_index, f)
+        # with open(os.path.join(self.state.dataset_path, self.sample_index_filename), "w") as f:
+
+        filenames = {filename: file_idx
+                     for file_idx, filename in enumerate(Counter([filename
+                                                                  for _, filename, _ in self.sample_index]).keys())}
+
+        _sample_index = np.array([(chunk_idx, filenames[filename], sample_idx)
+                                  for chunk_idx, filename, sample_idx in self.sample_index], dtype=np.int32)
+
+        filenames = {filename: file_idx for file_idx, filename in filenames.items()}
+        np.savez(os.path.join(self.state.dataset_path, self.sample_index_filename),
+                 filenames=filenames,
+                 sample_index=_sample_index)
 
     def _read_info(self):
         with open(os.path.join(self.state.dataset_path, self.info_filename), "r") as f:
             _state = json.load(f)
             self.state = SimpleNamespace(**_state)
             self.state.phoneme_dict = load_phoneme_dict(*_state['phoneme_dict'])
-        with open(os.path.join(self.state.dataset_path, self.sample_index_filename), "r") as f:
-            _sample_index = json.load(f)
+        # with open(os.path.join(self.state.dataset_path, self.sample_index_filename), "r") as f:
+        # _sample_index = json.load(f)
+        _sample_index = np.load(os.path.join(self.state.dataset_path, self.sample_index_filename))
+
+        if 'filenames' in _sample_index:
+            self.sample_index = {}
+            self.sample_index['filenames'] = _sample_index['filenames'].item()
+            self.sample_index['sample_index'] = _sample_index['sample_index']
+        else:
             self.sample_index = _sample_index
 
 

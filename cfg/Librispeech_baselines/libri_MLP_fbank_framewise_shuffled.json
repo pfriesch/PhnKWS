@@ -7,8 +7,10 @@
     "prefetch_to_gpu": true,
     "n_epochs_tr": 24,
     "save_period": 1,
+    "checkpoint_interval_seconds": 10000000000000,
+    "compute_train_metrics": true,
     "data_cache_root": "/mnt/data/pytorch-kaldi/data_cache",
-    "num_workers": 4
+    "num_workers": 0
   },
   "dataset": {
     "name": "librispeech",
@@ -40,7 +42,9 @@
     "lr_scheduler": {
       "patience": 1,
       "arch_halving_factor": 0.5,
-      "arch_improvement_threshold": 0.001
+      "arch_improvement_threshold": 0.001,
+      "cooldown": 3,
+      "min_lr": 0.00001
     }
   },
   "arch": {

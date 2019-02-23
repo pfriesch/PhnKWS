@@ -27,7 +27,7 @@
     "batch_size_valid": 8,
     "max_seq_length_train": 3500,
     "increase_seq_length_train": true,
-    "start_seq_len_train": 400,
+    "start_seq_len_train": 3500,
     "multply_factor_seq_len_train": 2,
     "max_seq_length_valid": 3500,
     "shuffle_frames": false,
@@ -42,7 +42,9 @@
     "lr_scheduler": {
       "patience": 1,
       "arch_halving_factor": 0.5,
-      "arch_improvement_threshold": 0.001
+      "arch_improvement_threshold": 0.001,
+      "cooldown": 3,
+      "min_lr": 0.00001
     }
   },
   "arch": {
