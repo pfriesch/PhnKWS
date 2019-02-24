@@ -6,7 +6,7 @@ import subprocess
 import numpy as np
 import torch
 import matplotlib
-
+import logging
 from data.data_util import load_counts
 from utils.logger_config import logger
 
@@ -93,10 +93,10 @@ def check_environment():
 
 
 def run_shell_info(cmd, stdin=None, pipefail=True):
-    return run_shell(cmd, stdin, pipefail, cmd_logging_level='INFO')
+    return run_shell(cmd, stdin, pipefail, cmd_logging_level=logging.INFO)
 
 
-def run_shell(cmd, stdin=None, pipefail=True, cmd_logging_level='DEBUG'):
+def run_shell(cmd, stdin=None, pipefail=True, cmd_logging_level=logging.DEBUG):
     """
     :param cmd:
     :param stdin:

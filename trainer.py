@@ -1,7 +1,10 @@
 import logging
 import os
 import time
+from functools import partial
 from glob import glob
+from multiprocessing import Pipe, Process
+from multiprocessing.connection import Connection
 
 import numpy as np
 import torch
@@ -15,6 +18,8 @@ from data.kaldi_data_loader import KaldiDataLoader
 from kaldi_decoding_scripts.decode_dnn import decode, best_wer
 from nn_.losses.ctc_phn import CTCPhnLoss
 from utils.logger_config import logger
+
+DONE_MSG = 'done'
 
 
 class Trainer(BaseTrainer):
@@ -30,12 +35,6 @@ class Trainer(BaseTrainer):
         self.overfit_small_batch = overfit_small_batch
         # Necessary for cudnn ctc function
         self.max_label_length = 256 if isinstance(self.loss, CTCPhnLoss) else None
-
-    def _eval_metrics(self, output, target):
-        acc_metrics = {}
-        for metric in self.metrics:
-            acc_metrics[metric] = self.metrics[metric](output, target)
-        return acc_metrics
 
     def _train_epoch(self, epoch):
         """
@@ -71,13 +70,11 @@ class Trainer(BaseTrainer):
                                max_seq_len=self.max_seq_length_train_curr,
                                max_label_length=self.max_label_length,
                                shuffle_frames=self.config['training']['shuffle_frames'],
-                               overfit_small_batch=self.overfit_small_batch,
-                               num_workers=self.config['exp']['num_workers'])
+                               overfit_small_batch=self.overfit_small_batch)
 
         dataloader = KaldiDataLoader(dataset,
                                      self.config['training']['batch_size_train'],
                                      self.config["exp"]["n_gpu"] > 0,
-                                     self.config['exp']['num_workers'],
                                      shuffle=True)
 
         assert len(dataset) >= self.config['training']['batch_size_train'], \
@@ -94,7 +91,13 @@ class Trainer(BaseTrainer):
         last_checkpoint = time.time()
 
         n_steps_this_epoch = 0
-        # TODO chunked dataloader length
+
+        _metrics_fun = partial(metrics_fun, metrics=self.metrics)
+
+        (trainer_metrics_conn, metrics_process_conn) = Pipe()
+        p = Process(target=_metrics_fun, args=(metrics_process_conn,))
+        p.start()
+
         with tqdm(disable=not logger.isEnabledFor(logging.INFO), total=len(dataloader)) as pbar:
             pbar.set_description('T e:{} l: {} a: {}'.format(epoch, '-', '-'))
             for batch_idx, (_, inputs, targets) in enumerate(dataloader):
@@ -131,20 +134,25 @@ class Trainer(BaseTrainer):
                     accumulated_train_losses[_loss] += loss_value
                 total_train_loss += loss["loss_final"]
 
-                if self.config['exp']['compute_train_metrics']:
-                    _train_metrics = self._eval_metrics(output, targets)
-                    for metric, metric_value in _train_metrics.items():
-                        if metric not in accumulated_train_metrics:
-                            accumulated_train_metrics[metric] = 0
-                        accumulated_train_metrics[metric] += metric_value
-                        total_train_metrics[metric] += metric_value
-                #
+                trainer_metrics_conn.send(detach_metrics(output, targets))
+
                 pbar.set_description('T e:{} l: {:.4f}'.format(epoch,
                                                                loss["loss_final"].item()))
                 pbar.update()
 
                 # Log training every 30s and smoothe since its the average
                 if (time.time() - last_train_logging) > 30:
+
+                    start_polling = time.time()
+                    while trainer_metrics_conn.poll():
+                        _train_metrics = trainer_metrics_conn.recv()
+                        for metric, metric_value in _train_metrics.items():
+                            if metric not in accumulated_train_metrics:
+                                accumulated_train_metrics[metric] = 0
+                            accumulated_train_metrics[metric] += metric_value
+                            total_train_metrics[metric] += metric_value
+                    logging.info(f"End metrics polling after {(time.time() - start_polling)}s")
+
                     last_train_logging = time.time()
                     self.tensorboard_logger.set_step(self.global_step, 'train')
                     for _loss, loss_value in accumulated_train_losses.items():
@@ -174,6 +182,21 @@ class Trainer(BaseTrainer):
                         # TODO add saving checkpoint
 
                 #### /Logging ####
+
+        trainer_metrics_conn.send(DONE_MSG)
+        while True:
+            # get the remaining metrix values
+
+            _train_metrics = trainer_metrics_conn.recv()
+            if _train_metrics == DONE_MSG:
+                logger.debug("Done metrics polling")
+                break
+            for metric, metric_value in _train_metrics.items():
+                total_train_metrics[metric] += metric_value
+        p.join()
+        p.close()
+        trainer_metrics_conn.close()
+        metrics_process_conn.close()
 
         if n_steps_this_epoch > 0:
             self.tensorboard_logger.set_step(epoch, 'train')
@@ -226,19 +249,24 @@ class Trainer(BaseTrainer):
                                phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
                                max_seq_len=self.config['training']['max_seq_length_valid'],
                                max_label_length=self.max_label_length,
-                               shuffle_frames=self.config['training']['shuffle_frames'],
-                               num_workers=self.config['exp']['num_workers'])
+                               shuffle_frames=self.config['training']['shuffle_frames'])
 
         dataloader = KaldiDataLoader(dataset,
                                      self.config['training']['batch_size_valid'],
-                                     self.config["exp"]["n_gpu"] > 0,
-                                     self.config['exp']['num_workers'])
+                                     self.config["exp"]["n_gpu"] > 0)
 
         assert len(dataset) >= self.config['training']['batch_size_valid'], \
             f"Length of valid dataset {len(dataset)} too small " \
             + f"for batch_size of {self.config['training']['batch_size_valid']}"
 
         n_steps_this_epoch = 0
+
+        _metrics_fun = partial(metrics_fun, metrics=self.metrics)
+
+        (trainer_metrics_conn, metrics_process_conn) = Pipe()
+        p = Process(target=_metrics_fun, args=(metrics_process_conn,))
+        p.start()
+
         with tqdm(disable=not logger.isEnabledFor(logging.INFO), total=len(dataloader)) as pbar:
             pbar.set_description('V e:{} l: {} '.format(epoch, '-'))
             for batch_idx, (_, inputs, targets) in enumerate(dataloader):
@@ -253,13 +281,28 @@ class Trainer(BaseTrainer):
 
                 #### Logging ####
                 valid_loss += loss["loss_final"].item()
-                _eval_metrics = self._eval_metrics(output, targets)
-                valid_metrics = {metric: valid_metrics[metric] + metric_value for
-                                 metric, metric_value
-                                 in _eval_metrics.items()}
+                trainer_metrics_conn.send(detach_metrics(output, targets))
+
                 pbar.set_description('V e:{} l: {:.4f} '.format(epoch, loss["loss_final"].item()))
                 pbar.update()
                 #### /Logging ####
+
+        trainer_metrics_conn.send(DONE_MSG)
+        start_polling = time.time()
+        while trainer_metrics_conn.poll():
+            _eval_metrics = trainer_metrics_conn.recv()
+            if _eval_metrics == DONE_MSG:
+                logger.debug("Done metrics polling")
+                break
+            for metric, metric_value in _eval_metrics.items():
+                valid_metrics[metric] += metric_value
+
+        p.join()
+        p.close()
+        trainer_metrics_conn.close()
+        metrics_process_conn.close()
+
+        logging.info(f"End metrics polling after {(time.time() - start_polling)}s")
 
         self.tensorboard_logger.set_step(epoch, 'valid')
         self.tensorboard_logger.add_scalar('valid_loss', valid_loss / n_steps_this_epoch)
@@ -294,13 +337,11 @@ class Trainer(BaseTrainer):
                                phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
                                max_seq_len=max_seq_length,
                                max_label_length=self.max_label_length,
-                               shuffle_frames=self.config['training']['shuffle_frames'],
-                               num_workers=self.config['exp']['num_workers'])
+                               shuffle_frames=self.config['training']['shuffle_frames'])
 
         dataloader = KaldiDataLoader(dataset,
                                      batch_size,
-                                     self.config["exp"]["n_gpu"] > 0,
-                                     self.config['exp']['num_workers'])
+                                     self.config["exp"]["n_gpu"] > 0)
 
         assert len(dataset) >= batch_size, \
             f"Length of valid dataset {len(dataset)} too small " \
@@ -308,6 +349,13 @@ class Trainer(BaseTrainer):
 
         n_steps_this_epoch = 0
         warned_size = False
+
+        _metrics_fun = partial(metrics_fun, metrics=self.metrics)
+
+        (trainer_metrics_conn, metrics_process_conn) = Pipe()
+        p = Process(target=_metrics_fun, args=(metrics_process_conn,))
+        p.start()
+
         with KaldiOutputWriter(out_folder, test_data, self.model.out_names, epoch, self.config) as writer:
             with tqdm(disable=not logger.isEnabledFor(logging.INFO), total=len(dataloader)) as pbar:
                 pbar.set_description('E e:{}    '.format(epoch))
@@ -321,10 +369,7 @@ class Trainer(BaseTrainer):
                     output = self.model(inputs)
 
                     #### Logging ####
-                    _eval_metrics = self._eval_metrics(output, targets)
-                    test_metrics = {metric: test_metrics[metric] + metric_value for
-                                    metric, metric_value
-                                    in _eval_metrics.items()}
+                    trainer_metrics_conn.send(detach_metrics(output, targets))
 
                     pbar.set_description('E e:{}           '.format(epoch))
                     pbar.update()
@@ -381,6 +426,23 @@ class Trainer(BaseTrainer):
             self.tensorboard_logger.set_step(self.global_step, 'eval')
             for metric, metric_value in test_metrics.items():
                 self.tensorboard_logger.add_scalar(metric, test_metrics[metric] / len(dataloader))
+
+
+        trainer_metrics_conn.send(DONE_MSG)
+        start_polling = time.time()
+        while trainer_metrics_conn.poll():
+            _eval_metrics = trainer_metrics_conn.recv()
+            if _eval_metrics == DONE_MSG:
+                break
+            for metric, metric_value in _eval_metrics.items():
+                test_metrics[metric] += metric_value
+
+        p.join()
+        p.close()
+        trainer_metrics_conn.close()
+        metrics_process_conn.close()
+
+        logging.info(f"End metrics polling after {(time.time() - start_polling)}s")
 
         test_metrics = {metric: test_metrics[metric] / len(dataloader)
                         for metric in test_metrics}
@@ -459,3 +521,48 @@ class KaldiOutputWriter:
 
     def write_mat(self, out_name, out_save, sample_name):
         kaldi_io.write_mat(self.post_file[out_name], out_save, sample_name)
+
+
+def metrics_fun(conn: Connection, metrics):
+    """
+    We do not want the metrics computation to block while we could be training.
+    So we put the computation in a different process.
+    Using pipes, which seemed to be the best choice here. Not sure though.
+
+    :param conn:
+    :param metrics:
+    :return:
+    """
+
+    def _eval_metrics(output, target):
+        acc_metrics = {}
+        for metric in metrics:
+            acc_metrics[metric] = metrics[metric](output, target)
+        return acc_metrics
+
+    # print("Metrics Process started")
+    while True:
+        x = conn.recv()
+        # print("Got metrics")
+        if isinstance(x, tuple):
+            output, targets = x
+            _train_metrics = _eval_metrics(output, targets)
+            # print(_train_metrics)
+
+            conn.send(_train_metrics)
+
+        elif isinstance(x, str) and x == DONE_MSG:
+            conn.send(DONE_MSG)
+            break
+        else:
+            raise RuntimeError(f"got unexpected {x}")
+
+
+def detach_metrics(output, targets):
+    detached_output = {}
+    for k in output:
+        detached_output[k] = output[k].detach().cpu()
+    detached_targets = {}
+    for k in targets:
+        detached_targets[k] = targets[k].detach().cpu()
+    return detached_output, detached_targets

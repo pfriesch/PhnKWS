@@ -1,3 +1,5 @@
+import os
+
 import torch
 from torch.utils.data import DataLoader, Sampler, SequentialSampler
 
@@ -145,8 +147,7 @@ class ChunkedStatefulRandomSampler(Sampler):
 
 class KaldiDataLoader(DataLoader):
 
-    def __init__(self, dataset: KaldiDataset, batch_size, use_gpu,
-                 num_workers, shuffle=False, ):
+    def __init__(self, dataset: KaldiDataset, batch_size, use_gpu, shuffle=False):
         self.dataset = dataset
         self.n_samples = len(self.dataset)
 
@@ -167,5 +168,5 @@ class KaldiDataLoader(DataLoader):
                                               sampler=self._sampler,
                                               collate_fn=_collate_fn,
                                               pin_memory=pin_memory,
-                                              num_workers=num_workers,
+                                              num_workers=os.cpu_count(),
                                               drop_last=True)  # drop last because maybe batchnorm

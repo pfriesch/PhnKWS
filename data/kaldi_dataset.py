@@ -48,11 +48,9 @@ class KaldiDataset(data.Dataset):
                  max_seq_len=100,
                  max_label_length=None,
                  shuffle_frames=False,
-                 overfit_small_batch=False,
-                 num_workers=None
+                 overfit_small_batch=False
                  ):
         self.state = SimpleNamespace()
-        self.num_workers = num_workers
 
         self.state.overfit_small_batch = overfit_small_batch
         assert isinstance(phoneme_dict, PhonemeDict)
@@ -245,11 +243,14 @@ class KaldiDataset(data.Dataset):
                                                    left_context=self.state.left_context,
                                                    right_context=self.state.right_context)
         with tqdm(total=len(file_chunks)) as pbar:
-            with Pool(processes=self.num_workers) as pool:
+            with Pool() as pool:
+                chunksize = len(file_chunks) // (
+                        2 * os.cpu_count())
+                if chunksize < 1:
+                    chunksize = 1
                 for chnk_id, sample_splits, max_len, min_len in pool.imap_unordered(_convert_chunk_from_kaldi_format,
                                                                                     enumerate(file_chunks),
-                                                                                    chunksize=len(file_chunks) // (
-                                                                                            2 * self.num_workers)):
+                                                                                    chunksize=chunksize):
                     self.sample_index.extend(sample_splits)
                     if max_len is not None:
                         self.state.max_len_per_chunk[chnk_id] = max_len

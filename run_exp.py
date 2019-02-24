@@ -58,10 +58,10 @@ def setup_run(config):
 
     lr_schedulers = lr_scheduler_init(config, optimizers)
 
-    logger.info(["="] * 80)
+    logger.info("".join(["="] * 80))
     logger.info("Architecture:")
     logger.info(model)
-    logger.info(["="] * 80)
+    logger.info("".join(["="] * 80))
     metrics = metrics_init(config)
 
     loss = loss_init(config)
@@ -72,9 +72,6 @@ def setup_run(config):
 def main(config_path, resume_path, overfit_small_batch, warm_start):
     config = read_json(config_path)
     check_config(config)
-
-    if overfit_small_batch:
-        config['exp']['num_workers'] = 0
 
     # if resume_path:
     # TODO

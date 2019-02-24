@@ -9,8 +9,7 @@
     "save_period": 1,
     "checkpoint_interval_seconds": 10000000000000,
     "compute_train_metrics": true,
-    "data_cache_root": "/mnt/data/pytorch-kaldi/data_cache",
-    "num_workers": 0
+    "data_cache_root": "/mnt/data/pytorch-kaldi/data_cache"
   },
   "dataset": {
     "name": "TIMIT",

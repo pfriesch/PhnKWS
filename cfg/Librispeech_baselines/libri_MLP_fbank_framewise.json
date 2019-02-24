@@ -7,8 +7,7 @@
     "prefetch_to_gpu": true,
     "n_epochs_tr": 24,
     "save_period": 1,
-    "data_cache_root": "/mnt/data/pytorch-kaldi/data_cache",
-    "num_workers": 4
+    "data_cache_root": "/mnt/data/pytorch-kaldi/data_cache"
   },
   "dataset": {
     "name": "librispeech",
