@@ -70,6 +70,9 @@ class BaseTrainer:
         if resume_path:
             self.start_epoch, self.global_step = \
                 resume_checkpoint(resume_path, model, logger, optimizers, lr_schedulers)
+            for lr_scheduler in self.lr_schedulers:
+                if self.lr_schedulers[lr_scheduler].current_lr() > self.config['training']['optimizer']['args']['lr']:
+                    self.lr_schedulers[lr_scheduler].set_lr(self.config['training']['optimizer']['args']['lr'])
 
         self.device = 'cpu'
         if nvidia_smi_enabled:
@@ -109,7 +112,9 @@ class BaseTrainer:
         """
         Full training logic
         """
-
+        logger.info([f"{lr_scheduler_name}: {self.lr_schedulers[lr_scheduler_name].current_lr()}"
+                     for lr_scheduler_name in self.lr_schedulers])
+        logger.info(f"max_seq_length_train_curr: {self.max_seq_length_train_curr}")
         epoch = self.start_epoch
         for epoch in range(self.start_epoch, self.epochs):
             logger.info('----- Epoch {} / {} -----'.format(format(epoch, "03d"), format(self.epochs, "03d")))

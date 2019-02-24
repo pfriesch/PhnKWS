@@ -168,5 +168,5 @@ class KaldiDataLoader(DataLoader):
                                               sampler=self._sampler,
                                               collate_fn=_collate_fn,
                                               pin_memory=pin_memory,
-                                              num_workers=os.cpu_count(),
+                                              num_workers=os.cpu_count() * 2,
                                               drop_last=True)  # drop last because maybe batchnorm

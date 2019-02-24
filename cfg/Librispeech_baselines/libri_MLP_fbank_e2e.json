@@ -35,7 +35,7 @@
     "optimizer": {
       "type": "adam",
       "args": {
-        "lr": 0.01
+        "lr": 0.001
       }
     },
     "lr_scheduler": {
