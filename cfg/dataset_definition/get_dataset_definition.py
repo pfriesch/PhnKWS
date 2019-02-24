@@ -1,4 +1,4 @@
-from utils.utils import run_shell, read_json
+from utils.utils import run_shell, read_json, run_shell_info
 
 
 def get_lab_count(label_opts, num_label, folder_lab_count):
@@ -32,7 +32,7 @@ def get_dataset_definition(dataset_name, train_with):
 
                 folder_lab_count = dataset_definition['datasets'][train_with] \
                     ['labels'][label]['label_folder']
-                hmm_info = run_shell(f"hmm-info {folder_lab_count}/final.mdl")
+                hmm_info = run_shell_info(f"hmm-info {folder_lab_count}/final.mdl")
                 label_info['num_lab'] = int(hmm_info.split("\n")[1].rsplit(" ", 1)[1])
 
                 label_info['lab_count'] = get_lab_count(
@@ -44,7 +44,7 @@ def get_dataset_definition(dataset_name, train_with):
             elif label == "lab_mono" or label == "lab_phn":
                 folder_lab_count = dataset_definition['datasets'][train_with] \
                     ['labels'][label]['label_folder']
-                hmm_info = run_shell(f"hmm-info {folder_lab_count}/final.mdl")
+                hmm_info = run_shell_info(f"hmm-info {folder_lab_count}/final.mdl")
                 label_info['num_lab'] = int(hmm_info.split("\n")[0].rsplit(" ", 1)[1])
 
                 label_info['lab_count'] = get_lab_count(

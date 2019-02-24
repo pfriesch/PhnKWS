@@ -71,7 +71,8 @@ class Trainer(BaseTrainer):
                                max_seq_len=self.max_seq_length_train_curr,
                                max_label_length=self.max_label_length,
                                shuffle_frames=self.config['training']['shuffle_frames'],
-                               overfit_small_batch=self.overfit_small_batch)
+                               overfit_small_batch=self.overfit_small_batch,
+                               num_workers=self.config['exp']['num_workers'])
 
         dataloader = KaldiDataLoader(dataset,
                                      self.config['training']['batch_size_train'],
@@ -225,7 +226,8 @@ class Trainer(BaseTrainer):
                                phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
                                max_seq_len=self.config['training']['max_seq_length_valid'],
                                max_label_length=self.max_label_length,
-                               shuffle_frames=self.config['training']['shuffle_frames'])
+                               shuffle_frames=self.config['training']['shuffle_frames'],
+                               num_workers=self.config['exp']['num_workers'])
 
         dataloader = KaldiDataLoader(dataset,
                                      self.config['training']['batch_size_valid'],
@@ -292,7 +294,8 @@ class Trainer(BaseTrainer):
                                phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
                                max_seq_len=max_seq_length,
                                max_label_length=self.max_label_length,
-                               shuffle_frames=self.config['training']['shuffle_frames'])
+                               shuffle_frames=self.config['training']['shuffle_frames'],
+                               num_workers=self.config['exp']['num_workers'])
 
         dataloader = KaldiDataLoader(dataset,
                                      batch_size,

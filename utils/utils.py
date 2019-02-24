@@ -92,7 +92,11 @@ def check_environment():
     #### /KALDI ####
 
 
-def run_shell(cmd, stdin=None, pipefail=True):
+def run_shell_info(cmd, stdin=None, pipefail=True):
+    return run_shell(cmd, stdin, pipefail, cmd_logging_level='INFO')
+
+
+def run_shell(cmd, stdin=None, pipefail=True, cmd_logging_level='DEBUG'):
     """
     :param cmd:
     :param stdin:
@@ -103,7 +107,7 @@ def run_shell(cmd, stdin=None, pipefail=True):
     """
     assert stdin is None or isinstance(stdin, bytes), f"Expected bytes as input for stdin, got {type(stdin)}"
 
-    logger.debug("RUN: {}".format(cmd))
+    logger.log(cmd_logging_level, "RUN: {}".format(cmd))
     if cmd.split(" ")[0].endswith(".sh"):
         if not (os.path.isfile(cmd.split(" ")[0]) and os.access(cmd.split(" ")[0], os.X_OK)):
             logger.warn("{} does not exist or is not runnable!".format(cmd.split(" ")[0]))
@@ -125,5 +129,5 @@ def run_shell(cmd, stdin=None, pipefail=True):
         raise RuntimeError("Call: {} had nonzero return code: {}, stderr: {}".format(cmd, return_code, err))
     # logger.warn("ERROR: {}".format(err))
 
-    logger.debug("OUTPUT: {}".format(output))
+    logger.log(cmd_logging_level, "OUTPUT: {}".format(output))
     return output

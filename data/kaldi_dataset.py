@@ -7,6 +7,8 @@ import random
 import errno
 import sys
 from collections import Counter
+from functools import partial
+from multiprocessing.pool import Pool
 from types import SimpleNamespace
 
 import numpy as np
@@ -14,8 +16,8 @@ import torch.utils.data as data
 import torch
 from tqdm import tqdm
 
-from data.data_util import load_features, split_chunks, load_labels, splits_by_seqlen, apply_context_single_feat, \
-    filter_by_seqlen
+from data.data_util import split_chunks, apply_context_single_feat
+from data.kaldi_dataset_utils import convert_chunk_from_kaldi_format, _load_labels
 from data.phoneme_dict import load_phoneme_dict, PhonemeDict
 from utils.logger_config import logger
 
@@ -46,10 +48,11 @@ class KaldiDataset(data.Dataset):
                  max_seq_len=100,
                  max_label_length=None,
                  shuffle_frames=False,
-                 overfit_small_batch=False
-
+                 overfit_small_batch=False,
+                 num_workers=None
                  ):
         self.state = SimpleNamespace()
+        self.num_workers = num_workers
 
         self.state.overfit_small_batch = overfit_small_batch
         assert isinstance(phoneme_dict, PhonemeDict)
@@ -71,6 +74,7 @@ class KaldiDataset(data.Dataset):
 
         self.state.shuffle_frames = shuffle_frames
         if self.state.shuffle_frames:
+            assert max_label_length is None
             assert max_seq_len is False or \
                    max_seq_len is None
             assert max_sample_len is False or \
@@ -167,8 +171,8 @@ class KaldiDataset(data.Dataset):
         #           start      end
         #            index      index
         #
-
-        chunk_idx, filename, start_idx, end_idx = self.sample_index[index]
+        chunk_idx, file_idx, start_idx, end_idx = self.sample_index['sample_index'][index]
+        filename = self.sample_index['filenames'][file_idx]
 
         if self.cached_pt != chunk_idx:
             self.cached_pt = chunk_idx
@@ -202,157 +206,8 @@ class KaldiDataset(data.Dataset):
 
         return filename, np_dict_to_torch(features), np_dict_to_torch(lables)
 
-    def _load_labels(self, label_dict, label_index_from, max_label_length):
-        all_labels_loaded = {}
-
-        for lable_name in label_dict:
-            all_labels_loaded[lable_name] = load_labels(label_dict[lable_name]['label_folder'],
-                                                        label_dict[lable_name]['label_opts'])
-
-            if max_label_length is not None and max_label_length > 0:
-                all_labels_loaded[lable_name] = \
-                    {l: all_labels_loaded[lable_name][l] for l in all_labels_loaded[lable_name]
-                     if len(all_labels_loaded[lable_name][l]) < max_label_length}
-
-            if lable_name == "lab_phn":
-                if self.state.phoneme_dict is not None:
-                    for sample_id in all_labels_loaded[lable_name]:
-                        assert max(all_labels_loaded[lable_name][sample_id]) <= max(
-                            self.state.phoneme_dict.idx2reducedIdx.keys()), \
-                            "Are you sure you have the righ phoneme dict?" + \
-                            " Labels have higher indices than phonemes ( {} <!= {} )".format(
-                                max(all_labels_loaded[lable_name][sample_id]),
-                                max(self.state.phoneme_dict.idx2reducedIdx.keys()))
-
-                        # map labels according to phoneme dict
-                        tmp_labels = np.copy(all_labels_loaded[lable_name][sample_id])
-                        for k, v in self.state.phoneme_dict.idx2reducedIdx.items():
-                            tmp_labels[all_labels_loaded[lable_name][sample_id] == k] = v
-
-                        all_labels_loaded[lable_name][sample_id] = tmp_labels
-
-            max_label = max([all_labels_loaded[lable_name][l].max() for l in all_labels_loaded[lable_name]])
-            min_label = min([all_labels_loaded[lable_name][l].min() for l in all_labels_loaded[lable_name]])
-            logger.debug(
-                f"Max label: {max_label}")
-            logger.debug(
-                f"min label: {min_label}")
-
-            if min_label > 0:
-                logger.warn(f"label {lable_name} does not seem to be indexed from 0 -> making it indexed from 0")
-                for l in all_labels_loaded[lable_name]:
-                    all_labels_loaded[lable_name][l] = all_labels_loaded[lable_name][l] - 1
-
-                max_label = max([all_labels_loaded[lable_name][l].max() for l in all_labels_loaded[lable_name]])
-                min_label = min([all_labels_loaded[lable_name][l].min() for l in all_labels_loaded[lable_name]])
-                logger.debug(
-                    f"Max label new : {max_label}")
-                logger.debug(
-                    f"min label new: {min_label}")
-
-            if label_index_from != 0:
-                assert label_index_from > 0
-                all_labels_loaded[lable_name] = {filename:
-                                                     all_labels_loaded[lable_name][filename] + label_index_from
-                                                 for filename in all_labels_loaded[lable_name]}
-
-        return all_labels_loaded
-
-    def _filter_samples_by_length(self, file_names, feature_dict, features_loaded, label_dict, all_labels_loaded):
-
-        samples = {}
-
-        for file in file_names:
-
-            _continue = False
-            for feature_name in feature_dict:
-                if file not in features_loaded[feature_name]:
-                    logger.info("Skipping {}, not in features".format(file))
-                    _continue = True
-                    break
-            for label_name in label_dict:
-                if file not in all_labels_loaded[label_name]:
-                    logger.info("Skipping {}, not in labels".format(file))
-                    _continue = True
-                    break
-            for feature_name in feature_dict:
-                if type(self.state.max_sample_len) == int and \
-                        len(features_loaded[feature_name][file]) > self.state.max_sample_len:
-                    logger.info("Skipping {}, feature of size {} too big ( {} expected) ".format(
-                        file, len(features_loaded[feature_name][file]), self.state.max_sample_len))
-                    _continue = True
-                    break
-                if type(self.state.min_sample_len) == int and \
-                        self.state.min_sample_len > len(features_loaded[feature_name][file]):
-                    logger.info("Skipping {}, feature of size {} too small ( {} expected) ".format(
-                        file, len(features_loaded[feature_name][file]), self.state.max_sample_len))
-                    _continue = True
-                    break
-
-            if _continue:
-                continue
-
-            samples[file] = {"features": {}, "labels": {}}
-            for feature_name in feature_dict:
-                samples[file]["features"][feature_name] = features_loaded[feature_name][file]
-
-            for label_name in label_dict:
-                samples[file]["labels"][label_name] = all_labels_loaded[label_name][file]
-
-        return samples
-
-    def _make_frames_shuffled(self, samples_list, main_feat):
-        # framewise shuffled frames
-        sample_splits = []
-        # sample_splits = [ ( file_id, end_idx_total_in_chunk)]
-
-        for sample_id, data in samples_list:
-            sample_splits.extend([(sample_id, i)
-                                  for i in range(
-                    len(data['features'][main_feat]) - self.state.left_context - self.state.right_context)])
-
-        return sample_splits
-
-    def _make_frames_sequential(self, samples_list, main_feat, chnk_id):
-        # sequential data
-        if any([not self.state.aligned_labels[label_name] for label_name in self.state.aligned_labels]):
-            assert all([not self.state.aligned_labels[label_name] for label_name in self.state.aligned_labels])
-            # unaligned labels
-            sample_splits, min_len = filter_by_seqlen(samples_list, self.state.max_seq_len,
-                                                      self.state.left_context, self.state.right_context)
-            logger.info(f"Used samples {len(sample_splits)}/{len(samples_list)} "
-                        + f"for a max seq length of {self.state.max_seq_len} (min length was {min_len})")
-
-        elif any([not self.state.aligned_labels[label_name] for label_name in self.state.aligned_labels]) \
-                and not self.state.max_seq_len:
-            assert all([not self.state.aligned_labels[label_name] for label_name in self.state.aligned_labels])
-            # unaligned labels but no max_seq_len
-            sample_splits = [
-                (filename, self.state.left_context, len(sample_dict["features"][main_feat]) - self.state.right_context)
-                for filename, sample_dict in samples_list]
-        else:
-            # framewise sequential
-            if self.state.max_seq_len:
-                sample_splits = splits_by_seqlen(samples_list, self.state.max_seq_len,
-                                                 self.state.left_context, self.state.right_context)
-            else:
-                raise NotImplementedError("Framewise without max_seq_len not impl")
-
-        for sample_id, start_idx, end_idx in sample_splits:
-            self.state.max_len_per_chunk[chnk_id] = (end_idx - start_idx) \
-                if (end_idx - start_idx) > self.state.max_len_per_chunk[chnk_id] else self.state.max_len_per_chunk[
-                chnk_id]
-
-            self.state.min_len_per_chunk[chnk_id] = (end_idx - start_idx) \
-                if (end_idx - start_idx) < self.state.min_len_per_chunk[chnk_id] else self.state.min_len_per_chunk[
-                chnk_id]
-
-        # sort sigs/labels: longest -> shortest
-        sample_splits = sorted(sample_splits, key=lambda x: x[2] - x[1])
-
-        return sample_splits
-
     def _convert_from_kaldi_format(self, feature_dict, label_dict):
+        logger.info("Converting features from kaldi features!")
         main_feat = next(iter(feature_dict))
 
         # download files
@@ -364,7 +219,8 @@ class KaldiDataset(data.Dataset):
             else:
                 raise
 
-        all_labels_loaded = self._load_labels(label_dict, self.state.label_index_from, self.state.max_label_length)
+        all_labels_loaded = _load_labels(label_dict, self.state.label_index_from, self.state.max_label_length,
+                                         self.state.phoneme_dict)
 
         with open(feature_dict[main_feat]["feature_lst_path"], "r") as f:
             lines = f.readlines()
@@ -374,64 +230,32 @@ class KaldiDataset(data.Dataset):
 
         self.state.max_len_per_chunk = [0] * len(file_chunks)
         self.state.min_len_per_chunk = [sys.maxsize] * len(file_chunks)
-        for chnk_id, file_chnk in tqdm(list(enumerate(file_chunks))):  # TODO do threaded
-            file_names = [feat.split(" ")[0] for feat in file_chnk]
 
-            chnk_prefix = os.path.join(self.state.dataset_path, "chunk_{:04d}".format(chnk_id))
-
-            features_loaded = {}
-            for feature_name in feature_dict:
-                chnk_scp = chnk_prefix + "feats.scp"
-                with open(chnk_scp, "w") as f:
-                    f.writelines(file_chnk)
-
-                features_loaded[feature_name] = load_features(chnk_scp, feature_dict[feature_name]["feature_opts"])
-                os.remove(chnk_scp)
-
-            samples = self._filter_samples_by_length(file_names, feature_dict, features_loaded, label_dict,
-                                                     all_labels_loaded)
-
-            samples_list = list(samples.items())
-
-            mean = {}
-            std = {}
-            for feature_name in feature_dict:
-                feat_concat = []
-                for file in file_names:
-                    feat_concat.append(features_loaded[feature_name][file])
-
-                feat_concat = np.concatenate(feat_concat)
-                mean[feature_name] = np.mean(feat_concat, axis=0)
-                std[feature_name] = np.std(feat_concat, axis=0)
-
-            if not self.state.shuffle_frames:
-                sample_splits = self._make_frames_sequential(samples_list, main_feat, chnk_id)
-            else:
-                sample_splits = self._make_frames_shuffled(samples_list, main_feat)
-
-            # samples =
-            #   {file_id:
-            #       { 'feautres' :
-            #           { 'fbank' : ndarray
-            #           },
-            #         'labels':
-            #           { 'lab_phn' : ndarray
-            #           }
-            #       }
-            #   }
-
-            # sample_splits = [ ( file_id, start_idx_file, end_idx_file)] # context & frame
-            # sample_splits = [ ( file_id, end_idx_total_in_chunk)]
-
-            torch.save(
-                {"samples": samples,
-                 "means": mean,
-                 "std": std},
-                chnk_prefix + ".pyt"
-            )
-
-            self.sample_index.extend([(chnk_id,) + sample_split for sample_split in sample_splits])
-            # TODO add warning when files get too big -> choose different chunk size
+        _convert_chunk_from_kaldi_format = partial(convert_chunk_from_kaldi_format,
+                                                   dataset_path=self.state.dataset_path,
+                                                   feature_dict=feature_dict,
+                                                   label_dict=label_dict,
+                                                   all_labels_loaded=all_labels_loaded,
+                                                   shuffle_frames=self.state.shuffle_frames,
+                                                   main_feat=main_feat,
+                                                   aligned_labels=self.state.aligned_labels,
+                                                   max_sample_len=self.state.max_sample_len,
+                                                   min_sample_len=self.state.min_sample_len,
+                                                   max_seq_len=self.state.max_seq_len,
+                                                   left_context=self.state.left_context,
+                                                   right_context=self.state.right_context)
+        with tqdm(total=len(file_chunks)) as pbar:
+            with Pool(processes=self.num_workers) as pool:
+                for chnk_id, sample_splits, max_len, min_len in pool.imap_unordered(_convert_chunk_from_kaldi_format,
+                                                                                    enumerate(file_chunks),
+                                                                                    chunksize=len(file_chunks) // (
+                                                                                            2 * self.num_workers)):
+                    self.sample_index.extend(sample_splits)
+                    if max_len is not None:
+                        self.state.max_len_per_chunk[chnk_id] = max_len
+                    if min_len is not None:
+                        self.state.min_len_per_chunk[chnk_id] = min_len
+                    pbar.update()
 
         assert len(self) > 0, \
             f"No sample with a max seq length of {self.state.max_seq_len} in the dataset! " \
@@ -460,12 +284,25 @@ class KaldiDataset(data.Dataset):
             json.dump(vars(self.state), f)
         # with open(os.path.join(self.state.dataset_path, self.sample_index_filename), "w") as f:
 
-        filenames = {filename: file_idx
-                     for file_idx, filename in enumerate(Counter([filename
-                                                                  for _, filename, _ in self.sample_index]).keys())}
+        if len(self.sample_index[0]) == 3:
+            filenames = {filename: file_idx
+                         for file_idx, filename in enumerate(Counter([filename
+                                                                      for _, filename, _ in
+                                                                      self.sample_index]).keys())}
 
-        _sample_index = np.array([(chunk_idx, filenames[filename], sample_idx)
-                                  for chunk_idx, filename, sample_idx in self.sample_index], dtype=np.int32)
+            _sample_index = np.array([(chunk_idx, filenames[filename], sample_idx)
+                                      for chunk_idx, filename, sample_idx in self.sample_index], dtype=np.int32)
+
+        elif len(self.sample_index[0]) == 4:
+            filenames = {filename: file_idx
+                         for file_idx, filename in enumerate(Counter([filename
+                                                                      for _, filename, _, _ in
+                                                                      self.sample_index]).keys())}
+
+            _sample_index = np.array([(chunk_idx, filenames[filename], start_idx, end_idx)
+                                      for chunk_idx, filename, start_idx, end_idx in self.sample_index], dtype=np.int32)
+        else:
+            raise RuntimeError
 
         filenames = {filename: file_idx for file_idx, filename in filenames.items()}
         np.savez(os.path.join(self.state.dataset_path, self.sample_index_filename),
@@ -486,7 +323,7 @@ class KaldiDataset(data.Dataset):
             self.sample_index['filenames'] = _sample_index['filenames'].item()
             self.sample_index['sample_index'] = _sample_index['sample_index']
         else:
-            self.sample_index = _sample_index
+            raise RuntimeError
 
 
 def apply_context(sample, start_idx, end_idx, context_left, context_right, aligned_labels):

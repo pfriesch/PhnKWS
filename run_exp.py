@@ -27,6 +27,11 @@ def setup_run(config):
     config['dataset']['dataset_definition'] = dataset_definition
 
     if 'lab_phn' in config['dataset']['labels_use'][0]:
+        if dataset_definition['data_info']['labels']['lab_phn']['lab_count'][0] < 1:
+            # TODO counts return 0 indexed but phns are not so wtf
+            dataset_definition['data_info']['labels']['lab_phn']['lab_count'] = \
+                dataset_definition['data_info']['labels']['lab_phn']['lab_count'][1:]
+
         if len(config['dataset']['labels_use']) == 0:
             raise NotImplementedError("Multiple output labels not implemented for e2e/ctc")
 
@@ -53,7 +58,10 @@ def setup_run(config):
 
     lr_schedulers = lr_scheduler_init(config, optimizers)
 
-    logger.debug(model)
+    logger.info(["="] * 80)
+    logger.info("Architecture:")
+    logger.info(model)
+    logger.info(["="] * 80)
     metrics = metrics_init(config)
 
     loss = loss_init(config)

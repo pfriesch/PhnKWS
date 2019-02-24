@@ -96,15 +96,30 @@ class KWSEngine(Engine):
 
     @staticmethod
     def preppare_tmp_files(files, tmp_dir):
-        # [(speaker, file_id, path]
-        # TODO add noise for context of model
-        files = [(os.path.basename(file).split("_")[0],
-                  "_".join(file.rsplit("/", 2)[1:])
-                  [:-4], file) for file in files]
 
-        tmp_scp = os.path.join(tmp_dir, "tmp.scp")
-        with open(tmp_scp, "w") as f:
-            f.writelines([f"{file_id} {path}\n" for speaker, file_id, path in files])
+        if ".flac" in files[0]:
+            # librispeech source
+            # [(speaker, file_id, path]
+            files = [(os.path.basename(file).split("-")[0],
+                      os.path.basename(file)[:-5],
+                      f"flac -c -d -s {file} |") for file in files]
+
+            tmp_scp = os.path.join(tmp_dir, "tmp.scp")
+            with open(tmp_scp, "w") as f:
+                f.writelines([f"{file_id} {path}\n" for speaker, file_id, path in files])
+
+
+        else:
+
+            # [(speaker, file_id, path]
+            # TODO add noise for context of model
+            files = [(os.path.basename(file).split("_")[0],
+                      "_".join(file.rsplit("/", 2)[1:])[:-4],
+                      file) for file in files]
+
+            tmp_scp = os.path.join(tmp_dir, "tmp.scp")
+            with open(tmp_scp, "w") as f:
+                f.writelines([f"{file_id} {path}\n" for speaker, file_id, path in files])
 
         #### spk2utt
         spk2utt_path = os.path.join(tmp_dir, "spk2utt")
