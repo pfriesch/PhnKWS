@@ -254,26 +254,26 @@ class KaldiDataset(data.Dataset):
     def _load_labels(self, label_dict):
         all_labels_loaded = {}
 
-        for lable_name in label_dict:
-            all_labels_loaded[lable_name] = load_labels(label_dict[lable_name]['label_folder'],
-                                                        label_dict[lable_name]['label_opts'])
+        for label_name in label_dict:
+            all_labels_loaded[label_name] = load_labels(label_dict[label_name]['label_folder'],
+                                                        label_dict[label_name]['label_opts'])
 
-            if lable_name == "lab_phn":
+            if label_name == "lab_phn":
                 if self.phoneme_dict is not None:
-                    for sample_id in all_labels_loaded[lable_name]:
-                        assert max(all_labels_loaded[lable_name][sample_id]) <= max(
+                    for sample_id in all_labels_loaded[label_name]:
+                        assert max(all_labels_loaded[label_name][sample_id]) <= max(
                             self.phoneme_dict.idx2reducedIdx.keys()), \
                             "Are you sure you have the righ phoneme dict?" + \
                             " Labels have higher indices than phonemes ( {} <!= {} )".format(
-                                max(all_labels_loaded[lable_name][sample_id]),
+                                max(all_labels_loaded[label_name][sample_id]),
                                 max(self.phoneme_dict.idx2reducedIdx.keys()))
 
                         # map labels according to phoneme dict
-                        tmp_labels = np.copy(all_labels_loaded[lable_name][sample_id])
+                        tmp_labels = np.copy(all_labels_loaded[label_name][sample_id])
                         for k, v in self.phoneme_dict.idx2reducedIdx.items():
-                            tmp_labels[all_labels_loaded[lable_name][sample_id] == k] = v
+                            tmp_labels[all_labels_loaded[label_name][sample_id] == k] = v
 
-                        all_labels_loaded[lable_name][sample_id] = tmp_labels
+                        all_labels_loaded[label_name][sample_id] = tmp_labels
 
         return all_labels_loaded
 

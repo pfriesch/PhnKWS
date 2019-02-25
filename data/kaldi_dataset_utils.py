@@ -7,65 +7,8 @@ import sys
 import numpy as np
 import torch
 
-from data.data_util import load_features, load_labels, splits_by_seqlen, filter_by_seqlen
+from data.data_util import load_features, splits_by_seqlen, filter_by_seqlen
 from utils.logger_config import logger
-
-
-def _load_labels(label_dict, label_index_from, max_label_length, phoneme_dict):
-    all_labels_loaded = {}
-
-    for lable_name in label_dict:
-        all_labels_loaded[lable_name] = load_labels(label_dict[lable_name]['label_folder'],
-                                                    label_dict[lable_name]['label_opts'])
-
-        if max_label_length is not None and max_label_length > 0:
-            all_labels_loaded[lable_name] = \
-                {l: all_labels_loaded[lable_name][l] for l in all_labels_loaded[lable_name]
-                 if len(all_labels_loaded[lable_name][l]) < max_label_length}
-
-        if lable_name == "lab_phn":
-            if phoneme_dict is not None:
-                for sample_id in all_labels_loaded[lable_name]:
-                    assert max(all_labels_loaded[lable_name][sample_id]) <= max(
-                        phoneme_dict.idx2reducedIdx.keys()), \
-                        "Are you sure you have the righ phoneme dict?" + \
-                        " Labels have higher indices than phonemes ( {} <!= {} )".format(
-                            max(all_labels_loaded[lable_name][sample_id]),
-                            max(phoneme_dict.idx2reducedIdx.keys()))
-
-                    # map labels according to phoneme dict
-                    tmp_labels = np.copy(all_labels_loaded[lable_name][sample_id])
-                    for k, v in phoneme_dict.idx2reducedIdx.items():
-                        tmp_labels[all_labels_loaded[lable_name][sample_id] == k] = v
-
-                    all_labels_loaded[lable_name][sample_id] = tmp_labels
-
-        max_label = max([all_labels_loaded[lable_name][l].max() for l in all_labels_loaded[lable_name]])
-        min_label = min([all_labels_loaded[lable_name][l].min() for l in all_labels_loaded[lable_name]])
-        logger.debug(
-            f"Max label: {max_label}")
-        logger.debug(
-            f"min label: {min_label}")
-
-        if min_label > 0:
-            logger.warn(f"label {lable_name} does not seem to be indexed from 0 -> making it indexed from 0")
-            for l in all_labels_loaded[lable_name]:
-                all_labels_loaded[lable_name][l] = all_labels_loaded[lable_name][l] - 1
-
-            max_label = max([all_labels_loaded[lable_name][l].max() for l in all_labels_loaded[lable_name]])
-            min_label = min([all_labels_loaded[lable_name][l].min() for l in all_labels_loaded[lable_name]])
-            logger.debug(
-                f"Max label new : {max_label}")
-            logger.debug(
-                f"min label new: {min_label}")
-
-        if label_index_from != 0:
-            assert label_index_from > 0
-            all_labels_loaded[lable_name] = {filename:
-                                                 all_labels_loaded[lable_name][filename] + label_index_from
-                                             for filename in all_labels_loaded[lable_name]}
-
-    return all_labels_loaded
 
 
 def _filter_samples_by_length(file_names, feature_dict, features_loaded, label_dict, all_labels_loaded,
@@ -165,29 +108,6 @@ def _make_frames_sequential(samples_list, main_feat, aligned_labels, max_seq_len
     sample_splits = sorted(sample_splits, key=lambda x: x[2] - x[1])
 
     return sample_splits, max_len, min_len
-
-
-# def convert_chunks_from_kaldi_format(chnk_id_file_chnk_list, dataset_path, feature_dict, label_dict, all_labels_loaded,
-#                                      shuffle_frames, main_feat, max_sample_len, min_sample_len, max_seq_len,
-#                                      left_context, right_context):
-#     chnk_ids = []
-#     sample_index = []
-#     max_len_per_chunk = {}
-#     min_len_per_chunk = {}
-#     for chnk_id, file_chnk in chnk_id_file_chnk_list:
-#         chnk_id, sample_splits, max_len, min_len = convert_chunk_from_kaldi_format(chnk_id, file_chnk, dataset_path,
-#                                                                                    feature_dict, label_dict,
-#                                                                                    all_labels_loaded,
-#                                                                                    shuffle_frames, main_feat,
-#                                                                                    max_sample_len, min_sample_len,
-#                                                                                    max_seq_len,
-#                                                                                    left_context, right_context)
-#         sample_index.extend(sample_splits)
-#         if max_len is not None:
-#             max_len_per_chunk[chnk_id] = max_len
-#         if min_len is not None:
-#             min_len_per_chunk[chnk_id] = min_len
-#     return chnk_ids, sample_index, max_len, min_len
 
 
 def convert_chunk_from_kaldi_format(chnk_id_file_chnk, dataset_path, feature_dict, label_dict, all_labels_loaded,

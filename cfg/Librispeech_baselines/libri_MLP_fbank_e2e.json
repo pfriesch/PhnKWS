@@ -22,15 +22,14 @@
     "labels_use": ["lab_phn"]
   },
   "training": {
-    "batch_size_train": 1,
-    "batch_size_valid": 1,
+    "dataset_type": "SEQUENTIAL_APPENDED_CONTEXT",
     "max_seq_length_train": 3500,
-    "increase_seq_length_train": true,
     "start_seq_len_train": 3500,
+    "increase_seq_length_train": true,
     "multply_factor_seq_len_train": 2,
     "max_seq_length_valid": 3500,
-    "shuffle_frames": false,
-    "sort_by_feat": "fbank",
+    "batch_size_train": 1,
+    "batch_size_valid": 1,
     "clip_grad_norm": -1,
     "optimizer": {
       "type": "adam",

@@ -1,17 +1,9 @@
-import itertools
-import torch
-from collections import OrderedDict
+from enum import Enum
 
+import torch
 import numpy as np
 
 from data import kaldi_io
-
-
-def load_counts(class_counts_file):
-    with open(class_counts_file) as f:
-        row = next(f).strip().strip('[]').strip()
-        counts = np.array([np.float32(v) for v in row.split()])
-    return counts
 
 
 def split_chunks(seq, size, overfit_small_batch):
@@ -45,46 +37,6 @@ def load_labels(label_folder, label_opts):
                  .format(label_folder, label_opts, label_folder))}
     assert len(labels_loaded) > 0
     return labels_loaded
-
-
-def load_kws(feature_dict, label_dict, kw2phn_mapping):
-    features_loaded = {}
-    labels_loaded = {}
-
-    for feature_name in feature_dict:
-        feature_lst_path = feature_dict[feature_name]['feature_lst_path']
-        feature_opts = feature_dict[feature_name]['feature_opts']
-
-        features_loaded[feature_name] = \
-            {k: m for k, m in
-             kaldi_io.read_mat_ark('ark:copy-feats scp:{} ark:- |{}'.format(feature_lst_path, feature_opts))}
-        assert len(features_loaded[feature_name]) > 0
-
-    for label_name in label_dict:
-        text_file = label_dict[label_name]['text_file']
-        with open(text_file, "r") as f:
-            lines = f.readlines()
-
-        labels_loaded[label_name] = \
-            {filenames: kw2phn_mapping[text]['phn_ids']
-             for filenames, text in
-             [l.strip().split(" ") for l in lines] if text in kw2phn_mapping}
-
-    all_files = set(itertools.chain.from_iterable(
-        [set(labels_loaded[l]) for l in labels_loaded] + [set(features_loaded[f]) for f in features_loaded]))
-    all_files_intersect = set.intersection(
-        *[set(labels_loaded[l]) for l in labels_loaded] + [set(features_loaded[f]) for f in features_loaded])
-    print("removed {} files because of missing labels".format(len(all_files) - len(all_files_intersect)))
-    for feature_name in feature_dict:
-        features_loaded[feature_name] = {filename: features_loaded[feature_name][filename]
-                                         for filename in features_loaded[feature_name]
-                                         if filename in all_files_intersect}
-    for label_name in label_dict:
-        labels_loaded[label_name] = {filename: labels_loaded[label_name][filename]
-                                     for filename in labels_loaded[label_name]
-                                     if filename in all_files_intersect}
-
-    return features_loaded, labels_loaded
 
 
 def filter_by_seqlen(samples_list, max_sequence_length, context_left, context_right):
@@ -161,19 +113,6 @@ def splits_by_seqlen(samples_list, max_sequence_length, context_left, context_ri
                 splits.append((filename, start_idx, end_idx))
 
     return splits
-
-
-def get_order_by_length(feature_dict):
-    ordering_length = {}
-    for feature_name in feature_dict:
-        ordering_length[feature_name] = \
-            sorted(enumerate(feature_dict[feature_name]),
-                   key=lambda _idx_filename: feature_dict[feature_name][_idx_filename[1]].shape[0])
-        ordering_length[feature_name] = OrderedDict([(filename, {"idx": _idx,
-                                                                 "length": feature_dict[feature_name][filename].shape[
-                                                                     0]})
-                                                     for _idx, filename in ordering_length[feature_name]])
-    return ordering_length
 
 
 def apply_context_single_feat(feat, context_left, context_right, start_idx, end_idx):

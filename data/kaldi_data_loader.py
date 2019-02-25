@@ -3,8 +3,6 @@ import os
 import torch
 from torch.utils.data import DataLoader, Sampler, SequentialSampler
 
-from data.kaldi_dataset import KaldiDataset
-
 
 def collate_fn_simple(sample_list):
     fea_keys = list(sample_list[0][1].keys())
@@ -154,7 +152,7 @@ class KaldiDataLoader(DataLoader):
         # Warn: packed sequence does not work with pin_memory
         pin_memory = use_gpu
 
-        if dataset.shuffle_frames:
+        if dataset.state.dataset_type == DatasetType.FRAMEWISE_SHUFFLED_FRAMES:
             _collate_fn = collate_fn_simple
         else:
             _collate_fn = collate_fn_pad

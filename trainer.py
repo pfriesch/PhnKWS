@@ -9,9 +9,9 @@ import torch
 from tqdm import tqdm
 
 # from data.kaldi_dataset_prefetch_gpu import KaldiDataset
-from data.kaldi_dataset import KaldiDataset
 from base.base_trainer import BaseTrainer
 from data import kaldi_io
+from data.dataset_regestry import get_dataset
 from data.kaldi_data_loader import KaldiDataLoader
 from kaldi_decoding_scripts.decode_dnn import decode, best_wer
 from nn_.losses.ctc_phn import CTCPhnLoss
@@ -31,6 +31,8 @@ class Trainer(BaseTrainer):
         self.overfit_small_batch = overfit_small_batch
         # Necessary for cudnn ctc function
         self.max_label_length = 256 if isinstance(self.loss, CTCPhnLoss) else None
+
+        self.dataset_type = DatasetType.FRAMEWISE_SHUFFLED_FRAMES  # TODO
 
     def _train_epoch(self, epoch):
         """
@@ -54,19 +56,19 @@ class Trainer(BaseTrainer):
         _all_feats = self.config['dataset']['dataset_definition']['datasets'][tr_data]['features']
         _all_labs = self.config['dataset']['dataset_definition']['datasets'][tr_data]['labels']
 
-        dataset = KaldiDataset(self.config['exp']['data_cache_root'], tr_data,
-                               {feat: _all_feats[feat] for feat in self.config['dataset']['features_use']},
-                               {lab: _all_labs[lab] for lab in self.config['dataset']['labels_use']},
-                               self.device,
-                               self.config['training']['max_seq_length_train'],
-                               self.model.context_left,
-                               self.model.context_right,
-                               normalize_features=True,
-                               phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
-                               max_seq_len=self.max_seq_length_train_curr,
-                               max_label_length=self.max_label_length,
-                               shuffle_frames=self.config['training']['shuffle_frames'],
-                               overfit_small_batch=self.overfit_small_batch)
+        dataset = get_dataset(self.config['training']['dataset_type'],
+                              self.config['exp']['data_cache_root'],
+                              tr_data,
+                              {feat: _all_feats[feat] for feat in self.config['dataset']['features_use']},
+                              {lab: _all_labs[lab] for lab in self.config['dataset']['labels_use']},
+                              self.config['training']['max_seq_length_train'],
+                              self.model.context_left,
+                              self.model.context_right,
+                              normalize_features=True,
+                              phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
+                              max_seq_len=self.max_seq_length_train_curr,
+                              max_label_length=self.max_label_length,
+                              overfit_small_batch=self.overfit_small_batch)
 
         dataloader = KaldiDataLoader(dataset,
                                      self.config['training']['batch_size_train'],
@@ -216,19 +218,18 @@ class Trainer(BaseTrainer):
         valid_data = self.config['dataset']['data_use']['valid_with']
         _all_feats = self.config['dataset']['dataset_definition']['datasets'][valid_data]['features']
         _all_labs = self.config['dataset']['dataset_definition']['datasets'][valid_data]['labels']
-        dataset = KaldiDataset(self.config['exp']['data_cache_root'],
-                               valid_data,
-                               {feat: _all_feats[feat] for feat in self.config['dataset']['features_use']},
-                               {lab: _all_labs[lab] for lab in self.config['dataset']['labels_use']},
-                               self.device,
-                               self.config['training']['max_seq_length_valid'],
-                               self.model.context_left,
-                               self.model.context_right,
-                               normalize_features=True,
-                               phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
-                               max_seq_len=self.config['training']['max_seq_length_valid'],
-                               max_label_length=self.max_label_length,
-                               shuffle_frames=self.config['training']['shuffle_frames'])
+        dataset = get_dataset(self.config['training']['dataset_type'],
+                              self.config['exp']['data_cache_root'],
+                              valid_data,
+                              {feat: _all_feats[feat] for feat in self.config['dataset']['features_use']},
+                              {lab: _all_labs[lab] for lab in self.config['dataset']['labels_use']},
+                              self.config['training']['max_seq_length_valid'],
+                              self.model.context_left,
+                              self.model.context_right,
+                              normalize_features=True,
+                              phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
+                              max_seq_len=self.config['training']['max_seq_length_valid'],
+                              max_label_length=self.max_label_length)
 
         dataloader = KaldiDataLoader(dataset,
                                      self.config['training']['batch_size_valid'],
@@ -288,19 +289,18 @@ class Trainer(BaseTrainer):
         test_data = self.config['dataset']['data_use']['test_with']
         _all_feats = self.config['dataset']['dataset_definition']['datasets'][test_data]['features']
         _all_labs = self.config['dataset']['dataset_definition']['datasets'][test_data]['labels']
-        dataset = KaldiDataset(self.config['exp']['data_cache_root'],
-                               test_data,
-                               {feat: _all_feats[feat] for feat in self.config['dataset']['features_use']},
-                               {lab: _all_labs[lab] for lab in self.config['dataset']['labels_use']},
-                               self.device,
-                               max_seq_length,
-                               self.model.context_left,
-                               self.model.context_right,
-                               normalize_features=True,
-                               phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
-                               max_seq_len=max_seq_length,
-                               max_label_length=self.max_label_length,
-                               shuffle_frames=self.config['training']['shuffle_frames'])
+        dataset = get_dataset(self.config['training']['dataset_type'],
+                              self.config['exp']['data_cache_root'],
+                              test_data,
+                              {feat: _all_feats[feat] for feat in self.config['dataset']['features_use']},
+                              {lab: _all_labs[lab] for lab in self.config['dataset']['labels_use']},
+                              max_seq_length,
+                              self.model.context_left,
+                              self.model.context_right,
+                              normalize_features=True,
+                              phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
+                              max_seq_len=max_seq_length,
+                              max_label_length=self.max_label_length)
 
         dataloader = KaldiDataLoader(dataset,
                                      batch_size,

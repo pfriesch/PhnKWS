@@ -6,7 +6,7 @@ import os.path
 import random
 import errno
 import sys
-from collections import Counter
+from enum import Enum
 from functools import partial
 from multiprocessing.pool import Pool
 from types import SimpleNamespace
@@ -17,13 +17,23 @@ import torch
 from tqdm import tqdm
 
 from data.data_util import split_chunks, apply_context_single_feat
-from data.kaldi_dataset_utils import convert_chunk_from_kaldi_format, _load_labels
-from data.phoneme_dict import load_phoneme_dict, PhonemeDict
+from data.kaldi_dataset_utils import convert_chunk_from_kaldi_format
+from data.phoneme_dict import load_phoneme_dict
 from utils.logger_config import logger
 
 
+
+class DatasetType(Enum):
+    FRAMEWISE_SHUFFLED_FRAMES = 1
+    FRAMEWISE_SEQUENTIAL = 2
+    FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT = 3
+    SEQUENTIAL = 4
+    SEQUENTIAL_APPENDED_CONTEXT = 5
+
+
+
 # inspired by https://github.com/pytorch/audio/blob/master/torchaudio/datasets/vctk.py
-class KaldiDataset(data.Dataset):
+class BaseKaldiDataset(data.Dataset):
     """
     Termenology:
     Chunk: A number of files/samples put together in one file to cache
@@ -38,45 +48,44 @@ class KaldiDataset(data.Dataset):
                  dataset_name,
                  feature_dict,
                  label_dict,
-                 device,
+                 dataset_type,
                  max_sample_len=1000,
                  left_context=0,
                  right_context=0,
                  normalize_features=True,
-                 phoneme_dict=None,  # e.g. kaldi/egs/librispeech/s5/data/lang/phones.txt
 
                  max_seq_len=100,
                  max_label_length=None,
-                 shuffle_frames=False,
                  overfit_small_batch=False
                  ):
+
         self.state = SimpleNamespace()
+        self.state.dataset_type = dataset_type
 
         self.state.overfit_small_batch = overfit_small_batch
-        assert isinstance(phoneme_dict, PhonemeDict)
+        # assert isinstance(phoneme_dict, PhonemeDict)
 
-        self.state.aligned_labels = {}
+        self.state.aligned_labels = None
 
-        for label_name in label_dict:
-            if label_dict[label_name]["label_opts"] == "ali-to-phones --per-frame=true" or \
-                    label_dict[label_name]["label_opts"] == "ali-to-pdf":
-                self.state.aligned_labels[label_name] = True
+        # for label_name in label_dict:
+        #     if label_dict[label_name]["label_opts"] == "ali-to-phones --per-frame=true" or \
+        #             label_dict[label_name]["label_opts"] == "ali-to-pdf":
+        #         self.state.aligned_labels[label_name] = True
+        #
+        #     elif label_dict[label_name]["label_opts"] == "ali-to-phones":
+        #         self.state.aligned_labels[label_name] = False
+        #         if max_seq_len < 0:
+        #             max_seq_len = None
+        #
+        #     else:
+        #         raise NotImplementedError
 
-            elif label_dict[label_name]["label_opts"] == "ali-to-phones":
-                self.state.aligned_labels[label_name] = False
-                if max_seq_len < 0:
-                    max_seq_len = None
-
-            else:
-                raise NotImplementedError
-
-        self.state.shuffle_frames = shuffle_frames
-        if self.state.shuffle_frames:
-            assert max_label_length is None
-            assert max_seq_len is False or \
-                   max_seq_len is None
-            assert max_sample_len is False or \
-                   max_sample_len is None
+        # if dataset_type == DatasetType.FRAMEWISE_SHUFFLED_FRAMES:
+        #     assert max_label_length is None
+        #     assert max_seq_len is False or \
+        #            max_seq_len is None
+        #     assert max_sample_len is False or \
+        #            max_sample_len is None
         if max_sample_len is None or max_sample_len < 0:
             max_sample_len = float("inf")
 
@@ -90,11 +99,11 @@ class KaldiDataset(data.Dataset):
         self.state.max_label_length = max_label_length
         self.state.left_context = left_context
         self.state.right_context = right_context
-        self.state.phoneme_dict = phoneme_dict
+        # self.state.phoneme_dict = phoneme_dict
         self.state.label_index_from = 1  # TODO ?
 
         self.cached_pt = 0
-        self.sample_index = []
+        self.sample_index = {'sample_index': [], 'filenames': []}
 
         self.state.normalize_features = normalize_features
 
@@ -111,21 +120,25 @@ class KaldiDataset(data.Dataset):
 
     @property
     def shuffle_frames(self):
-        return self.state.shuffle_frames
+        raise NotImplementedError
+
+    #     return self.state.shuffle_frames
 
     @property
     def samples_per_chunk(self):
-        if 'sample_index' in self.sample_index:
-            return list(Counter([s[0] for s in self.sample_index['sample_index']]).values())
-
-        else:
-            return list(Counter([s[0] for s in self.sample_index]).values())
+        raise NotImplementedError
+        # if 'sample_index' in self.sample_index:
+        #     return list(Counter([s[0] for s in self.sample_index['sample_index']]).values())
+        #
+        # else:
+        #     return list(Counter([s[0] for s in self.sample_index]).values())
 
     def __len__(self):
-        if 'sample_index' in self.sample_index:
-            return len(self.sample_index['sample_index'])
-        else:
-            return len(self.sample_index)
+        raise NotImplementedError
+        # if 'sample_index' in self.sample_index:
+        #     return len(self.sample_index['sample_index'])
+        # else:
+        #     return len(self.sample_index)
 
     def _getitem_shuffled_frames(self, index):
         # # Reason for not just doing a big matrix with all samples and skipping the following mess:
@@ -188,12 +201,16 @@ class KaldiDataset(data.Dataset):
 
         return filename, features, lables
 
-    def __getitem__(self, index):
-        if self.state.shuffle_frames:
-            filename, features, lables = self._getitem_shuffled_frames(index)
+    def _getitem(self, index):
+        raise NotImplementedError
 
-        else:
-            filename, features, lables = self._getitem_sequential(index)
+    def __getitem__(self, index):
+        # if self.state.dataset_type == DatasetType.FRAMEWISE_SHUFFLED_FRAMES:
+        #     filename, features, lables = self._getitem_shuffled_frames(index)
+        #
+        # else:
+        #     filename, features, lables = self._getitem_sequential(index)
+        filename, features, lables = self._getitem(index)
 
         if self.state.normalize_features:
             # Normalize over whole chunk instead of only over a single file, which is done by applying the kaldi cmvn
@@ -203,6 +220,36 @@ class KaldiDataset(data.Dataset):
                                          np.expand_dims(self.cached_samples['std'][feature_name], axis=-1)
 
         return filename, np_dict_to_torch(features), np_dict_to_torch(lables)
+
+    def _check_labels_indexed_from(self, all_labels_loaded, label_name):
+
+        max_label = max([all_labels_loaded[label_name][l].max() for l in all_labels_loaded[label_name]])
+        min_label = min([all_labels_loaded[label_name][l].min() for l in all_labels_loaded[label_name]])
+        logger.debug(
+            f"Max label: {max_label}")
+        logger.debug(
+            f"min label: {min_label}")
+
+        if min_label > 0:
+            logger.warn(f"label {label_name} does not seem to be indexed from 0 -> making it indexed from 0")
+            for l in all_labels_loaded[label_name]:
+                all_labels_loaded[label_name][l] = all_labels_loaded[label_name][l] - 1
+
+            max_label = max([all_labels_loaded[label_name][l].max() for l in all_labels_loaded[label_name]])
+            min_label = min([all_labels_loaded[label_name][l].min() for l in all_labels_loaded[label_name]])
+            logger.debug(
+                f"Max label new : {max_label}")
+            logger.debug(
+                f"min label new: {min_label}")
+
+        if self.state.label_index_from != 0:
+            assert self.state.label_index_from > 0
+            all_labels_loaded[label_name] = {filename:
+                                                 all_labels_loaded[label_name][filename] + self.state.label_index_from
+                                             for filename in all_labels_loaded[label_name]}
+
+    def _load_labels(self, label_dict):
+        raise NotImplementedError
 
     def _convert_from_kaldi_format(self, feature_dict, label_dict):
         logger.info("Converting features from kaldi features!")
@@ -217,8 +264,9 @@ class KaldiDataset(data.Dataset):
             else:
                 raise
 
-        all_labels_loaded = _load_labels(label_dict, self.state.label_index_from, self.state.max_label_length,
-                                         self.state.phoneme_dict)
+        # all_labels_loaded = _load_labels(label_dict, self.state.label_index_from, self.state.max_label_length,
+        #                                  self.state.phoneme_dict)
+        all_labels_loaded = self._load_labels(label_dict)
 
         with open(feature_dict[main_feat]["feature_lst_path"], "r") as f:
             lines = f.readlines()
@@ -234,7 +282,8 @@ class KaldiDataset(data.Dataset):
                                                    feature_dict=feature_dict,
                                                    label_dict=label_dict,
                                                    all_labels_loaded=all_labels_loaded,
-                                                   shuffle_frames=self.state.shuffle_frames,
+                                                   shuffle_frames=self.state.dataset_type \
+                                                                  == DatasetType.FRAMEWISE_SHUFFLED_FRAMES,
                                                    main_feat=main_feat,
                                                    aligned_labels=self.state.aligned_labels,
                                                    max_sample_len=self.state.max_sample_len,
@@ -280,30 +329,29 @@ class KaldiDataset(data.Dataset):
                             return False
                 return True
 
+    def _filenames_from_sample_index(self):
+        """
+
+        :return: filenames, _sample_index
+        """
+        raise NotImplementedError
+
     def _write_info(self):
         with open(os.path.join(self.state.dataset_path, self.info_filename), "w") as f:
             json.dump(vars(self.state), f)
-        # with open(os.path.join(self.state.dataset_path, self.sample_index_filename), "w") as f:
 
-        if len(self.sample_index[0]) == 3:
-            filenames = {filename: file_idx
-                         for file_idx, filename in enumerate(Counter([filename
-                                                                      for _, filename, _ in
-                                                                      self.sample_index]).keys())}
+        filenames, _sample_index = self._filenames_from_sample_index()
 
-            _sample_index = np.array([(chunk_idx, filenames[filename], sample_idx)
-                                      for chunk_idx, filename, sample_idx in self.sample_index], dtype=np.int32)
-
-        elif len(self.sample_index[0]) == 4:
-            filenames = {filename: file_idx
-                         for file_idx, filename in enumerate(Counter([filename
-                                                                      for _, filename, _, _ in
-                                                                      self.sample_index]).keys())}
-
-            _sample_index = np.array([(chunk_idx, filenames[filename], start_idx, end_idx)
-                                      for chunk_idx, filename, start_idx, end_idx in self.sample_index], dtype=np.int32)
-        else:
-            raise RuntimeError
+        # elif len(self.sample_index[0]) == 4:
+        #     filenames = {filename: file_idx
+        #                  for file_idx, filename in enumerate(Counter([filename
+        #                                                               for _, filename, _, _ in
+        #                                                               self.sample_index]).keys())}
+        #
+        #     _sample_index = np.array([(chunk_idx, filenames[filename], start_idx, end_idx)
+        #                               for chunk_idx, filename, start_idx, end_idx in self.sample_index], dtype=np.int32)
+        # else:
+        #     raise RuntimeError
 
         filenames = {filename: file_idx for file_idx, filename in filenames.items()}
         np.savez(os.path.join(self.state.dataset_path, self.sample_index_filename),
@@ -315,16 +363,33 @@ class KaldiDataset(data.Dataset):
             _state = json.load(f)
             self.state = SimpleNamespace(**_state)
             self.state.phoneme_dict = load_phoneme_dict(*_state['phoneme_dict'])
-        # with open(os.path.join(self.state.dataset_path, self.sample_index_filename), "r") as f:
-        # _sample_index = json.load(f)
+
         _sample_index = np.load(os.path.join(self.state.dataset_path, self.sample_index_filename))
 
-        if 'filenames' in _sample_index:
-            self.sample_index = {}
-            self.sample_index['filenames'] = _sample_index['filenames'].item()
-            self.sample_index['sample_index'] = _sample_index['sample_index']
+        assert 'filenames' in _sample_index
+        self.sample_index = {}
+        self.sample_index['filenames'] = _sample_index['filenames'].item()
+        self.sample_index['sample_index'] = _sample_index['sample_index']
+
+
+def apply_context_full_sequence(sample, start_idx, end_idx, context_left, context_right, aligned_labels):
+    lables = {}
+    for label_name in sample['labels']:
+        if aligned_labels:
+            assert end_idx > 0
+            lables[label_name] = sample['labels'][label_name][start_idx: end_idx]
+
         else:
-            raise RuntimeError
+            lables[label_name] = sample['labels'][label_name]
+
+    features = {}
+    for feature_name in sample['features']:
+        assert len(sample['features'][feature_name]) == end_idx - start_idx + context_left + context_right, \
+            f"{len(sample['features'][feature_name])} {end_idx} {start_idx} {context_left} {context_right}"
+        features[feature_name] = sample['features'][feature_name][start_idx: end_idx]
+        assert len(sample['features'][feature_name] - context_left - context_right) == end_idx - start_idx
+
+    return features, lables
 
 
 def apply_context(sample, start_idx, end_idx, context_left, context_right, aligned_labels):
@@ -352,7 +417,7 @@ def apply_context(sample, start_idx, end_idx, context_left, context_right, align
 
     lables = {}
     for label_name in sample['labels']:
-        if aligned_labels[label_name]:
+        if aligned_labels:
             assert end_idx > 0
             lables[label_name] = sample['labels'][label_name][start_idx: end_idx]
 
@@ -361,9 +426,8 @@ def apply_context(sample, start_idx, end_idx, context_left, context_right, align
 
     features = {}
     for feature_name in sample['features']:
-        if all([not aligned_labels[label_name] for label_name in sample['labels']]):
-            assert len(sample['features'][feature_name]) == end_idx - start_idx + context_left + context_right, \
-                f"{len(sample['features'][feature_name])} {end_idx} {start_idx} {context_left} {context_right}"
+        assert len(sample['features'][feature_name]) == end_idx - start_idx + context_left + context_right, \
+            f"{len(sample['features'][feature_name])} {end_idx} {start_idx} {context_left} {context_right}"
         features[feature_name] = \
             apply_context_single_feat(
                 sample['features'][feature_name],
