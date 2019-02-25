@@ -88,7 +88,7 @@ class Trainer(BaseTrainer):
 
         n_steps_this_epoch = 0
 
-        with Pool(processes=2) as metrics_pool:
+        with Pool(processes=os.cpu_count() // 2) as metrics_pool:
             with tqdm(disable=not logger.isEnabledFor(logging.INFO), total=len(dataloader), position=0) as pbar:
                 pbar.set_description('T e:{} l: {} a: {}'.format(epoch, '-', '-'))
                 for batch_idx, (_, inputs, targets) in enumerate(dataloader):

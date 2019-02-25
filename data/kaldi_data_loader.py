@@ -16,7 +16,7 @@ def collate_fn_simple(sample_list):
     return sample_names, fea_dict, lab_dict
 
 
-def collate_fn_zero_pad(sample_list, feat_padding='repeat'):
+def collate_fn_pad(sample_list, feat_padding='repeat'):
     # TODO compare padding methods
     # feat repeat padding see: https://github.com/SeanNaren/deepspeech.pytorch/issues/312
     # mostly used when batchnorm is used in the model
@@ -157,7 +157,8 @@ class KaldiDataLoader(DataLoader):
         if dataset.shuffle_frames:
             _collate_fn = collate_fn_simple
         else:
-            _collate_fn = collate_fn_zero_pad
+            _collate_fn = collate_fn_pad
+
         if shuffle:
             self._sampler = ChunkedStatefulRandomSampler(dataset)
         else:

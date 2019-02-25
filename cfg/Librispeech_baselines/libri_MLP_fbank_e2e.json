@@ -22,8 +22,8 @@
     "labels_use": ["lab_phn"]
   },
   "training": {
-    "batch_size_train": 8,
-    "batch_size_valid": 8,
+    "batch_size_train": 1,
+    "batch_size_valid": 1,
     "max_seq_length_train": 3500,
     "increase_seq_length_train": true,
     "start_seq_len_train": 3500,
@@ -35,15 +35,16 @@
     "optimizer": {
       "type": "adam",
       "args": {
-        "lr": 0.001
+        "lr": 1e-4,
+        "amsgrad": true
       }
     },
     "lr_scheduler": {
       "patience": 1,
       "arch_halving_factor": 0.5,
-      "arch_improvement_threshold": 0.001,
-      "cooldown": 3,
-      "min_lr": 0.00001
+      "arch_improvement_threshold": 1e-4,
+      "cooldown": 1,
+      "min_lr": 1e-7
     }
   },
   "arch": {

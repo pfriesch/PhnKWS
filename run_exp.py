@@ -121,6 +121,7 @@ def main(config_path, resume_path, overfit_small_batch, warm_start):
         assert hasattr(model, "load_warm_start")
         model.load_warm_start(warm_start)
 
+    # TODO instead of resuming and making a new folder, make a backup and continue in the same folder
     trainer = Trainer(model, loss, metrics, optimizers, lr_schedulers,
                       resume_path, config,
                       do_validation=True,

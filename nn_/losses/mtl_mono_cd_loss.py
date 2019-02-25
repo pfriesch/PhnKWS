@@ -28,10 +28,10 @@ class MtlMonoCDLoss(nn.Module):
         num_cd = output['out_cd'].shape[-1]
         cd_max = target['lab_cd'].view(-1).max()
 
-        assert cd_max < num_cd, "got max {}".format(cd_max)
+        assert cd_max < num_cd, f"got max {cd_max}, expeced {num_cd}"
         num_mono = output['out_mono'].shape[-1]
         mono_max = target['lab_mono'].view(-1).max()
-        assert mono_max < num_mono, "got max {}, min: {}".format(mono_max, target['lab_mono'].view(-1).min())
+        assert mono_max < num_mono, f"got max {mono_max}, expeced {num_mono} (min: {target['lab_mono'].view(-1).min()})"
 
         loss_cd = F.nll_loss(output['out_cd'].view(seq_len * batch_size, -1),
                              target['lab_cd'].view(-1),
