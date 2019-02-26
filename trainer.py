@@ -8,7 +8,6 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-# from data.kaldi_dataset_prefetch_gpu import KaldiDataset
 from base.base_trainer import BaseTrainer
 from data import kaldi_io
 from data.dataset_regestry import get_dataset
@@ -31,8 +30,6 @@ class Trainer(BaseTrainer):
         self.overfit_small_batch = overfit_small_batch
         # Necessary for cudnn ctc function
         self.max_label_length = 256 if isinstance(self.loss, CTCPhnLoss) else None
-
-        self.dataset_type = DatasetType.FRAMEWISE_SHUFFLED_FRAMES  # TODO
 
     def _train_epoch(self, epoch):
         """
@@ -73,6 +70,7 @@ class Trainer(BaseTrainer):
         dataloader = KaldiDataLoader(dataset,
                                      self.config['training']['batch_size_train'],
                                      self.config["exp"]["n_gpu"] > 0,
+                                     batch_ordering=self.model.batch_ordering,
                                      shuffle=True)
 
         assert len(dataset) >= self.config['training']['batch_size_train'], \
@@ -233,7 +231,8 @@ class Trainer(BaseTrainer):
 
         dataloader = KaldiDataLoader(dataset,
                                      self.config['training']['batch_size_valid'],
-                                     self.config["exp"]["n_gpu"] > 0)
+                                     self.config["exp"]["n_gpu"] > 0,
+                                     batch_ordering=self.model.batch_ordering)
 
         assert len(dataset) >= self.config['training']['batch_size_valid'], \
             f"Length of valid dataset {len(dataset)} too small " \
@@ -304,7 +303,8 @@ class Trainer(BaseTrainer):
 
         dataloader = KaldiDataLoader(dataset,
                                      batch_size,
-                                     self.config["exp"]["n_gpu"] > 0)
+                                     self.config["exp"]["n_gpu"] > 0,
+                                     batch_ordering=self.model.batch_ordering)
 
         assert len(dataset) >= batch_size, \
             f"Length of valid dataset {len(dataset)} too small " \

@@ -48,7 +48,6 @@
   },
   "arch": {
     "name": "MLP",
-    "framewise_labels": false,
     "loss": {
       "name": "CTC",
       "args": {

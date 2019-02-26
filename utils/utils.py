@@ -7,7 +7,6 @@ import numpy as np
 import torch
 import matplotlib
 import logging
-from data.data_util import load_counts
 from utils.logger_config import logger
 
 matplotlib.use('agg')

@@ -71,17 +71,14 @@ def _make_frames_shuffled(samples_list, main_feat, left_context, right_context):
 def _make_frames_sequential(samples_list, main_feat, aligned_labels, max_seq_len, left_context,
                             right_context):
     # sequential data
-    if any([not aligned_labels[label_name] for label_name in aligned_labels]):
-        assert all([not aligned_labels[label_name] for label_name in aligned_labels])
+    if not aligned_labels:
         # unaligned labels
         sample_splits, min_len = filter_by_seqlen(samples_list, max_seq_len,
                                                   left_context, right_context)
         logger.info(f"Used samples {len(sample_splits)}/{len(samples_list)} "
                     + f"for a max seq length of {max_seq_len} (min length was {min_len})")
 
-    elif any([not aligned_labels[label_name] for label_name in aligned_labels]) \
-            and not max_seq_len:
-        assert all([not aligned_labels[label_name] for label_name in aligned_labels])
+    elif not aligned_labels and not max_seq_len:
         # unaligned labels but no max_seq_len
         sample_splits = [
             (filename, left_context, len(sample_dict["features"][main_feat]) - right_context)

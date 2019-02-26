@@ -9,7 +9,7 @@ import torch
 
 from base.base_kaldi_dataset import BaseKaldiDataset, apply_context
 from data.data_util import load_labels
-from base.base_kaldi_dataset import DatasetType
+from data.datasets import DatasetType
 
 
 class KaldiDatasetFramewiseContext(BaseKaldiDataset):
@@ -24,8 +24,9 @@ class KaldiDatasetFramewiseContext(BaseKaldiDataset):
                    label_dict[label_name]["label_opts"] == "ali-to-pdf"
 
         super().__init__(data_cache_root, dataset_name, feature_dict, label_dict, dataset_type, max_sample_len,
-                         left_context, right_context, normalize_features, max_seq_len, max_label_length,
-                         overfit_small_batch)
+                         left_context, right_context, normalize_features,
+                         aligned_labels=True, max_seq_len=max_seq_len, max_label_length=max_label_length,
+                         overfit_small_batch=overfit_small_batch)
         self.state.aligned_labels = True
 
     @property
@@ -34,12 +35,10 @@ class KaldiDatasetFramewiseContext(BaseKaldiDataset):
 
     @property
     def samples_per_chunk(self):
-        assert 'sample_index' in self.sample_index
-        return list(Counter([s[0] for s in self.sample_index['sample_index']]).values())
+        return list(Counter([s[0] for s in self.sample_index]).values())
 
     def __len__(self):
-        assert 'sample_index' in self.sample_index
-        return len(self.sample_index['sample_index'])
+        return len(self.sample_index)
 
     def _getitem(self, index):
         #     context left    context right
@@ -53,8 +52,8 @@ class KaldiDatasetFramewiseContext(BaseKaldiDataset):
         #           start      end
         #            index      index
         #
-        chunk_idx, file_idx, start_idx, end_idx = self.sample_index['sample_index'][index]
-        filename = self.sample_index['filenames'][file_idx]
+        chunk_idx, file_idx, start_idx, end_idx = self.sample_index[index]
+        filename = self.filename_index[file_idx]
 
         if self.cached_pt != chunk_idx:
             self.cached_pt = chunk_idx
@@ -91,7 +90,7 @@ class KaldiDatasetFramewiseContext(BaseKaldiDataset):
 
         return all_labels_loaded
 
-    def _filenames_from_sample_index(self):
+    def _filenames_from_sample_index(self, sample_index):
         """
 
         :return: filenames, _sample_index
@@ -99,8 +98,8 @@ class KaldiDatasetFramewiseContext(BaseKaldiDataset):
         filenames = {filename: file_idx
                      for file_idx, filename in enumerate(Counter([filename
                                                                   for _, filename, _, _ in
-                                                                  self.sample_index]).keys())}
+                                                                  sample_index]).keys())}
 
         _sample_index = np.array([(chunk_idx, filenames[filename], start_idx, end_idx)
-                                  for chunk_idx, filename, start_idx, end_idx in self.sample_index], dtype=np.int32)
+                                  for chunk_idx, filename, start_idx, end_idx in sample_index], dtype=np.int32)
         return filenames, _sample_index

@@ -1,4 +1,4 @@
-from base.base_kaldi_dataset import DatasetType
+from data.datasets import DatasetType
 from data.datasets.kaldi_dataset_framewise_sequential import KaldiDatasetFramewise
 from data.datasets.kaldi_dataset_framewise_sequential_context import KaldiDatasetFramewiseContext
 from data.datasets.kaldi_dataset_framewise_shuffled_frames import KaldiDatasetFramewiseContextShuffledFrames
@@ -22,7 +22,7 @@ def get_dataset(dataset_type,
                 overfit_small_batch=False,
 
                 ):
-    assert dataset_type in DatasetType
+    assert DatasetType[dataset_type]
     dataset_type = DatasetType[dataset_type]
     if dataset_type == DatasetType.FRAMEWISE_SHUFFLED_FRAMES:
         assert max_sample_len == None
@@ -36,14 +36,14 @@ def get_dataset(dataset_type,
                                                           overfit_small_batch)
 
     elif dataset_type == DatasetType.FRAMEWISE_SEQUENTIAL:
-        assert phoneme_dict == None
+        # assert phoneme_dict == None
         assert 'lab_cd' in label_dict and 'lab_mono' in label_dict
 
         return KaldiDatasetFramewise(data_cache_root, dataset_name, feature_dict, label_dict, max_sample_len,
                                      left_context, right_context, normalize_features, max_seq_len, max_label_length,
                                      overfit_small_batch)
     elif dataset_type == DatasetType.FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT:
-        assert phoneme_dict == None
+        # assert phoneme_dict == None
         assert 'lab_cd' in label_dict and 'lab_mono' in label_dict
 
         assert left_context > 0 or right_context > 0

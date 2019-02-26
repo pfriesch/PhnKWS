@@ -48,7 +48,6 @@
   },
   "arch": {
     "name": "MLP_mtl",
-    "framewise_labels": false,
     "loss": {
       "name": "CE_mtl_mono_cd",
       "args": {

@@ -7,8 +7,9 @@ from collections import Counter
 import numpy as np
 import torch
 
-from base.base_kaldi_dataset import BaseKaldiDataset, apply_context_full_sequence, DatasetType
+from base.base_kaldi_dataset import BaseKaldiDataset, apply_context_full_sequence
 from data.data_util import load_labels
+from data.datasets import DatasetType
 
 
 class KaldiDatasetFramewise(BaseKaldiDataset):
@@ -24,8 +25,8 @@ class KaldiDatasetFramewise(BaseKaldiDataset):
 
         super().__init__(data_cache_root, dataset_name, feature_dict, label_dict, dataset_type, max_sample_len,
                          left_context, right_context, normalize_features,
-                         max_seq_len, max_label_length,
-                         overfit_small_batch)
+                         aligned_labels=True, max_seq_len=max_seq_len, max_label_length=max_label_length,
+                         overfit_small_batch=overfit_small_batch)
         self.state.aligned_labels = True
 
     @property
@@ -34,12 +35,10 @@ class KaldiDatasetFramewise(BaseKaldiDataset):
 
     @property
     def samples_per_chunk(self):
-        assert 'sample_index' in self.sample_index
-        return list(Counter([s[0] for s in self.sample_index['sample_index']]).values())
+        return list(Counter([s[0] for s in self.sample_index]).values())
 
     def __len__(self):
-        assert 'sample_index' in self.sample_index
-        return len(self.sample_index['sample_index'])
+        return len(self.sample_index)
 
     def _getitem(self, index):
         #     context left    context right
@@ -53,8 +52,10 @@ class KaldiDatasetFramewise(BaseKaldiDataset):
         #           start      end
         #            index      index
         #
-        chunk_idx, file_idx, start_idx, end_idx = self.sample_index['sample_index'][index]
-        filename = self.sample_index['filenames'][file_idx]
+        chunk_idx, file_idx, start_idx, end_idx = self.sample_index[index]
+        filename = self.filename_index[file_idx]
+
+        assert end_idx - start_idx <= 128 and end_idx - start_idx >= 32
 
         if self.cached_pt != chunk_idx:
             self.cached_pt = chunk_idx
@@ -66,11 +67,11 @@ class KaldiDatasetFramewise(BaseKaldiDataset):
                                                        context_right=self.state.right_context,
                                                        context_left=self.state.left_context,
                                                        aligned_labels=self.state.aligned_labels)
-        for feature_name in features:
-            if not end_idx - start_idx == len(features[feature_name]):
-                assert end_idx - start_idx == len(features[feature_name]), \
-                    f"{end_idx - start_idx} =!= {len(features[feature_name])}"
-                assert len(features[feature_name][-1]) == 40  # no context appended
+        # for feature_name in features:
+        #     if not end_idx - start_idx == len(features[feature_name]):
+        #         assert end_idx - start_idx == len(features[feature_name]), \
+        #             f"{end_idx - start_idx} =!= {len(features[feature_name])}"
+        #     assert features[feature_name].shape[-1] == 1  # no context appended
 
         return filename, features, lables
 
@@ -93,7 +94,7 @@ class KaldiDatasetFramewise(BaseKaldiDataset):
 
         return all_labels_loaded
 
-    def _filenames_from_sample_index(self):
+    def _filenames_from_sample_index(self, sample_index):
         """
 
         :return: filenames, _sample_index
@@ -101,8 +102,8 @@ class KaldiDatasetFramewise(BaseKaldiDataset):
         filenames = {filename: file_idx
                      for file_idx, filename in enumerate(Counter([filename
                                                                   for _, filename, _, _ in
-                                                                  self.sample_index]).keys())}
+                                                                  sample_index]).keys())}
 
         _sample_index = np.array([(chunk_idx, filenames[filename], start_idx, end_idx)
-                                  for chunk_idx, filename, start_idx, end_idx in self.sample_index], dtype=np.int32)
+                                  for chunk_idx, filename, start_idx, end_idx in sample_index], dtype=np.int32)
         return filenames, _sample_index

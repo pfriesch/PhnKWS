@@ -1,6 +1,7 @@
-from nn_.net_modules.WaveNet import WaveNet
+from data.datasets import DatasetType
 from nn_.networks.MLPNet import MLPNet
 from nn_.networks.MLP_mtl_Net import MLP_mtl_Net
+from nn_.networks.WaveNet import WaveNet
 
 
 def model_init(config):
@@ -51,6 +52,10 @@ def model_init(config):
         net = MLPNet(input_feat_length, input_feat_name, lab_num)
 
     elif arch_name == "WaveNet_mtl":
+        # assert DatasetType[config['training']['dataset_type']]
+        # dataset_type = DatasetType[config['training']['dataset_type']]
+        # assert dataset_type in [DatasetType.SEQUENTIAL, DatasetType.FRAMEWISE_SEQUENTIAL]
+
         input_feat_name = config['dataset']['features_use'][0]
         input_feat_length = config['dataset']['dataset_definition']['data_info']['features'] \
             [input_feat_name]['input_feat_length']
@@ -61,7 +66,12 @@ def model_init(config):
         #             for lab_name in lab_names]
         if 'CTC' in config['arch']['loss']['name'] or 'ctc' in config['arch']['loss']['name']:
             raise NotImplementedError
-        net = WaveNet(input_feat_length, input_feat_name, lab_num)
+
+        net = WaveNet(input_feat_length, input_feat_name,
+                      lab_cd_num=config['dataset']['dataset_definition']['data_info']['labels'] \
+                                     ['lab_cd']['num_lab'] + 1,
+                      lab_mono_num=config['dataset']['dataset_definition']['data_info']['labels'] \
+                                       ['lab_mono']['num_lab'] + 1)
 
     else:
         raise ValueError("Can't find the arch {}".format(arch_name))

@@ -6,7 +6,7 @@ import numpy as np
 
 from base.base_kaldi_dataset import BaseKaldiDataset
 from data.data_util import load_labels
-from base.base_kaldi_dataset import DatasetType
+from data.datasets import DatasetType
 
 
 class KaldiDatasetFramewiseContextShuffledFrames(BaseKaldiDataset):
@@ -23,7 +23,7 @@ class KaldiDatasetFramewiseContextShuffledFrames(BaseKaldiDataset):
 
         super().__init__(data_cache_root, dataset_name, feature_dict, label_dict, dataset_type, max_sample_len=None,
                          left_context=left_context, right_context=right_context, normalize_features=normalize_features,
-                         max_seq_len=None, max_label_length=None,
+                         aligned_labels=True, max_seq_len=None, max_label_length=None,
                          overfit_small_batch=overfit_small_batch)
         self.state.aligned_labels = True
 
@@ -33,12 +33,10 @@ class KaldiDatasetFramewiseContextShuffledFrames(BaseKaldiDataset):
 
     @property
     def samples_per_chunk(self):
-        assert 'sample_index' in self.sample_index
-        return list(Counter([s[0] for s in self.sample_index['sample_index']]).values())
+        return list(Counter([s[0] for s in self.sample_index]).values())
 
     def __len__(self):
-        assert 'sample_index' in self.sample_index
-        return len(self.sample_index['sample_index'])
+        return len(self.sample_index)
 
     def _getitem(self, index):
         # # Reason for not just doing a big matrix with all samples and skipping the following mess:
@@ -48,8 +46,8 @@ class KaldiDatasetFramewiseContextShuffledFrames(BaseKaldiDataset):
         #
 
         # _sample_index = self.sample_index[index]
-        chunk_idx, file_idx, in_sample_index = self.sample_index['sample_index'][index]
-        filename = self.sample_index['filenames'][file_idx]
+        chunk_idx, file_idx, in_sample_index = self.sample_index[index]
+        filename = self.filename_index[file_idx]
 
         if self.cached_pt != chunk_idx:
             self.cached_pt = chunk_idx
@@ -86,7 +84,7 @@ class KaldiDatasetFramewiseContextShuffledFrames(BaseKaldiDataset):
 
         return all_labels_loaded
 
-    def _filenames_from_sample_index(self):
+    def _filenames_from_sample_index(self, sample_index):
         """
 
         :return: filenames, _sample_index
@@ -94,9 +92,9 @@ class KaldiDatasetFramewiseContextShuffledFrames(BaseKaldiDataset):
         filenames = {filename: file_idx
                      for file_idx, filename in enumerate(Counter([filename
                                                                   for _, filename, _ in
-                                                                  self.sample_index]).keys())}
+                                                                  sample_index]).keys())}
 
         _sample_index = np.array([(chunk_idx, filenames[filename], sample_idx)
-                                  for chunk_idx, filename, sample_idx in self.sample_index], dtype=np.int32)
+                                  for chunk_idx, filename, sample_idx in sample_index], dtype=np.int32)
 
         return filenames, _sample_index
