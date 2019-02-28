@@ -193,9 +193,12 @@ class Trainer(BaseTrainer):
                             for metric in train_metrics}}
             else:
                 log = {'train_loss_avg': total_train_loss / n_steps_this_epoch}
-            if self.do_validation:
+            if self.do_validation and (not self.overfit_small_batch or epoch == 1):
                 valid_log = self._valid_epoch(epoch)
                 log.update(valid_log)
+            else:
+                log.update({'valid_loss': -1,
+                            'valid_metrics': {}})
         else:
             raise RuntimeError("Training epoch hat 0 batches.")
 
@@ -441,9 +444,9 @@ class Trainer(BaseTrainer):
         if isinstance(data, dict):
             return {k: self.to_device(v) for k, v in data.items()}
         if isinstance(data, list):
-            return [e.to(self.device) for e in data]
+            return [e.to(self.device, non_blocking=True) for e in data]
         else:
-            return data.to(self.device)
+            return data.to(self.device, non_blocking=True)
 
 
 class KaldiOutputWriter:

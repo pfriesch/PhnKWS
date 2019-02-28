@@ -17,10 +17,10 @@ class WaveNet(BaseModel):
                  lab_cd_num,
                  lab_mono_num,
                  lookahead_context=5,
-                 n_layers=24,
+                 n_layers=28,
                  max_dilation=4,
-                 n_residual_channels=16,
-                 n_skip_channels=32,
+                 n_residual_channels=32,
+                 n_skip_channels=64,
                  kernel_size=3):
         super(WaveNet, self).__init__()
         self.input_feat_name = input_feat_name
@@ -35,13 +35,13 @@ class WaveNet(BaseModel):
 
         self.conv_in = Conv1d(input_feat_length, n_residual_channels)
 
-        self.conv_out_cd = Conv1d(n_skip_channels, lab_cd_num,
+        self.conv_out_cd = Conv1d(n_skip_channels, n_skip_channels,
                                   bias=False, w_init_gain='relu')
-        self.conv_end_cd = Conv1d(lab_cd_num, lab_cd_num,
+        self.conv_end_cd = Conv1d(n_skip_channels, lab_cd_num,
                                   bias=False, w_init_gain='linear')
-        self.conv_out_mono = Conv1d(n_skip_channels, lab_mono_num,
+        self.conv_out_mono = Conv1d(n_skip_channels, n_skip_channels,
                                     bias=False, w_init_gain='relu')
-        self.conv_end_mono = Conv1d(lab_mono_num, lab_mono_num,
+        self.conv_end_mono = Conv1d(n_skip_channels, lab_mono_num,
                                     bias=False, w_init_gain='linear')
 
         loop_factor = math.floor(math.log2(max_dilation)) + 1
@@ -54,13 +54,17 @@ class WaveNet(BaseModel):
 
         self.context_left, self.context_right = self.context()
 
-        self.batch_ordering = "BCL"
+        self.batch_ordering = "NCL"
+
+    def info(self):
+        return f" context: {self.context_left}, {self.context_right}" \
+               + f" receptive_field: {self.context_left + self.context_right}"
 
     def forward(self, _input):
         x = _input[self.input_feat_name]
         # [N , C_in, L]
 
-        # output_length = x.shape[2] - self.context_left - self.context_right
+        output_length = x.shape[2] - self.context_left - self.context_right
 
         x = self.conv_in(x)
         x = torch.tanh(x)
@@ -69,9 +73,9 @@ class WaveNet(BaseModel):
         for layer in self.layers:
             x, _skip_connection = layer(x)
             if skip_connection is None:
-                skip_connection = _skip_connection[:, :, -1:]
+                skip_connection = _skip_connection[:, :, -output_length:]
             else:
-                skip_connection = _skip_connection[:, :, -1:] + skip_connection
+                skip_connection = _skip_connection[:, :, -output_length:] + skip_connection
                 # TODO check for variance and and multiply wiht sqrt(0,5)
         x = skip_connection
 
@@ -80,16 +84,16 @@ class WaveNet(BaseModel):
         x_cd = F.relu(x_cd)
         x_cd = self.conv_end_cd(x_cd)
         x_cd = F.log_softmax(x_cd, dim=1)
-        assert x_cd.shape[2] == 1
-        x_cd = x_cd.squeeze(2)
+        # assert x_cd.shape[2] == 1
+        # x_cd = x_cd.squeeze(2)
 
         x_mono = F.relu(x)
         x_mono = self.conv_out_mono(x_mono)
         x_mono = F.relu(x_mono)
         x_mono = self.conv_end_mono(x_mono)
         x_mono = F.log_softmax(x_mono, dim=1)
-        assert x_mono.shape[2] == 1
-        x_mono = x_mono.squeeze(2)
+        # assert x_mono.shape[2] == 1
+        # x_mono = x_mono.squeeze(2)
 
         return {'out_cd': x_cd, 'out_mono': x_mono}
 

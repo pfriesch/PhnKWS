@@ -23,26 +23,36 @@ def collate_fn_pad_batch_first(sample_list, feat_padding='zero', ctc_labels=Fals
     # TODO compare padding methods
     # feat repeat padding see: https://github.com/SeanNaren/deepspeech.pytorch/issues/312
     # mostly used when batchnorm is used in the model
-    # BCT
+    # NCL
 
     fea_keys = list(sample_list[0][1].keys())
     lab_keys = list(sample_list[0][2].keys())
 
     batch_size = len(sample_list)
-    max_length = 0
+    max_length_feat = 0
     for sample in sample_list:
         assert sample[1][fea_keys[0]].shape[-1] == 1
         _len = sample[1][fea_keys[0]].shape[0]
-        if _len > max_length:
-            max_length = _len
+        if _len > max_length_feat:
+            max_length_feat = _len
+
+    if not ctc_labels:
+
+        batch_size = len(sample_list)
+        max_length_labs = 0
+        for sample in sample_list:
+            _len = sample[2][lab_keys[0]].shape[0]
+            if _len > max_length_labs:
+                max_length_labs = _len
 
     sample_names = []
 
-    fea_dict = {k: torch.zeros((batch_size, sample_list[0][1][k].shape[1], max_length)) for k in
+    fea_dict = {k: torch.zeros((batch_size, sample_list[0][1][k].shape[1], max_length_feat)) for k in
                 fea_keys}
     if not ctc_labels:
-        lab_dict = {k: torch.full((batch_size, max_length), fill_value=PADDING_IGNORE_INDEX, dtype=torch.int32) for k in
-                    lab_keys}
+        lab_dict = {k: torch.full((batch_size, max_length_labs),
+                                  fill_value=PADDING_IGNORE_INDEX,
+                                  dtype=torch.int64) for k in lab_keys}
     else:
         lab_dict = {k: [[]] * batch_size for k in
                     lab_keys}
@@ -245,7 +255,7 @@ class KaldiDataLoader(DataLoader):
         L: appended context length
         """
 
-        assert batch_ordering in ["BCL", "TBCL", "BCT"]
+        assert batch_ordering in ["NCL", "TNCL", "NCL"]
 
         self.dataset = dataset
         self.n_samples = len(self.dataset)
@@ -254,12 +264,12 @@ class KaldiDataLoader(DataLoader):
         pin_memory = use_gpu
 
         if dataset.state.dataset_type == DatasetType.FRAMEWISE_SHUFFLED_FRAMES:
-            assert batch_ordering == "BCL"
+            assert batch_ordering == "NCL"
             _collate_fn = collate_fn_simple
         else:
-            if batch_ordering == "TBCL":
+            if batch_ordering == "TNCL":
                 _collate_fn = collate_fn_pad
-            elif batch_ordering == "BCT":
+            elif batch_ordering == "NCL":
                 _collate_fn = collate_fn_pad_batch_first
 
             else:
@@ -270,10 +280,15 @@ class KaldiDataLoader(DataLoader):
         else:
             self._sampler = SequentialSampler(dataset)
 
+        if 'DEBUG_MODE' in os.environ and os.environ['DEBUG_MODE']:
+            _num_workers = 0
+        else:
+            _num_workers = os.cpu_count() * 2
+
         super(KaldiDataLoader, self).__init__(self.dataset,
                                               batch_size,
                                               sampler=self._sampler,
                                               collate_fn=_collate_fn,
                                               pin_memory=pin_memory,
-                                              num_workers=os.cpu_count() * 2,
+                                              num_workers=_num_workers,
                                               drop_last=True)  # drop last because maybe batchnorm

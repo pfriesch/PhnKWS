@@ -118,8 +118,6 @@ def make_ctc_decoding_graph(keywords, phn2idx, tmpdir,
     # phonemes), and the disambiguation symbols.
 
     with open(f"{tmpdir}/units.list", "w") as f:
-        f.write("SPN\n")
-        f.write("UNK\n")
         for phn in phn2idx:
             # if "SIL" not in phn and "sil" not in phn:
             f.write(f"{phn.upper()}\n")

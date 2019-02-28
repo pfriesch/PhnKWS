@@ -8,17 +8,7 @@ class LabMonoAccuracy(Module):
         super().__init__()
 
     def forward(self, output, target):
-        if len(target['lab_mono'].shape) == 2:
-            _len = target['lab_mono'].shape[0]
-            batch_size = target['lab_mono'].shape[1]
-
-        elif len(target['lab_mono'].shape) == 1:
-            _len = 1
-            batch_size = target['lab_mono'].shape[0]
-        else:
-            raise ValueError
-
-        pred = output['out_mono'].view(_len * batch_size, -1).max(dim=1)[1]
+        pred = output['out_mono'].max(dim=1)[1].view(-1)
         lab = target['lab_mono'].view(-1)
 
         accuracy = torch.mean((pred == lab).to(dtype=torch.float32))
@@ -32,17 +22,7 @@ class LabMonoError(Module):
         super().__init__()
 
     def forward(self, output, target):
-        if len(target['lab_mono'].shape) == 2:
-            _len = target['lab_mono'].shape[0]
-            batch_size = target['lab_mono'].shape[1]
-
-        elif len(target['lab_mono'].shape) == 1:
-            _len = 1
-            batch_size = target['lab_mono'].shape[0]
-        else:
-            raise ValueError
-
-        pred = output['out_mono'].view(_len * batch_size, -1).max(dim=1)[1]
+        pred = output['out_mono'].max(dim=1)[1].view(-1)
         lab = target['lab_mono'].view(-1)
 
         error = torch.mean((pred != lab).to(dtype=torch.float32))
@@ -56,17 +36,7 @@ class LabCDAccuracy(Module):
         super().__init__()
 
     def forward(self, output, target):
-        if len(target['lab_cd'].shape) == 2:
-            _len = target['lab_cd'].shape[0]
-            batch_size = target['lab_cd'].shape[1]
-
-        elif len(target['lab_cd'].shape) == 1:
-            _len = 1
-            batch_size = target['lab_cd'].shape[0]
-        else:
-            raise ValueError
-
-        pred = output['out_cd'].view(_len * batch_size, -1).max(dim=1)[1]
+        pred = output['out_cd'].max(dim=1)[1].view(-1)
         lab = target['lab_cd'].view(-1)
 
         accuracy = torch.mean((pred == lab).to(dtype=torch.float32))
@@ -80,17 +50,7 @@ class LabCDError(Module):
         super().__init__()
 
     def forward(self, output, target):
-        if len(target['lab_cd'].shape) == 2:
-            _len = target['lab_cd'].shape[0]
-            batch_size = target['lab_cd'].shape[1]
-
-        elif len(target['lab_cd'].shape) == 1:
-            _len = 1
-            batch_size = target['lab_cd'].shape[0]
-        else:
-            raise ValueError
-
-        pred = output['out_cd'].view(_len * batch_size, -1).max(dim=1)[1]
+        pred = output['out_cd'].max(dim=1)[1].view(-1)
         lab = target['lab_cd'].view(-1)
 
         error = torch.mean((pred != lab).to(dtype=torch.float32))

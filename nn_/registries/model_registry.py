@@ -51,6 +51,30 @@ def model_init(config):
         #     lab_num += 1 #TODO
         net = MLPNet(input_feat_length, input_feat_name, lab_num)
 
+
+
+    elif arch_name == "WaveNet_mtl_sequential":
+        assert DatasetType[config['training']['dataset_type']]
+        dataset_type = DatasetType[config['training']['dataset_type']]
+        assert dataset_type in [DatasetType.SEQUENTIAL, DatasetType.FRAMEWISE_SEQUENTIAL]
+
+        input_feat_name = config['dataset']['features_use'][0]
+        input_feat_length = config['dataset']['dataset_definition']['data_info']['features'] \
+            [input_feat_name]['input_feat_length']
+        lab_names = config['dataset']['labels_use']
+        assert 'lab_cd' in lab_names and 'lab_mono' in lab_names
+        # lab_nums = [config['dataset']['dataset_definition']['data_info']['labels'] \
+        #                 [lab_name]['num_lab']
+        #             for lab_name in lab_names]
+        if 'CTC' in config['arch']['loss']['name'] or 'ctc' in config['arch']['loss']['name']:
+            raise NotImplementedError
+
+        net = WaveNet(input_feat_length, input_feat_name,
+                                 lab_cd_num=config['dataset']['dataset_definition']['data_info']['labels'] \
+                                                ['lab_cd']['num_lab'] + 1,
+                                 lab_mono_num=config['dataset']['dataset_definition']['data_info']['labels'] \
+                                                  ['lab_mono']['num_lab'] + 1)
+
     elif arch_name == "WaveNet_mtl":
         # assert DatasetType[config['training']['dataset_type']]
         # dataset_type = DatasetType[config['training']['dataset_type']]

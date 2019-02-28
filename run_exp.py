@@ -1,6 +1,8 @@
 import os
 import argparse
 import datetime
+import shutil
+
 import torch
 
 from cfg.dataset_definition.get_dataset_definition import get_dataset_definition
@@ -90,8 +92,8 @@ def main(config_path, resume_path, overfit_small_batch, warm_start):
     #     # start_time = datetime.datetime.now().strftime('_%Y%m%d_%H%M%S')
     #     # config['exp']['name'] = config['exp']['name'] + "r-" + start_time
     # else:
-    start_time = datetime.datetime.now().strftime('_%Y%m%d_%H%M%S')
-    config['exp']['name'] = config['exp']['name'] + start_time
+    save_time = datetime.datetime.now().strftime('_%Y%m%d_%H%M%S')
+    # config['exp']['name'] = config['exp']['name'] + start_time
 
     set_seed(config['exp']['seed'])
 
@@ -99,7 +101,15 @@ def main(config_path, resume_path, overfit_small_batch, warm_start):
 
     # Output folder creation
     out_folder = os.path.join(config['exp']['save_dir'], config['exp']['name'])
-    if not os.path.exists(out_folder):
+    if os.path.exists(out_folder):
+        print(f"Experiement under {out_folder} exists, moving it copying it to backup")
+        shutil.copytree(out_folder,
+                        os.path.join(config['exp']['save_dir'] + "_finished_runs_backup/",
+                                     config['exp']['name'] + save_time))
+        if len(os.listdir(os.path.join(out_folder, "checkpoints"))) > 0:
+            print(os.listdir(os.path.join(out_folder, "checkpoints")))
+            resume_path = out_folder
+    else:
         os.makedirs(out_folder + '/exp_files')
 
     logger.configure_logger(out_folder)

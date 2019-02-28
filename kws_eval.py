@@ -1,8 +1,8 @@
+import json
 import os
 import random
 from glob import glob
 
-from data.kaldi_dataset import _load_labels
 from kws_decoder.kws_engine import KWSEngine
 import numpy as np
 import matplotlib.pyplot as plt
@@ -32,16 +32,19 @@ def get_files_librispeech(data_folder):
 
 
 def test_kws():
-    data_folder = "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/speech_commands_v0.02"
+    data_folder = "/mnt/data/pytorch-kaldi/bench_data/speech_commands_v0.02"
 
     files, keywords = get_files_speech_commands(data_folder, "validation_list.txt")
     random.shuffle(files)
-    files = files[:20]
+    # files = [f for f in files if "seven" in f]
+    files = files[:200]
     keywords = [kw.upper() for kw in keywords]
+    keywords = sorted(keywords)
+
     print(keywords)
 
     engine = KWSEngine(keywords, 0.0,
-                       "/mnt/data/pytorch-kaldi/exp/libri_MLP_fbank_20190222_172402/checkpoints/checkpoint-epoch14.pth")
+                       "/mnt/data/pytorch-kaldi/exp/libri_MLP_fbank_20190225_133944/checkpoints/checkpoint-epoch7.pth")
 
     results = engine.process_batch(files)
 
@@ -64,8 +67,15 @@ def test_kws():
     ax = fig.add_subplot(111)
 
     ax.matshow(confusion_matrix)
-    ax.set_xticklabels([''] + keywords)
-    ax.set_yticklabels([''] + keywords)
+    # tickmar_font_dict = {'fontsize': 8}
+    # ax.set_xticklabels([''] + keywords, fontdict=tickmar_font_dict)
+    # ax.set_yticklabels([''] + keywords, fontdict=tickmar_font_dict)
+
+    tick_marks = np.arange(len(keywords))
+    plt.xticks(tick_marks, keywords, rotation=90, fontsize=8)
+    assert keywords[0] == "<UNK>"
+    plt.yticks(tick_marks, keywords[1:], fontsize=8)
+
     plt.xlabel('Predicted')
     plt.ylabel('True')
     plt.savefig("kw_resilt.png")
@@ -87,22 +97,24 @@ def test_kws():
 
     #### count
 
-    print(results)
+    print(json.dumps(results, indent=1))
     # plot_output_phonemes(model_logits)
 
 
 def test_asr():
     data_folder = "/mnt/data/datasets/LibriSpeech/dev-clean"
 
-    data_folder_kw = "/mnt/data/libs/kaldi/egs/google_speech_commands/kws/data_kws/speech_commands_v0.02"
+    data_folder_kw = "/mnt/data/pytorch-kaldi/bench_data/speech_commands_v0.02"
 
     _, keywords = get_files_speech_commands(data_folder_kw, "validation_list.txt")
 
     files = get_files_librispeech(data_folder)
-    files = files[:20]
+    files = files[:40]
+    keywords = [kw.upper() for kw in keywords]
+    print(keywords)
 
     engine = KWSEngine(keywords, 0.0,
-                       "/mnt/data/pytorch-kaldi/exp/libri_MLP_fbank_20190222_172402/checkpoints/checkpoint-epoch14.pth")
+                       "/mnt/data/pytorch-kaldi/exp/libri_MLP_fbank_20190225_133944/checkpoints/checkpoint-epoch7.pth")
 
     results = engine.process_batch(files)
 
@@ -148,7 +160,7 @@ def test_asr():
 
     #### count
 
-    print(results)
+    print(json.dumps(results, indent=1))
     # plot_output_phonemes(model_logits)
 
 

@@ -55,7 +55,9 @@ class KaldiDatasetFramewise(BaseKaldiDataset):
         chunk_idx, file_idx, start_idx, end_idx = self.sample_index[index]
         filename = self.filename_index[file_idx]
 
-        assert end_idx - start_idx <= 128 and end_idx - start_idx >= 32
+        # assert end_idx - start_idx <= self.state.max_seq_len + self.state.max_seq_len // 4 and end_idx - start_idx >= self.state.max_seq_len // 4, \
+        #     f"got {end_idx - start_idx} expeced {end_idx - start_idx} <= {self.state.max_seq_len + self.state.max_seq_len // 4} " \
+        #     + f"and {end_idx - start_idx} >= {self.state.max_seq_len // 4}"
 
         if self.cached_pt != chunk_idx:
             self.cached_pt = chunk_idx

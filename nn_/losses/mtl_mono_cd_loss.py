@@ -19,23 +19,26 @@ class MtlMonoCDLoss(nn.Module):
             raise ValueError
 
         if sequence_input:
-            seq_len = target['lab_cd'].shape[0]
-            batch_size = target['lab_cd'].shape[1]
-        elif not sequence_input:
-            seq_len = 1
             batch_size = target['lab_cd'].shape[0]
+            seq_len = target['lab_cd'].shape[1]
+        elif not sequence_input:
+            batch_size = target['lab_cd'].shape[0]
+            seq_len = 1
 
-        num_cd = output['out_cd'].shape[-1]
+        num_cd = output['out_cd'].shape[1]
         cd_max = target['lab_cd'].view(-1).max()
 
-        assert cd_max < num_cd, f"got max {cd_max}, expeced {num_cd}"
-        num_mono = output['out_mono'].shape[-1]
+        assert cd_max < num_cd, f"got max {cd_max}, expected {num_cd}"
+        num_mono = output['out_mono'].shape[1]
         mono_max = target['lab_mono'].view(-1).max()
-        assert mono_max < num_mono, f"got max {mono_max}, expeced {num_mono} (min: {target['lab_mono'].view(-1).min()})"
+        assert mono_max < num_mono, f"got max {mono_max}, expected {num_mono} " \
+                                    + f"(min: {target['lab_mono'].view(-1).min()})"
 
+        # loss_cd = F.nll_loss(output['out_cd'].permute(0, 2, 1).contiguous().view(seq_len * batch_size, -1),
         loss_cd = F.nll_loss(output['out_cd'].view(seq_len * batch_size, -1),
                              target['lab_cd'].view(-1),
                              ignore_index=PADDING_IGNORE_INDEX)
+        # loss_mono = F.nll_loss(output['out_mono'].permute(0, 2, 1).contiguous().view(seq_len * batch_size, -1),
         loss_mono = F.nll_loss(output['out_mono'].view(seq_len * batch_size, -1),
                                target['lab_mono'].view(-1),
                                ignore_index=PADDING_IGNORE_INDEX)

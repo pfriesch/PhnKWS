@@ -122,3 +122,6 @@ class MLP(nn.Module):
             x = self.layers[i](x)
 
         return x
+
+
+# if __name__ == '__main__':

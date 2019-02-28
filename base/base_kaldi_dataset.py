@@ -65,7 +65,7 @@ class BaseKaldiDataset(data.Dataset):
         self.state.min_len_per_chunk = None
         self.state.max_seq_len = max_seq_len
         self.state.max_sample_len = max_sample_len
-        self.state.min_sample_len = 0  # TODO ?
+        self.state.min_sample_len = left_context + right_context + 1  # TODO ?
         self.state.max_label_length = max_label_length
         self.state.left_context = left_context
         self.state.right_context = right_context

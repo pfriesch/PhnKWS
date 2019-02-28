@@ -18,7 +18,7 @@ class Conv1d(torch.nn.Module):
                                     kernel_size=kernel_size, stride=stride,
                                     dilation=dilation, bias=bias)
 
-        torch.nn.init.xavier_uniform(
+        torch.nn.init.xavier_uniform_(
             self.conv.weight, gain=torch.nn.init.calculate_gain(w_init_gain))
 
     def forward(self, signal):
@@ -83,7 +83,8 @@ class WaveNetLayer(nn.Module):
 
         if not self.no_output_layer:
             res_acts = self.res_layer(acts)
-            x = res_acts + x[:, :, -res_acts.shape[2]:]  # TODO r9y9 adds here for variance?: * math.sqrt(0.5)
+            x = res_acts + x[:, :, -res_acts.shape[2]:]
+            # TODO r9y9 adds here for variance?: * math.sqrt(0.5)
 
         s = self.skip_layer(acts)
 

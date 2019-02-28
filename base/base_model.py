@@ -51,5 +51,6 @@ class BaseModel(nn.Module):
         Model prints with number of trainable parameters
         """
         _trainable_parameters = self.trainable_parameters()
-        return super(BaseModel, self).__str__() + '\nTrainable parameters: ~{} ({})'.format(
-            millify(_trainable_parameters), _trainable_parameters)
+        return super(BaseModel, self).__str__() \
+               + f'\nTrainable parameters: ~{millify(_trainable_parameters)} ({_trainable_parameters})\n' \
+               + f'{self.info()}'

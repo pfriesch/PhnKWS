@@ -38,6 +38,8 @@ class MLP_mtl_Net(BaseModel):
                                    dnn_use_laynorm=[False],
                                    dnn_act=["log_softmax"])
 
+        self.batch_ordering = "NCL"
+
     def forward(self, x):
         x = x[self.input_feat_name]
 

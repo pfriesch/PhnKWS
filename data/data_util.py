@@ -1,5 +1,3 @@
-from enum import Enum
-
 import torch
 import numpy as np
 
@@ -80,6 +78,13 @@ def splits_by_seqlen(samples_list, max_sequence_length, context_left, context_ri
 
         assert len(sample_dict["features"]) == 1  # TODO multi feature
         for feature_name in sample_dict["features"]:
+            # if len(sample_dict["features"][feature_name]) - (context_left + context_right) < (
+            #         min_sequence_length) and min_sequence_length > 0:
+            #     # skip feature since it is too short
+            #     logger.debug(f"skipping too short sample! sample was {len(sample_dict['features'][feature_name])} "
+            #                  + f" - {(context_left + context_right)} expected {min_sequence_length}")
+            #     break
+
             if len(sample_dict["features"][feature_name]) - (context_left + context_right) > (
                     max_sequence_length + min_sequence_length) and max_sequence_length > 0:
                 for i in range((len(sample_dict["features"][feature_name]) - (context_left + context_right)
@@ -111,6 +116,10 @@ def splits_by_seqlen(samples_list, max_sequence_length, context_left, context_ri
                 start_idx = context_left
                 end_idx = len(sample_dict["features"][feature_name]) - context_right
                 splits.append((filename, start_idx, end_idx))
+
+    # seq_lens = [end_idx - start_idx for _, start_idx, end_idx in splits]
+    # assert max(seq_lens) <= max_sequence_length + min_sequence_length
+    # assert min(seq_lens) >= min_sequence_length
 
     return splits
 
