@@ -24,7 +24,7 @@ class Logger(object):
                 },
                 'handlers': {
                     'console': {
-                        'level': 'DEBUG',
+                        'level': 'INFO',
                         'class': 'utils.logger_format.TqdmLoggingHandler',
                         'formatter': 'brief'
                     },

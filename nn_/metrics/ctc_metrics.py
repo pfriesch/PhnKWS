@@ -15,10 +15,18 @@ class PhnErrorRate(Module):
                           :vocabulary_size]
         self.decoder = ctcdecode.CTCBeamDecoder(self.vocabulary, log_probs_input=True, beam_width=1)
 
+    @property
+    def cpu_only(self):
+        return True
+
     def convert_to_string(self, tokens, vocab, seq_len):
         assert isinstance(tokens, list) or (isinstance(tokens, np.ndarray) and len(tokens.shape) == 1)
         assert isinstance(seq_len, int)
         assert isinstance(vocab, list)
+        assert min(tokens[0:seq_len]) >= 0
+        # assert max(tokens[0:seq_len]) < len(vocab), max(tokens[0:seq_len])
+        if not max(tokens[0:seq_len]) < len(vocab):
+            print("here")
         return ''.join([vocab[x] for x in tokens[0:seq_len]])
 
     def forward(self, output, target):
@@ -29,9 +37,9 @@ class PhnErrorRate(Module):
         batch_size = len(input_sequence_lengths)
         # batch x seq x label_size
 
-        _logits = logits.permute(1, 0, 2)
+        _logits = logits.permute(0, 2, 1)
         assert _logits.shape[0] == batch_size
-
+        # N x L x C expected
         beam_result, beam_scores, timesteps, out_seq_len = self.decoder.decode(_logits)
 
         curr_idx = 0

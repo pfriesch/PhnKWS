@@ -1,4 +1,5 @@
 import os
+from functools import partial
 
 import torch
 from torch.utils.data import DataLoader, Sampler, SequentialSampler
@@ -101,8 +102,11 @@ def collate_fn_pad_batch_first(sample_list, feat_padding='zero', ctc_labels=Fals
     fea_dict = {k: fea_dict[k][sorting] for k in fea_keys}
     if not ctc_labels:
         lab_dict = {k: lab_dict[k][sorting] for k in lab_dict}
+
     else:
         lab_dict = {k: torch.cat([lab_dict[k][i] for i in sorting], dim=0) for k in lab_keys}
+        for k in lab_dict:
+            assert 0 not in lab_dict[k]
 
     # .view(-1).to(dtype=torch.int32)
 
@@ -209,7 +213,7 @@ class StatefulRandomSampler(Sampler):
         return len(self.data_source)
 
 
-class ChunkedStatefulRandomSampler(Sampler):
+class StatefulChunkedRandomSampler(Sampler):
     r"""Samples elements randomly. State can be saved.
 
     Arguments:
@@ -221,13 +225,13 @@ class ChunkedStatefulRandomSampler(Sampler):
     def __init__(self, data_source):
         assert hasattr(data_source, "samples_per_chunk")
         self.data_source = data_source
-        samples_per_chunk = data_source.samples_per_chunk
+        self.samples_per_chunk = data_source.samples_per_chunk
 
         n = len(self.data_source)
-        assert sum(samples_per_chunk) == n
+        assert sum(self.samples_per_chunk) == n
         self.permutation = []
         total_idx = 0
-        for chunk_id, chunk_len in enumerate(samples_per_chunk):
+        for chunk_id, chunk_len in enumerate(self.samples_per_chunk):
             for i in torch.randperm(chunk_len).tolist():
                 self.permutation.append(total_idx + i)
             total_idx += chunk_len
@@ -235,12 +239,53 @@ class ChunkedStatefulRandomSampler(Sampler):
         self.start_idx = 0
 
     def __iter__(self):
-        for index in self.permutation[self.start_idx:]:
+        for self.start_idx, index in enumerate(self.permutation[self.start_idx:], start=self.start_idx):
             # self.start_idx += 1
             yield index
 
     def __len__(self):
         return len(self.data_source)
+
+    def state_dict(self):
+        return {'permutation': self.permutation,
+                'start_idx': self.start_idx,
+                'samples_per_chunk': self.samples_per_chunk}
+
+    def load_state_dict(self, state_dict):
+        self.permutation = state_dict['permutation']
+        self.start_idx = state_dict['start_idx'] + 1
+        assert self.samples_per_chunk == state_dict['samples_per_chunk'], \
+            "The dataset used when this sampler was saved is not the same as the one used now."
+
+
+class StatefulSequentialSampler(Sampler):
+    r"""Samples elements sequentially, always in the same order.
+
+    Arguments:
+        data_source (Dataset): dataset to sample from
+    """
+
+    def __init__(self, data_source):
+        self.data_source = data_source
+        self.start_idx = 0
+
+    def __iter__(self):
+        for self.start_idx, index in \
+                list(enumerate(range(len(self.data_source)), start=self.start_idx))[self.start_idx:]:
+            yield index
+
+    def __len__(self):
+        return len(self.data_source)
+
+    def state_dict(self):
+        return {
+            'start_idx': self.start_idx,
+            'data_source_len': len(self.data_source)}
+
+    def load_state_dict(self, state_dict):
+        self.start_idx = state_dict['start_idx'] + 1
+        assert len(self.data_source) == state_dict['data_source_len'], \
+            "The dataset used when this sampler was saved is not the same as the one used now."
 
 
 class KaldiDataLoader(DataLoader):
@@ -263,22 +308,35 @@ class KaldiDataLoader(DataLoader):
         # Warn: packed sequence does not work with pin_memory
         pin_memory = use_gpu
 
+        # FRAMEWISE_SEQUENTIAL = 2
+        # FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT = 3
+        # SEQUENTIAL = 4
+        # SEQUENTIAL_APPENDED_CONTEXT = 5
+
         if dataset.state.dataset_type == DatasetType.FRAMEWISE_SHUFFLED_FRAMES:
             assert batch_ordering == "NCL"
             _collate_fn = collate_fn_simple
         else:
             if batch_ordering == "TNCL":
-                _collate_fn = collate_fn_pad
+                raise NotImplementedError
+                # _collate_fn = collate_fn_pad
             elif batch_ordering == "NCL":
-                _collate_fn = collate_fn_pad_batch_first
+                if dataset.state.dataset_type == DatasetType.FRAMEWISE_SEQUENTIAL or \
+                        dataset.state.dataset_type == DatasetType.FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT:
+                    _collate_fn = partial(collate_fn_pad_batch_first, feat_padding='zero', ctc_labels=False)
+                elif dataset.state.dataset_type == DatasetType.SEQUENTIAL or \
+                        dataset.state.dataset_type == DatasetType.SEQUENTIAL_APPENDED_CONTEXT:
+                    _collate_fn = partial(collate_fn_pad_batch_first, feat_padding='zero', ctc_labels=True)
 
+                else:
+                    raise ValueError
             else:
                 raise ValueError
 
         if shuffle:
-            self._sampler = ChunkedStatefulRandomSampler(dataset)
+            _sampler = StatefulChunkedRandomSampler(dataset)
         else:
-            self._sampler = SequentialSampler(dataset)
+            _sampler = StatefulSequentialSampler(dataset)
 
         if 'DEBUG_MODE' in os.environ and os.environ['DEBUG_MODE']:
             _num_workers = 0
@@ -287,8 +345,14 @@ class KaldiDataLoader(DataLoader):
 
         super(KaldiDataLoader, self).__init__(self.dataset,
                                               batch_size,
-                                              sampler=self._sampler,
+                                              sampler=_sampler,
                                               collate_fn=_collate_fn,
                                               pin_memory=pin_memory,
                                               num_workers=_num_workers,
                                               drop_last=True)  # drop last because maybe batchnorm
+
+    def start(self):
+        if self.drop_last:
+            return self.sampler.start_idx // self.batch_size
+        else:
+            return (self.sampler.start_idx + self.batch_size - 1) // self.batch_size

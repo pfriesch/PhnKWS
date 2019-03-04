@@ -26,8 +26,7 @@ class ColoredFormatter(Formatter):
         colored_record = copy(record)
         levelname = colored_record.levelname
         seq = MAPPING.get(levelname, 37)  # default white
-        colored_levelname = ('{0}{1}m{2}{3}') \
-            .format(PREFIX, seq, levelname, SUFFIX)
+        colored_levelname = (f'{PREFIX}{seq}m{levelname}{SUFFIX}')
         colored_record.levelname = colored_levelname
         return Formatter.format(self, colored_record)
 

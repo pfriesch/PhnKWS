@@ -23,7 +23,7 @@ class MonoLoss(nn.Module):
 
         num_mono = output['out_mono'].shape[-1]
         mono_max = target['lab_mono'].view(-1).max()
-        assert mono_max < num_mono, "got max {}".format(mono_max)
+        assert mono_max < num_mono, f"got max {mono_max}"
 
         loss_mono = F.nll_loss(output['out_mono'].view(seq_len * batch_size, -1),
                                target['lab_mono'].view(-1),

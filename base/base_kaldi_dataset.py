@@ -46,13 +46,13 @@ class BaseKaldiDataset(data.Dataset):
                  aligned_labels=False,
                  max_seq_len=None,
                  max_label_length=None,
-                 overfit_small_batch=False
+                 overfit_small_batch=False,
+                 phoneme_dict=None
                  ):
 
         self.state = SimpleNamespace()
         self.state.dataset_type = dataset_type
-
-        self.state.overfit_small_batch = overfit_small_batch
+        self.state.phoneme_dict = phoneme_dict
 
         self.state.aligned_labels = aligned_labels
 
@@ -84,6 +84,9 @@ class BaseKaldiDataset(data.Dataset):
         if not self._check_exists():
             raise RuntimeError('Dataset not found.')
         self._read_info()
+
+        if overfit_small_batch:
+            self.sample_index = self.sample_index[:30]
 
         self.cached_samples = torch.load(
             os.path.join(self.state.dataset_path, "chunk_{:04d}.pyt".format(self.cached_pt)))
@@ -134,9 +137,9 @@ class BaseKaldiDataset(data.Dataset):
             f"min label: {min_label}")
 
         if min_label > 0:
-            logger.warn(f"label {label_name} does not seem to be indexed from 0 -> making it indexed from 0")
+            logger.warn(f"label {label_name} is appears to be indexed from {min_label} -> making it indexed from 0")
             for l in all_labels_loaded[label_name]:
-                all_labels_loaded[label_name][l] = all_labels_loaded[label_name][l] - 1
+                all_labels_loaded[label_name][l] = all_labels_loaded[label_name][l] - min_label
 
             max_label = max([all_labels_loaded[label_name][l].max() for l in all_labels_loaded[label_name]])
             min_label = min([all_labels_loaded[label_name][l].min() for l in all_labels_loaded[label_name]])
@@ -169,7 +172,7 @@ class BaseKaldiDataset(data.Dataset):
             lines = f.readlines()
         feat_list = lines
         random.shuffle(feat_list)
-        file_chunks = list(split_chunks(feat_list, self.state.chunk_size, self.state.overfit_small_batch))
+        file_chunks = list(split_chunks(feat_list, self.state.chunk_size))
 
         self.state.max_len_per_chunk = [0] * len(file_chunks)
         self.state.min_len_per_chunk = [sys.maxsize] * len(file_chunks)
@@ -190,22 +193,22 @@ class BaseKaldiDataset(data.Dataset):
                                                    right_context=self.state.right_context)
 
         _sample_index = []
-        with tqdm(total=len(file_chunks)) as pbar:
-            with Pool() as pool:
-                chunksize = len(file_chunks) // (
-                        2 * os.cpu_count())
-                if chunksize < 1:
-                    chunksize = 1
-                for chnk_id, sample_splits, max_len, min_len in pool.imap_unordered(_convert_chunk_from_kaldi_format,
-                                                                                    enumerate(file_chunks),
-                                                                                    chunksize=chunksize):
-                    _sample_index.extend(sample_splits)
-                    if max_len is not None:
-                        self.state.max_len_per_chunk[chnk_id] = max_len
-                    if min_len is not None:
-                        self.state.min_len_per_chunk[chnk_id] = min_len
-                    pbar.update()
-                    pbar.set_description(f"{chnk_id}")
+        with Pool() as pool:
+            chunksize = len(file_chunks) // (
+                    2 * os.cpu_count())
+            if chunksize < 1:
+                chunksize = 1
+            for chnk_id, sample_splits, max_len, min_len in tqdm(pool.imap_unordered(_convert_chunk_from_kaldi_format,
+                                                                                     enumerate(file_chunks),
+                                                                                     chunksize=chunksize),
+                                                                 total=len(file_chunks),
+                                                                 desc="Converting Kaldi features"
+                                                                 ):
+                _sample_index.extend(sample_splits)
+                if max_len is not None:
+                    self.state.max_len_per_chunk[chnk_id] = max_len
+                if min_len is not None:
+                    self.state.min_len_per_chunk[chnk_id] = min_len
 
         assert len(_sample_index) > 0, \
             f"No sample with a max seq length of {self.state.max_seq_len} in the dataset! " \
@@ -337,6 +340,8 @@ def custom_decode_json(d):
         name, member = d["DatasetType"].split(".")
         return DatasetType[member]
     elif "phoneme_dict" in d:
-        return load_phoneme_dict(*d["phoneme_dict"])
+        if d["phoneme_dict"] is not None:
+            d["phoneme_dict"] = load_phoneme_dict(*d["phoneme_dict"])
+        return d
     else:
         return d

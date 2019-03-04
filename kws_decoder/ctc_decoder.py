@@ -5,9 +5,6 @@ import torch
 import ctcdecode
 import numpy as np
 from tqdm import tqdm
-from scipy.signal import find_peaks
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 
 from base.utils import resume_checkpoint
 from data.data_util import apply_context_single_feat
@@ -18,89 +15,6 @@ from nn_.registries.model_registry import model_init
 from trainer import KaldiOutputWriter
 from utils.logger_config import logger
 from utils.util import ensure_dir
-
-
-def feat_without_context(input_feat):
-    _input_feat = input_feat.squeeze(1)
-    out_feat = np.zeros((_input_feat.shape[0] + _input_feat.shape[2], _input_feat.shape[1]))
-    for i in range(out_feat.shape[0]):
-        if i >= _input_feat.shape[0]:
-            out_feat[i] = _input_feat[_input_feat.shape[0] - 1, :, i - _input_feat.shape[0]]
-        else:
-            out_feat[i] = _input_feat[i, :, 0]
-
-    return out_feat
-
-
-def plot(sample_name, input_feat, output, phn_dict, _labels=None, result_decoded=None):
-    min_height = 0.10
-    top_phns = [x[0] for x in list(sorted(enumerate(output.max(axis=0)), key=lambda x: x[1], reverse=True))
-                if output[:, x[0]].max() > min_height]
-
-    if _labels is not None:
-        _labels = _labels['lab_mono'][sample_name]
-        _labels = [phn_dict.idx2phoneme[l] for l in _labels]
-        prev_phn = None
-        _l_out = []
-        _l_out_i = []
-
-        for _i, l in enumerate(_labels):
-            if prev_phn is None:
-                prev_phn = l
-                # _l_out.append("")
-            else:
-                if prev_phn == l:
-                    pass
-                # _l_out.append("")
-                else:
-                    _l_out.append(prev_phn)
-                    _l_out_i.append(_i)
-                    prev_phn = l
-
-    if 0 in top_phns:
-        top_phns.remove(0)  # TODO removed blank maybe add later
-
-    # phn_dict = {k + 1: v for k, v in phn_dict.items()}
-    # phn_dict[0] = "<blk>"
-    # assert len(phn_dict) == output.shape[1]
-
-    height = 500
-
-    fig = plt.figure()
-    ax = fig.subplots()
-    in_feat = feat_without_context(input_feat)
-    ax.imshow(in_feat.T, origin='lower',
-              # extent=[-(in_feat.shape[0] - output.shape[0] + 1) // 2, in_feat.shape[0], 0, 100],
-              extent=[-(in_feat.shape[0] - output.shape[0]), in_feat.shape[0], 0, height],
-              alpha=0.5)
-    for i in top_phns:
-        # ax.plot(output[:, i] * height, linewidth=0.5)
-        if i != 0:
-            # x = (output[:, i] * height).argmax()
-            # y = (output[:, i] * height)[x]
-
-            peaks, _ = find_peaks(output[:, i] * height, height=min_height * height, distance=10)
-            # plt.plot(peaks, (output[:, i] * height)[peaks], "x", markersize=1)
-
-            for peak in peaks:
-                plt.axvline(x=peak, ymax=(output[:, i] * height)[peak] / height, linewidth=0.5, color='r',
-                            linestyle='-')
-                ax.annotate(phn_dict.reducedIdx2phoneme[i - 1], xy=(peak, (output[:, i] * height)[peak]), fontsize=4)
-    # ax.
-    if _labels is not None:
-        ax.set_xticklabels(_l_out, rotation='vertical')
-        ax.set_xticks(_l_out_i)
-    # ax.legend()
-    # ax.xaxis.set_major_locator(ticker.FixedLocator(_l_out_i))
-    # ax.xaxis.set_(ticker.FixedLocator(_l_out_i))
-    plt.tick_params(labelsize=4)
-    ax.set_aspect(aspect=0.2)
-    if result_decoded is None:
-        ax.set_title(result_decoded)
-    fig.savefig(f"output_{sample_name}.png")
-    fig.savefig(f"output_{sample_name}.pdf")
-    fig.clf()
-    # plt.close(fig)
 
 
 class CTCDecoder:
@@ -126,7 +40,7 @@ class CTCDecoder:
         with open(config_save_path, 'w') as f:
             json.dump(self.config, f, indent=4, sort_keys=False)
 
-        self.epoch, self.global_step = resume_checkpoint(model_path, self.model, logger)
+        self.epoch, self.global_step, _ = resume_checkpoint(model_path, self.model, logger)
 
         self.phoneme_dict = self.config['dataset']['dataset_definition']['phoneme_dict']
 
@@ -155,7 +69,9 @@ class CTCDecoder:
 
         return test_output
 
-    def is_keyword_batch(self, input_features, sensitivity):
+    def is_keyword_batch(self, input_features, sensitivity, tmp_out_dir=None):
+        if tmp_out_dir is None:
+            tmp_out_dir = self.out_dir
 
         # https://stackoverflow.com/questions/15638612/calculating-mean-and-standard-deviation-of-the-data-which-does-not-fit-in-memory
         #
@@ -214,13 +130,30 @@ class CTCDecoder:
 
         plot_num = 0
 
-        vocabulary_size = 42
-        self.vocabulary = [chr(c) for c in list(range(65, 65 + 58)) + list(range(65 + 58 + 69, 65 + 58 + 69 + 500))][
-                          :vocabulary_size]
-        self.decoder = ctcdecode.CTCBeamDecoder(self.vocabulary, log_probs_input=True, beam_width=1)
+        # vocabulary_size = 42
+        # self.vocabulary = [chr(c) for c in list(range(65, 65 + 58)) + list(range(65 + 58 + 69, 65 + 58 + 69 + 500))][
+        #                   :vocabulary_size]
+        # self.decoder = ctcdecode.CTCBeamDecoder(self.vocabulary, log_probs_input=True, beam_width=1)
 
-        with KaldiOutputWriter(self.out_dir, "keyword", self.model.out_names, self.epoch, self.config) as writer:
-            output_label = 'out_phn'
+        # len = 88
+
+        # input_batch = []
+        # sample_names = []
+        # for sample_name in tqdm(input_features, desc="computing acoustic features:"):
+        #     input_feature = self.preprocess_feat(input_features[sample_name])
+        #     # Normalize over whole chunk instead of only over a single file, which is done by applying the kaldi cmvn
+        #     _input_feature = ((input_feature - mean) / std).unsqueeze(1)
+        #     if _input_feature.shape[0] < len:
+        #         _zeros = torch.zeros((88, 1, 40, 11))
+        #         _zeros[-_input_feature.shape[0]:, :, :, :] = _input_feature
+        #         _input_feature = _zeros
+        #     input_batch.append(_input_feature)
+        #     sample_names.append(sample_name)
+
+        # input_batch = {'fbank': torch.cat(input_batch, dim=1)}
+        output_label = 'out_phn'
+        assert output_label in self.model.out_names
+        with KaldiOutputWriter(tmp_out_dir, "keyword", [output_label], self.epoch, self.config) as writer:
             post_files.append(writer.post_file[output_label].name)
             for sample_name in tqdm(input_features, desc="computing acoustic features:"):
                 input_feature = {"fbank": self.preprocess_feat(input_features[sample_name])}
@@ -236,7 +169,7 @@ class CTCDecoder:
                 # output = test_output
 
                 # if self.config['test'][output_label]['normalize_posteriors']:
-                counts = self.config['dataset']['dataset_definition']['data_info']['labels']['lab_phn']['lab_count']
+                # counts = self.config['dataset']['dataset_definition']['data_info']['labels']['lab_phn']['lab_count']
                 # counts = np.array(counts)
                 # blank_count = sum(counts)  # heuristic sil * 2 for the moment
                 # counts = counts * 0.5
@@ -253,38 +186,39 @@ class CTCDecoder:
                 # assert _logits.shape[0] == batch_size
                 # output = np.exp(output)
 
-                beam_result, beam_scores, timesteps, out_seq_len = self.decoder.decode(_logits)
-                beam_result = beam_result[0, 0, :out_seq_len[0, 0]]
+                # beam_result, beam_scores, timesteps, out_seq_len = self.decoder.decode(_logits)
+                # beam_result = beam_result[0, 0, :out_seq_len[0, 0]]
 
-                if plot_num < 20:
-                    # logger.debug(sample_name)
-                    result_decoded = [self.phoneme_dict.reducedIdx2phoneme[l.item() - 1] for l in beam_result]
-                    result_decoded = " ".join(result_decoded)
-                    # logger.debug(result_decoded)
-                    if plot_phns:
-                        label_decoded = " ".join(
-                            [self.phoneme_dict.idx2phoneme[l.item()] for l in _labels_no_ali['lab_mono'][sample_name]])
-                        logger.debug(label_decoded)
-
-                    if plot_phns:
-                        plot(sample_name, input_feature["fbank"], (np.exp(output).T / np.exp(output).sum(axis=1)).T,
-                             self.phoneme_dict, _labels, result_decoded=result_decoded)
-                    else:
-                        plot(sample_name, input_feature["fbank"], (np.exp(output).T / np.exp(output).sum(axis=1)).T,
-                             self.phoneme_dict, result_decoded=result_decoded)
-
-                    plot_num += 1
+                # if plot_num < 20:
+                #     # logger.debug(sample_name)
+                #     result_decoded = [self.phoneme_dict.reducedIdx2phoneme[l.item() - 1] for l in beam_result]
+                #     result_decoded = " ".join(result_decoded)
+                #     # logger.debug(result_decoded)
+                #     if plot_phns:
+                #         label_decoded = " ".join(
+                #             [self.phoneme_dict.idx2phoneme[l.item()] for l in _labels_no_ali['lab_mono'][sample_name]])
+                #         logger.debug(label_decoded)
+                #
+                #     if plot_phns:
+                #         plot(sample_name, input_feature["fbank"], (np.exp(output).T / np.exp(output).sum(axis=1)).T,
+                #              self.phoneme_dict, _labels, result_decoded=result_decoded)
+                #     else:
+                #         plot(sample_name, input_feature["fbank"], (np.exp(output).T / np.exp(output).sum(axis=1)).T,
+                #              self.phoneme_dict, result_decoded=result_decoded)
+                #
+                #     plot_num += 1
 
                 assert len(output.shape) == 2
                 assert np.sum(np.isnan(output)) == 0, "NaN in output"
                 writer.write_mat(output_label, output.squeeze(), sample_name)
+
         # self.config['decoding']['scoring_type'] = 'just_transcript'
         #### DECODING ####
         logger.debug("Decoding...")
         result = decode_ctc(**self.config['dataset']['dataset_definition']['decoding'],
                             words_path=self.words_path,
                             graph_path=self.graph_path,
-                            out_folder=self.out_dir,
+                            out_folder=tmp_out_dir,
                             featstrings=post_files)
 
         # TODO filter result

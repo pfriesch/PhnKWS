@@ -27,7 +27,7 @@ def decode(alignment_model_path,
     assert out_folder[-1] != '/'
     srcdir = os.path.dirname(out_folder)
 
-    thread_string = "-parallel --num-threads={}".format(num_threads)
+    thread_string = f"-parallel --num-threads={num_threads}"
 
     if not os.path.isdir(os.path.join(out_folder, "log")):
         os.makedirs(os.path.join(out_folder, "log"))
@@ -56,7 +56,7 @@ def decode(alignment_model_path,
               + f' --allow-partial=true ' \
               + f'--word-symbol-table={words_path} {alignment_model_path} ' \
               + f'{graph_path} ' \
-              + f'\"{finalfeats}\" \"ark:|gzip -c > {out_folder}/lat.{chnk_id}.gz\" &> {out_folder}/log/decode.{chnk_id}.log'
+              + f'\"{finalfeats}\" \"ark:|gzip -c > {out_folder}/lat.{chnk_id}.gz\"'
         run_shell(cmd)
         chnk_id += 1
 

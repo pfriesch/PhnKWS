@@ -88,7 +88,7 @@ class KaldiDataset(data.Dataset):
         self.cached_samples = []
         for chunk_idx in range(len(self.samples_per_chunk)):
             self.cached_samples.append(dict_to_torch(
-                torch.load(os.path.join(self.dataset_path, "chunk_{:04d}.pyt".format(chunk_idx))), device))
+                torch.load(os.path.join(self.dataset_path, f"chunk_{chunk_idx:04d}.pyt")), device))
             assert len(self.cached_samples[-1]['sample_splits']) == self.samples_per_chunk[chunk_idx], \
                 f"{len(self.cached_samples[-1]['sample_splits'])} =!= {self.samples_per_chunk[chunk_idx]}"
 
@@ -146,8 +146,8 @@ class KaldiDataset(data.Dataset):
                     sample['features'][feature_name]) - self.left_context - self.right_context
                 assert 0 <= in_sample_index + self.left_context + self.right_context + 1 < len(
                     sample['features'][feature_name]), \
-                    "{} <!= {}".format(in_sample_index + self.left_context + self.right_context + 1,
-                                       len(sample['features'][feature_name]))
+                    f"{in_sample_index + self.left_context + self.right_context + 1} " \
+                    + f"<!= {len(sample['features'][feature_name])}"
 
         elif self.split_files_max_sample_len:
             _samples_per_chunk_cumulative = np.cumsum(self.samples_per_chunk)
@@ -264,9 +264,9 @@ class KaldiDataset(data.Dataset):
                         assert max(all_labels_loaded[label_name][sample_id]) <= max(
                             self.phoneme_dict.idx2reducedIdx.keys()), \
                             "Are you sure you have the righ phoneme dict?" + \
-                            " Labels have higher indices than phonemes ( {} <!= {} )".format(
-                                max(all_labels_loaded[label_name][sample_id]),
-                                max(self.phoneme_dict.idx2reducedIdx.keys()))
+                            f" Labels have higher indices than phonemes " \
+                            + f"( {max(all_labels_loaded[label_name][sample_id])} " \
+                            + f"<!= {max(self.phoneme_dict.idx2reducedIdx.keys())} )"
 
                         # map labels according to phoneme dict
                         tmp_labels = np.copy(all_labels_loaded[label_name][sample_id])
@@ -303,7 +303,7 @@ class KaldiDataset(data.Dataset):
         for chnk_id, file_chnk in tqdm(list(enumerate(file_chunks))):
             file_names = [feat.split(" ")[0] for feat in file_chnk]
 
-            chnk_prefix = os.path.join(self.dataset_path, "chunk_{:04d}".format(chnk_id))
+            chnk_prefix = os.path.join(self.dataset_path, f"chunk_{chnk_id:04d}")
 
             features_loaded = {}
             for feature_name in feature_dict:
@@ -321,19 +321,20 @@ class KaldiDataset(data.Dataset):
                 _continue = False
                 for feature_name in feature_dict:
                     if file not in features_loaded[feature_name]:
-                        logger.info("Skipping {}, not in features".format(file))
+                        logger.info(f"Skipping {file}, not in features")
                         _continue = True
                         break
                 for label_name in label_dict:
                     if file not in all_labels_loaded[label_name]:
-                        logger.info("Skipping {}, not in labels".format(file))
+                        logger.info(f"Skipping {file}, not in labels")
                         _continue = True
                         break
                 for feature_name in feature_dict:
                     if type(self.max_sample_len) == int and \
                             len(features_loaded[feature_name][file]) > self.max_sample_len:
-                        logger.info("Skipping {}, feature of size {} too big ( {} expected) ".format(
-                            file, len(features_loaded[feature_name][file]), self.max_sample_len))
+                        logger.info(f"Skipping {file}, feature of size "
+                                    + f"{len(features_loaded[feature_name][file])} too big "
+                                    + f"( {self.max_sample_len} expected) ")
                         _continue = True
                         break
                     if type(self.min_sample_len) == int and \

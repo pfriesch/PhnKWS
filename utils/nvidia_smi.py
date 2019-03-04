@@ -14,7 +14,7 @@ except Exception as e:
     if isinstance(e, ImportError):
         warnings.warn('GPU usage loggin disabled. Install nvidia-ml-py or nvidia-ml-py3 to enable it.')
     else:
-        warnings.warn('{}'.format(e))
+        warnings.warn(str(e))
 
 
 def get_gpu_usage():

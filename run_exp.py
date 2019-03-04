@@ -5,13 +5,14 @@ import shutil
 
 import torch
 
+from base.utils import set_seed
 from cfg.dataset_definition.get_dataset_definition import get_dataset_definition
 from data.phoneme_dict import get_phoneme_dict
 from nn_ import model_init, optimizer_init, lr_scheduler_init, metrics_init, loss_init
+from nn_.registries.seq_len_scheduler_regestry import seq_len_scheduler_init
 from utils.logger_config import logger
 from utils.nvidia_smi import nvidia_smi_enabled
 from utils.util import code_versioning
-from utils.utils import set_seed
 from trainer import Trainer
 from utils.utils import check_environment, read_json
 
@@ -25,6 +26,7 @@ def setup_run(config):
     set_seed(config['exp']['seed'])
     torch.backends.cudnn.deterministic = True  # Otherwise I got nans for the CTC gradient
 
+    # TODO remove the data meta info part and move into kaldi folder e.g.
     dataset_definition = get_dataset_definition(config['dataset']['name'], config['dataset']['data_use']['train_with'])
     config['dataset']['dataset_definition'] = dataset_definition
 
@@ -59,6 +61,7 @@ def setup_run(config):
     optimizers = optimizer_init(config, model)
 
     lr_schedulers = lr_scheduler_init(config, optimizers)
+    seq_len_scheduler = seq_len_scheduler_init(config)
 
     logger.info("".join(["="] * 80))
     logger.info("Architecture:")
@@ -66,14 +69,17 @@ def setup_run(config):
     logger.info("".join(["="] * 80))
     metrics = metrics_init(config)
 
-    loss = loss_init(config)
+    loss = loss_init(config, model)
 
-    return model, loss, metrics, optimizers, config, lr_schedulers
+    return model, loss, metrics, optimizers, config, lr_schedulers, seq_len_scheduler
 
 
-def main(config_path, resume_path, overfit_small_batch, warm_start):
+def main(config_path, load_path, restart, overfit_small_batch, warm_start):
     config = read_json(config_path)
     check_config(config)
+
+    if load_path is not None:
+        raise NotImplementedError
 
     # if resume_path:
     # TODO
@@ -103,12 +109,18 @@ def main(config_path, resume_path, overfit_small_batch, warm_start):
     out_folder = os.path.join(config['exp']['save_dir'], config['exp']['name'])
     if os.path.exists(out_folder):
         print(f"Experiement under {out_folder} exists, moving it copying it to backup")
-        shutil.copytree(out_folder,
-                        os.path.join(config['exp']['save_dir'] + "_finished_runs_backup/",
-                                     config['exp']['name'] + save_time))
-        if len(os.listdir(os.path.join(out_folder, "checkpoints"))) > 0:
-            print(os.listdir(os.path.join(out_folder, "checkpoints")))
-            resume_path = out_folder
+        if os.path.exists(os.path.join(out_folder, "checkpoints")) \
+                and len(os.listdir(os.path.join(out_folder, "checkpoints"))) > 0:
+            shutil.copytree(out_folder,
+                            os.path.join(config['exp']['save_dir'] + "_finished_runs_backup/",
+                                         config['exp']['name'] + save_time))
+
+        #     print(os.listdir(os.path.join(out_folder, "checkpoints")))
+        #     resume_path = out_folder
+        # else:
+        if restart:
+            shutil.rmtree(out_folder)
+            os.makedirs(out_folder + '/exp_files')
     else:
         os.makedirs(out_folder + '/exp_files')
 
@@ -125,15 +137,15 @@ def main(config_path, resume_path, overfit_small_batch, warm_start):
     logger.info("Experiment name : {}".format(out_folder))
     logger.info("tensorboard : tensorboard --logdir {}".format(os.path.abspath(out_folder)))
 
-    model, loss, metrics, optimizers, config, lr_schedulers = setup_run(config)
+    model, loss, metrics, optimizers, config, lr_schedulers, seq_len_scheduler = setup_run(config)
 
     if warm_start is not None:
         assert hasattr(model, "load_warm_start")
         model.load_warm_start(warm_start)
 
     # TODO instead of resuming and making a new folder, make a backup and continue in the same folder
-    trainer = Trainer(model, loss, metrics, optimizers, lr_schedulers,
-                      resume_path, config,
+    trainer = Trainer(model, loss, metrics, optimizers, lr_schedulers, seq_len_scheduler,
+                      load_path, config,
                       do_validation=True,
                       overfit_small_batch=overfit_small_batch)
     trainer.train()
@@ -143,8 +155,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', default=None, type=str,
                         help='config file path (default: None)')
-    parser.add_argument('-r', '--resume', default=None, type=str,
-                        help='path to latest checkpoint (default: None)')
+    parser.add_argument('-r', '--restart', action='store_true',
+                        help='restart training from scratch')
+
+    parser.add_argument('-l', '--load', default=None, type=str,
+                        help='load specific checkpoint(default: None)')
+
     parser.add_argument('-w', '--warm_start', default=None, type=str,
                         help='path to checkpoint to load weights from for warm start (default: None)')
     parser.add_argument('-d', '--device', default=None, type=str,
@@ -156,4 +172,4 @@ if __name__ == '__main__':
     if args.device:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.device
 
-    main(args.config, args.resume, args.overfit, args.warm_start)
+    main(args.config, args.load, args.restart, args.overfit, args.warm_start)

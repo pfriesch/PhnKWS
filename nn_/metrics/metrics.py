@@ -7,6 +7,10 @@ class LabMonoAccuracy(Module):
     def __init__(self):
         super().__init__()
 
+    @property
+    def cpu_only(self):
+        return False
+
     def forward(self, output, target):
         pred = output['out_mono'].max(dim=1)[1].view(-1)
         lab = target['lab_mono'].view(-1)
@@ -20,6 +24,10 @@ class LabMonoError(Module):
 
     def __init__(self):
         super().__init__()
+
+    @property
+    def cpu_only(self):
+        return False
 
     def forward(self, output, target):
         pred = output['out_mono'].max(dim=1)[1].view(-1)
@@ -35,6 +43,10 @@ class LabCDAccuracy(Module):
     def __init__(self):
         super().__init__()
 
+    @property
+    def cpu_only(self):
+        return False
+
     def forward(self, output, target):
         pred = output['out_cd'].max(dim=1)[1].view(-1)
         lab = target['lab_cd'].view(-1)
@@ -48,6 +60,10 @@ class LabCDError(Module):
 
     def __init__(self):
         super().__init__()
+
+    @property
+    def cpu_only(self):
+        return False
 
     def forward(self, output, target):
         pred = output['out_cd'].max(dim=1)[1].view(-1)

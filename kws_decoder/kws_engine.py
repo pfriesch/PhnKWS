@@ -44,21 +44,31 @@ def get_kaldi_feats(scp_file, out_dir, spk2utt, utt2spk):
 
 class KWSEngine(Engine):
 
-    def __init__(self, keywords, sensitivity, model_path) -> None:
+    def __init__(self, keywords, sensitivity, model_path, n_parallel) -> None:
         super().__init__()
-        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.tmp_root_dir = '/mnt/data/tmp_kws_eval'
+        if not os.path.exists(self.tmp_root_dir):
+            os.makedirs(self.tmp_root_dir)
+        self.tmp_dir = tempfile.TemporaryDirectory(dir=self.tmp_root_dir)
+        self.tmp_run_dirs = [tempfile.TemporaryDirectory(dir=self.tmp_root_dir) for _ in range(n_parallel)]
+        for tmp_run_dir in self.tmp_run_dirs:
+            if not os.path.exists(os.path.join(tmp_run_dir.name, "exp_files")):
+                os.makedirs(os.path.join(tmp_run_dir.name, "exp_files"))
         # TODO debug mode
 
         logger.configure_logger(self.tmp_dir.name)
         check_environment()
 
-        assert isinstance(keywords, list)
+        assert isinstance(keywords, dict)
         self.keywords = keywords
         self.sensitivity = sensitivity
 
-        self.decoder = get_decoder(model_path, keywords, self.tmp_dir.name)
+        self.model_checkpoint_path = model_path
+        self.decoder = get_decoder(model_path, list(keywords.keys()), self.tmp_dir.name)
 
-    def process_batch(self, wav_files):
+    def process_batch(self, _input):
+
+        chunk_id, wav_files = _input
         _wav_files = set()
         for file in wav_files:
             assert os.path.abspath(file)
@@ -68,31 +78,45 @@ class KWSEngine(Engine):
                 _wav_files.add(file)
         wav_files = list(_wav_files)
 
-        tmp_scp, spk2utt_path, utt2spk_path = self.preppare_tmp_files(wav_files, self.tmp_dir.name)
-        feats = get_kaldi_feats(tmp_scp, self.tmp_dir.name, spk2utt_path, utt2spk_path)
+        # self.add_noise_padding()
+
+        tmp_scp, spk2utt_path, utt2spk_path = self.preppare_tmp_files(wav_files, self.tmp_run_dirs[chunk_id].name)
+
+        feats = get_kaldi_feats(tmp_scp, self.tmp_run_dirs[chunk_id].name, spk2utt_path, utt2spk_path)
 
         # TODO apply mean std norm, same as in dataloader
 
-        result = self.decoder.is_keyword_batch(feats, self.sensitivity)
+        result = self.decoder.is_keyword_batch(input_features=feats,
+                                               sensitivity=self.sensitivity,
+                                               tmp_out_dir=self.tmp_run_dirs[chunk_id].name)
+        n_parallel = len(self.tmp_run_dirs)
+        for _dir in self.tmp_run_dirs:
+            _dir.cleanup()
+        self.tmp_run_dirs = [tempfile.TemporaryDirectory(dir=self.tmp_root_dir) for _ in range(n_parallel)]
+        for tmp_run_dir in self.tmp_run_dirs:
+            if not os.path.exists(os.path.join(tmp_run_dir.name, "exp_files")):
+                os.makedirs(os.path.join(tmp_run_dir.name, "exp_files"))
+
         return result
 
     def release(self):
         self.tmp_dir.cleanup()
+        for _dir in self.tmp_run_dirs:
+            _dir.cleanup()
 
     def __str__(self):
         pass
 
     @property
-    def frame_length(self):
-        return -1  # TODO
+    def frame_length(self, sample_rate=16000):
+
+        assert self.decoder.model.context_right + self.decoder.model.context_left <= 150, \
+            "The context size of the model is larger than 150."
+        return 2 * sample_rate  # 2 seconds
 
     @staticmethod
-    def sensitivity_range(engine_type):
-        return super().sensitivity_range(engine_type)
-
-    @staticmethod
-    def create(engine_type, keyword, sensitivity):
-        return super().create(engine_type, keyword, sensitivity)
+    def sensitivity_range():
+        return [1.0]
 
     @staticmethod
     def preppare_tmp_files(files, tmp_dir):

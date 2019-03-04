@@ -4,11 +4,8 @@ import numpy as np
 from data import kaldi_io
 
 
-def split_chunks(seq, size, overfit_small_batch):
+def split_chunks(seq, size):
     assert len(seq) > 0
-    if overfit_small_batch:
-        seq = seq[:10]
-        return [seq]
     newseq = []
     chunk = 0
     for chunk in range(len(seq) // size):
@@ -31,8 +28,7 @@ def load_labels(label_folder, label_opts):
     labels_loaded = \
         {k: v for k, v in
          kaldi_io.read_vec_int_ark(
-             'gunzip -c {}/ali*.gz | {} {}/final.mdl ark:- ark:-|'
-                 .format(label_folder, label_opts, label_folder))}
+             f'gunzip -c {label_folder}/ali*.gz | {label_opts} {label_folder}/final.mdl ark:- ark:-|')}
     assert len(labels_loaded) > 0
     return labels_loaded
 

@@ -13,10 +13,11 @@ from nn_.utils.CNN_utils import LayerStats
 
 
 class WaveNet(BaseModel):
-    def __init__(self, input_feat_length, input_feat_name,
-                 lab_cd_num,
-                 lab_mono_num,
-                 lookahead_context=5,
+    def __init__(self,
+                 input_feat_length,
+                 input_feat_name,
+                 outputs,
+                 lookahead_context,
                  n_layers=28,
                  max_dilation=4,
                  n_residual_channels=32,
@@ -24,25 +25,17 @@ class WaveNet(BaseModel):
                  kernel_size=3):
         super(WaveNet, self).__init__()
         self.input_feat_name = input_feat_name
+        self.batch_ordering = "NCL"
+
         self.n_layers = n_layers
-        # assert n_layers == 24
+
         self.lookahead_context = lookahead_context
 
         self.max_dilation = max_dilation
-        # assert max_dilation == 8
 
         self.layers = nn.ModuleList()
 
         self.conv_in = Conv1d(input_feat_length, n_residual_channels)
-
-        self.conv_out_cd = Conv1d(n_skip_channels, n_skip_channels,
-                                  bias=False, w_init_gain='relu')
-        self.conv_end_cd = Conv1d(n_skip_channels, lab_cd_num,
-                                  bias=False, w_init_gain='linear')
-        self.conv_out_mono = Conv1d(n_skip_channels, n_skip_channels,
-                                    bias=False, w_init_gain='relu')
-        self.conv_end_mono = Conv1d(n_skip_channels, lab_mono_num,
-                                    bias=False, w_init_gain='linear')
 
         loop_factor = math.floor(math.log2(max_dilation)) + 1
         for i in range(n_layers):
@@ -52,9 +45,19 @@ class WaveNet(BaseModel):
                 WaveNetLayer(kernel_size, n_residual_channels, n_skip_channels, dilation,
                              no_output_layer=i == n_layers - 1))
 
-        self.context_left, self.context_right = self.context()
+        self.output_layers = nn.ModuleDict({})
+        self.out_names = []
+        for _output_name, _output_num in outputs.items():
+            self.out_names.append(_output_name)
 
-        self.batch_ordering = "NCL"
+            self.output_layers[_output_name] = nn.ModuleList([
+                Conv1d(n_skip_channels, n_skip_channels,
+                       bias=False, w_init_gain='relu'),
+                Conv1d(n_skip_channels, _output_num,
+                       bias=False, w_init_gain='linear')
+            ])
+
+        self.context_left, self.context_right = self.context()
 
     def info(self):
         return f" context: {self.context_left}, {self.context_right}" \
@@ -76,26 +79,17 @@ class WaveNet(BaseModel):
                 skip_connection = _skip_connection[:, :, -output_length:]
             else:
                 skip_connection = _skip_connection[:, :, -output_length:] + skip_connection
-                # TODO check for variance and and multiply wiht sqrt(0,5)
-        x = skip_connection
+                # TODO try multiply with sqrt(0,5) to keep variance at bay
+        x = F.relu(skip_connection)
 
-        x_cd = F.relu(x)
-        x_cd = self.conv_out_cd(x_cd)
-        x_cd = F.relu(x_cd)
-        x_cd = self.conv_end_cd(x_cd)
-        x_cd = F.log_softmax(x_cd, dim=1)
-        # assert x_cd.shape[2] == 1
-        # x_cd = x_cd.squeeze(2)
+        out_dict = {}
+        for _output_name, _output_layers in self.output_layers.items():
+            assert len(_output_layers) == 2
 
-        x_mono = F.relu(x)
-        x_mono = self.conv_out_mono(x_mono)
-        x_mono = F.relu(x_mono)
-        x_mono = self.conv_end_mono(x_mono)
-        x_mono = F.log_softmax(x_mono, dim=1)
-        # assert x_mono.shape[2] == 1
-        # x_mono = x_mono.squeeze(2)
+            out_dict[_output_name] = F.relu(_output_layers[0](x))
+            out_dict[_output_name] = F.log_softmax(_output_layers[1](out_dict[_output_name]), dim=1)
 
-        return {'out_cd': x_cd, 'out_mono': x_mono}
+        return out_dict
 
     def context(self):
         _receptive_field = self._receptive_field()

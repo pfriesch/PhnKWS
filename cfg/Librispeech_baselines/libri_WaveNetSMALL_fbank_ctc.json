@@ -1,0 +1,72 @@
+{
+  "exp": {
+    "save_dir": "../exp",
+    "name": "libri_WaveNetSAMLL_fbank_ctc",
+    "seed": 2234,
+    "n_gpu": 1,
+    "prefetch_to_gpu": true,
+    "n_epochs_tr": 30,
+    "save_period": 1,
+    "checkpoint_interval_minutes": 10,
+    "compute_train_metrics": false,
+    "data_cache_root": "/mnt/data/pytorch-kaldi/data_cache"
+  },
+  "dataset": {
+    "name": "librispeech",
+    "data_use": {
+      "train_with": "train_clean_100",
+      "valid_with": "dev_clean_100",
+      "test_with": "test_clean_100"
+    },
+    "features_use": ["fbank"],
+    "labels_use": ["lab_phn"]
+  },
+  "training": {
+    //    "dataset_type": "FRAMEWISE_SHUFFLED_FRAMES",
+    //    "dataset_type": "FRAMEWISE_SEQUENTIAL",
+    //    "dataset_type": "FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT",
+    "dataset_type": "SEQUENTIAL",
+    //    "dataset_type": "SEQUENTIAL_APPENDED_CONTEXT",
+
+    "max_seq_length_train": 3500,
+    "start_seq_len_train": 3500,
+    "increase_seq_length_train": false,
+    "multply_factor_seq_len_train": 1,
+    "max_seq_length_valid": 3500,
+    "batch_size_train": 1,
+    "batch_size_valid": 1,
+    "clip_grad_norm": -1,
+    "optimizer": {
+      "type": "adam",
+      "args": {
+        "lr": 1e-4
+      }
+    },
+    "lr_scheduler": {
+      "patience": 1,
+      "arch_halving_factor": 0.5,
+      "arch_improvement_threshold": 1e-4,
+      "cooldown": 1,
+      "min_lr": 1e-7
+    }
+  },
+  "arch": {
+    "name": "WaveNet",
+    "args": {
+      "lookahead_context": 5,
+      "n_layers": 28,
+      "max_dilation": 4,
+      "n_residual_channels": 16,
+      "n_skip_channels": 32,
+      "kernel_size": 3
+    },
+    "loss": {
+      "name": "CTC",
+      "args": {
+      }
+    },
+    "metrics": [
+      "phone_error_rate"
+    ]
+  }
+}

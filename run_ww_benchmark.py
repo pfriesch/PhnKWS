@@ -55,7 +55,7 @@ import time
 #     default=False,
 #     help='add noise to the datasets')
 
-from ww_benchmark.wakeword_executor import WakeWordExecutor, Dataset, Datasets, CompositeDataset, csv
+from ww_benchmark.wakeword_executor import KeyWordExecutor, Dataset, Datasets, CompositeDataset, csv
 
 
 def run_detection(engine):
@@ -70,7 +70,7 @@ def run_detection(engine):
     for sensitivity in engine.sensitivity_range:
         start_time = time.process_time()
 
-        executor = WakeWordExecutor(engine, sensitivity, keyword, dataset, noise_dataset=noise_dataset)
+        executor = KeyWordExecutor(engine, sensitivity, keyword, dataset, noise_dataset=noise_dataset)
         false_alarm_per_hour, miss_rate = executor.execute()
         executor.release()
 

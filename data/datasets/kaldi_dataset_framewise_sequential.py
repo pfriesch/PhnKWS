@@ -27,7 +27,6 @@ class KaldiDatasetFramewise(BaseKaldiDataset):
                          left_context, right_context, normalize_features,
                          aligned_labels=True, max_seq_len=max_seq_len, max_label_length=max_label_length,
                          overfit_small_batch=overfit_small_batch)
-        self.state.aligned_labels = True
 
     @property
     def shuffle_frames(self):

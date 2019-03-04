@@ -132,8 +132,8 @@ def _make_frames_sequential(samples_list, main_feat, aligned_labels, max_seq_len
         # unaligned labels
         sample_splits, min_len = filter_by_seqlen(samples_list, max_seq_len,
                                                   left_context, right_context)
-        logger.info(f"Used samples {len(sample_splits)}/{len(samples_list)} "
-                    + f"for a max seq length of {max_seq_len} (min length was {min_len})")
+        logger.debug(f"Used samples {len(sample_splits)}/{len(samples_list)} "
+                     + f"for a max seq length of {max_seq_len} (min length was {min_len})")
 
     elif not aligned_labels and not max_seq_len:
         # unaligned labels but no max_seq_len

@@ -67,6 +67,8 @@ def make_kaldi_decoding_graph(keywords, out_dir,
     libri_lexicon, lang_in_tmp, lang_tmp, final_lang_dir = \
         check_andsetup__dirs(out_dir, train_graph_dir, train_dict_folder, lexicon_path)
 
+    keywords = [kw.upper() for kw in keywords]
+
     if not os.path.exists(os.path.join(out_dir, "utils/prepare_lang.sh")):
         os.symlink(f"{KALDI_ROOT}/egs/wsj/s5/utils", os.path.join(out_dir, "utils"))
         os.symlink(f"{KALDI_ROOT}/egs/wsj/s5/steps", os.path.join(out_dir, "steps"))

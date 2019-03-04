@@ -3,7 +3,9 @@ import os
 from tqdm import tqdm
 
 from kaldi_decoding_scripts.local.just_transcript import get_transcripts
+from utils.logger_config import logger
 from utils.utils import run_shell
+
 
 
 def decode_ctc(words_path,
@@ -33,8 +35,9 @@ def decode_ctc(words_path,
     for ck_data in tqdm(featstrings, desc="lattice generation chunk:"):
         finalfeats = f"ark,s,cs: "
 
+
         # Decode for each of the acoustic scales
-        run_shell(f"cat {ck_data} | {latgen_faster_bin} "
+        run_shell(f"{latgen_faster_bin} "
                   + f"--max-active={max_active} "
                   + f"--max-mem={max_mem} "
                   + f"--beam={beam} "
@@ -43,7 +46,8 @@ def decode_ctc(words_path,
                   + f"--allow-partial=true "
                   + f"--word-symbol-table={words_path} "
                   + f"{graph_path} "
-                  + f"ark:- \"ark:|gzip -c > {out_folder}/lat.{chnk_id}.gz\"")
+                  + f"ark:{ck_data} \"ark:|gzip -c > {out_folder}/lat.{chnk_id}.gz\"")
+
 
     transcripts_best, transcripts, lattice_confidence, lm_posterior, acoustic_posterior = get_transcripts(words_path,
                                                                                                           out_folder)

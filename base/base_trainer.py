@@ -5,7 +5,7 @@ import threading
 
 import torch
 
-from base.utils import resume_checkpoint
+from base.utils import resume_checkpoint, save_checkpoint
 from utils.logger_config import logger
 from utils.nvidia_smi import nvidia_smi_enabled, get_gpu_usage, get_gpu_memory_consumption
 from utils.tensorboard_logger import WriterTensorboardX
@@ -17,35 +17,39 @@ class BaseTrainer:
     Base class for all trainers
     """
 
-    def __init__(self, model, loss, metrics, optimizers, lr_schedulers, resume_path, config):
+    def __init__(self, model, loss, metrics, optimizers, lr_schedulers, seq_len_scheduler, resume_path, config):
         self.config = config
 
         # setup GPU device if available, move model into configured device
         self.device, device_ids = self._prepare_device(config['exp']['n_gpu'])
         self.model = model.to(self.device)
         if len(device_ids) > 1:
-            self.model = torch.nn.DataParallel(model, device_ids=device_ids)
+            raise NotImplementedError
+            # self.model = torch.nn.DataParallel(model, device_ids=device_ids)
 
         self.loss = loss
         self.metrics = metrics
         self.optimizers = optimizers
         self.lr_schedulers = lr_schedulers
-        self.max_seq_length_train_curr = self.config['training']['start_seq_len_train']
+        self.seq_len_scheduler = seq_len_scheduler
 
         self.epochs = config['exp']['n_epochs_tr']
         self.save_period = config['exp']['save_period']
-        self.monitor = config['exp'].get('monitor', 'off')
 
+        # self.monitor = config['exp'].get('monitor', 'off')
+
+        # TODO  configuration to monitor model performance and save best
+        # TODO  early stopping
         # configuration to monitor model performance and save best
-        if self.monitor == 'off':
-            self.mnt_mode = 'off'
-            self.mnt_best = 0
-        else:
-            self.mnt_mode, self.mnt_metric = self.monitor.split()
-            assert self.mnt_mode in ['min', 'max']
-
-            self.mnt_best = math.inf if self.mnt_mode == 'min' else -math.inf
-            self.early_stop = config['exp'].get('early_stop', math.inf)
+        # if self.monitor == 'off':
+        #     self.mnt_mode = 'off'
+        #     self.mnt_best = 0
+        # else:
+        #     self.mnt_mode, self.mnt_metric = self.monitor.split()
+        #     assert self.mnt_mode in ['min', 'max']
+        #
+        #     self.mnt_best = math.inf if self.mnt_mode == 'min' else -math.inf
+        #     self.early_stop = config['exp'].get('early_stop', math.inf)
 
         self.start_epoch = 0
         self.global_step = 0
@@ -55,11 +59,6 @@ class BaseTrainer:
         # setup directory for checkpoint saving
         self.checkpoint_dir = os.path.join(self.out_dir, 'checkpoints')
         # setup visualization writer instance
-        self.tensorboard_logger = WriterTensorboardX(
-            os.path.join(self.out_dir, "logs"))
-
-        # if hasattr(model, "get_sample_input"):
-        #     self.tensorboard_logger.add_graph(model, model.get_sample_input(), True)
 
         # Save configuration file into checkpoint directory:
         ensure_dir(self.checkpoint_dir)
@@ -68,11 +67,33 @@ class BaseTrainer:
             json.dump(config, f, indent=4, sort_keys=False)
 
         if resume_path:
-            self.start_epoch, self.global_step = \
-                resume_checkpoint(resume_path, model, logger, optimizers, lr_schedulers)
+            raise NotImplementedError
+            # self.start_epoch, self.global_step, self.starting_dataset_sampler_state = \
+            #     resume_checkpoint(resume_path, model, logger, optimizers, lr_schedulers)
+            # for lr_scheduler in self.lr_schedulers:
+            #     if self.lr_schedulers[lr_scheduler].current_lr() > self.config['training']['optimizer']['args']['lr']:
+            #         self.lr_schedulers[lr_scheduler].set_lr(self.config['training']['optimizer']['args']['lr'])
+            #
+            # self.tensorboard_logger = WriterTensorboardX(os.path.join(self.out_dir, "tensorboard_logs"),
+            #                                              purge_step=self.global_step)
+
+        elif len(os.listdir(self.checkpoint_dir)) > 0:
+            logger.info("Restarting training!")
+            self.start_epoch, self.global_step, self.starting_dataset_sampler_state = \
+                resume_checkpoint(self.checkpoint_dir, model, logger, optimizers, lr_schedulers)
             for lr_scheduler in self.lr_schedulers:
                 if self.lr_schedulers[lr_scheduler].current_lr() > self.config['training']['optimizer']['args']['lr']:
                     self.lr_schedulers[lr_scheduler].set_lr(self.config['training']['optimizer']['args']['lr'])
+
+            self.tensorboard_logger = WriterTensorboardX(os.path.join(self.out_dir, "tensorboard_logs"),
+                                                         purge_step=self.global_step)
+        else:
+            self.starting_dataset_sampler_state = None
+
+            self.tensorboard_logger = WriterTensorboardX(os.path.join(self.out_dir, "tensorboard_logs"))
+
+            # if hasattr(model, "get_sample_input"):
+            #     self.tensorboard_logger.add_graph(model, model.get_sample_input(), True)
 
         self.device = 'cpu'
         if nvidia_smi_enabled:
@@ -114,29 +135,22 @@ class BaseTrainer:
         """
         logger.info([f"{lr_scheduler_name}: {self.lr_schedulers[lr_scheduler_name].current_lr()}"
                      for lr_scheduler_name in self.lr_schedulers])
-        logger.info(f"max_seq_length_train_curr: {self.max_seq_length_train_curr}")
-        epoch = self.start_epoch
-        for epoch in range(self.start_epoch, self.epochs):
-            logger.info('----- Epoch {} / {} -----'.format(format(epoch, "03d"), format(self.epochs, "03d")))
+        for self.epoch in range(self.start_epoch, self.epochs):
+            logger.info('----- Epoch {} / {} -----'.format(format(self.epoch, "03d"), format(self.epochs, "03d")))
 
             self.tensorboard_logger.set_step(self.global_step, 'epoch_info')
             with Timer("elapsed_time_epoch", [self.tensorboard_logger, logger], self.global_step) as t:
-                result_log = self._train_epoch(epoch)
+                result_log = self._train_epoch(self.epoch)
 
             for lr_scheduler_name in self.lr_schedulers:
                 self.tensorboard_logger.add_scalar("lr_{}".format(lr_scheduler_name),
                                                    self.lr_schedulers[lr_scheduler_name].current_lr())
-                self.lr_schedulers[lr_scheduler_name].step(result_log['valid_loss'], epoch=epoch)
+                self.lr_schedulers[lr_scheduler_name].step(result_log['valid_loss'], epoch=self.epoch)
 
-            if self.max_seq_length_train_curr is not None:
-                self.tensorboard_logger.add_scalar("max_seq_length_train_curr", self.max_seq_length_train_curr)
-                if self.config['training']['increase_seq_length_train']:
-                    self.max_seq_length_train_curr *= self.config['training']['multply_factor_seq_len_train']
-                    if self.max_seq_length_train_curr > self.config['training']['max_seq_length_train']:
-                        self.max_seq_length_train_curr = self.config['training']['max_seq_length_train']
+            self.seq_len_scheduler.step()
 
             # save logged informations into log dict
-            log = {'epoch': epoch}
+            log = {'epoch': self.epoch}
             log.update({'elapsed_time_epoch': f"{t.interval:.2f}s"})
             log.update(result_log)
 
@@ -147,36 +161,32 @@ class BaseTrainer:
 
             # evaluate model performance according to configured metric, save best checkpoint as model_best
             best = False
-            if self.mnt_mode != 'off':
-                try:
-                    # check whether model performance improved or not, according to specified metric(mnt_metric)
-                    improved = (self.mnt_mode == 'min' and log[self.mnt_metric] < self.mnt_best) or \
-                               (self.mnt_mode == 'max' and log[self.mnt_metric] > self.mnt_best)
-                except KeyError:
-                    logger.warning(
-                        "Warning: Metric '{}' is not found. Model performance monitoring is disabled.".format(
-                            self.mnt_metric))
-                    self.mnt_mode = 'off'
-                    improved = False
-                    not_improved_count = 0
+            # if self.mnt_mode != 'off':
+            #     # check whether model performance improved or not, according to specified metric(mnt_metric)
+            #     assert self.mnt_metric in log, \
+            #         f"Metric '{self.mnt_metric}' is not found. Model performance monitoring is disabled."
+            #     improved = (self.mnt_mode == 'min' and log[self.mnt_metric] < self.mnt_best) or \
+            #                (self.mnt_mode == 'max' and log[self.mnt_metric] > self.mnt_best)
+            #
+            #     if improved:
+            #         self.mnt_best = log[self.mnt_metric]
+            #         not_improved_count = 0
+            #         best = True
+            #     else:
+            #         not_improved_count += 1
+            #
+            #     if not_improved_count > self.early_stop:
+            #         logger.info(f"Validation performance didn\'t improve for {self.early_stop} epochs. Training stops.")
+            #         break
 
-                if improved:
-                    self.mnt_best = log[self.mnt_metric]
-                    not_improved_count = 0
-                    best = True
-                else:
-                    not_improved_count += 1
+            if self.epoch % self.save_period == 0:
+                save_checkpoint(self.epoch, self.global_step, self.model, self.optimizers, self.lr_schedulers,
+                                self.seq_len_scheduler, self.config, self.checkpoint_dir,
+                                # self.monitor_best,
+                                save_best=best)
 
-                if not_improved_count > self.early_stop:
-                    logger.info(
-                        "Validation performance didn\'t improve for {} epochs. Training stops.".format(self.early_stop))
-                    break
-
-            if epoch % self.save_period == 0:
-                self.save_checkpoint(epoch, save_best=best)
-
-        result_eval = self._eval_epoch(epoch)
-        logger.info(result_eval)
+        # result_eval = self._eval_epoch(epoch)
+        # logger.info(result_eval)
         if nvidia_smi_enabled:
             self.stop_gpu_usage_logging.set()
 
@@ -190,37 +200,3 @@ class BaseTrainer:
 
     def _eval_epoch(self, epoch):
         raise NotImplementedError
-
-    def save_checkpoint(self, epoch, save_best=False):
-        """
-        Saving checkpoints
-
-        :param epoch: current epoch number
-        :param log: logging information of the epoch
-        :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
-        """
-
-        state = {
-            'epoch': epoch,
-            'global_step': self.global_step,
-            'state_dict': self.model.state_dict(),
-            'optimizers': {opti_name: self.optimizers[opti_name].state_dict() for opti_name in self.optimizers},
-            'lr_schedulers': {lr_sched_name: self.lr_schedulers[lr_sched_name].state_dict()
-                              for lr_sched_name in self.lr_schedulers},
-            'monitor_best': self.mnt_best,
-            'config': self.config
-        }
-        filename = os.path.join(self.checkpoint_dir, 'checkpoint-epoch{}.pth'.format(epoch))
-        torch.save(state, filename)
-        logger.info("Saving checkpoint: {} ...".format(filename))
-
-        if epoch > 3:
-            filename_prev = os.path.join(self.checkpoint_dir, 'checkpoint-epoch{}.pth'.format(epoch - 3))
-            if os.path.exists(filename_prev):
-                os.remove(filename_prev)
-                logger.info("Removing old checkpoint: {} ...".format(filename_prev))
-
-        if save_best:
-            best_path = os.path.join(self.checkpoint_dir, 'model_best.pth')
-            torch.save(state, best_path)
-            logger.info("Saving current best: {} ...".format('model_best.pth'))

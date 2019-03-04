@@ -1,3 +1,6 @@
+from utils.logger_config import logger
+
+
 def int2sym(transcript_file, mapping_file):
     with open(mapping_file, "r") as f:
         mapping = f.readlines()
@@ -17,11 +20,10 @@ def int2sym(transcript_file, mapping_file):
     #         mapped_transcripts[t] = ["---"]
     #         transcripts.remove(t)
 
-    for tran in transcripts:
-        if len( tran) != 2:
-            print("Oops...")
-
-
+    for _idx, tran in enumerate(transcripts):
+        if len(tran) == 1:
+            transcripts[_idx] = (tran, str(mapping['<UNK>']))
+            logger.debug(f"transcript of {tran} was empty, using <UNK> instead")
 
     for sample_id, transcript in transcripts:
         if sample_id.endswith("-1"):

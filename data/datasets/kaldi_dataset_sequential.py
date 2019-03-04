@@ -25,13 +25,11 @@ class KaldiDatasetSequential(BaseKaldiDataset):
             if max_seq_len < 0:
                 max_seq_len = None
 
+        assert isinstance(phoneme_dict, PhonemeDict)
         super().__init__(data_cache_root, dataset_name, feature_dict, label_dict, dataset_type, max_sample_len,
                          left_context, right_context, normalize_features,
                          aligned_labels=False, max_seq_len=max_seq_len, max_label_length=max_label_length,
-                         overfit_small_batch=overfit_small_batch)
-        self.state.aligned_labels = False
-        assert isinstance(phoneme_dict, PhonemeDict)
-        self.state.phoneme_dict = phoneme_dict
+                         overfit_small_batch=overfit_small_batch, phoneme_dict=phoneme_dict)
 
     @property
     def shuffle_frames(self):
@@ -69,11 +67,11 @@ class KaldiDatasetSequential(BaseKaldiDataset):
                                                        context_right=self.state.right_context,
                                                        context_left=self.state.left_context,
                                                        aligned_labels=self.state.aligned_labels)
-        for feature_name in features:
-            if not end_idx - start_idx == len(features[feature_name]):
-                assert end_idx - start_idx == len(features[feature_name]), \
-                    f"{end_idx - start_idx} =!= {len(features[feature_name])}"
-                assert len(features[feature_name][-1]) == 40  # no context appended
+        # for feature_name in features:
+        #     if not end_idx - start_idx == len(features[feature_name]):
+        #         assert end_idx - start_idx == len(features[feature_name]), \
+        #             f"{end_idx - start_idx} =!= {len(features[feature_name])}"
+        #         assert len(features[feature_name][-1]) == 40  # no context appended
 
         return filename, features, lables
 

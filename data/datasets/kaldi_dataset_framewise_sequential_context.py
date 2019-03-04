@@ -58,7 +58,7 @@ class KaldiDatasetFramewiseContext(BaseKaldiDataset):
         if self.cached_pt != chunk_idx:
             self.cached_pt = chunk_idx
             self.cached_samples = torch.load(
-                os.path.join(self.state.dataset_path, "chunk_{:04d}.pyt".format(self.cached_pt)))
+                os.path.join(self.state.dataset_path, f"chunk_{self.cached_pt:04d}.pyt"))
 
         features, lables = apply_context(self.cached_samples['samples'][filename],
                                          start_idx=start_idx, end_idx=end_idx,
