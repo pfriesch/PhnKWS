@@ -1,13 +1,13 @@
 {
   "exp": {
     "save_dir": "../exp",
-    "name": "libri_MLP_fbank",
+    "name": "libri_MLP_fbank_ce",
     "seed": 2234,
     "n_gpu": 1,
     "prefetch_to_gpu": true,
-    "n_epochs_tr": 24,
+    "n_epochs_tr": 20,
     "save_period": 1,
-    "checkpoint_interval_seconds": 10000000000000,
+    "checkpoint_interval_minutes": 10,
     "compute_train_metrics": true,
     "data_cache_root": "/mnt/data/pytorch-kaldi/data_cache"
   },
@@ -15,17 +15,21 @@
     "name": "librispeech",
     "data_use": {
       "train_with": "train_clean_100",
-      "valid_with": "dev_clean",
-      "test_with": "test_clean"
+      "valid_with": "dev_clean_100",
+      "test_with": "test_clean_100"
     },
     "features_use": ["fbank"],
     "labels_use": ["lab_cd", "lab_mono"]
   },
   "training": {
     "dataset_type": "FRAMEWISE_SHUFFLED_FRAMES",
+    //    "dataset_type": "FRAMEWISE_SEQUENTIAL",
+    //    "dataset_type": "FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT",
+    //    "dataset_type": "SEQUENTIAL",
+    //    "dataset_type": "SEQUENTIAL_APPENDED_CONTEXT",
     "max_seq_length_train": null,
     "start_seq_len_train": null,
-    "increase_seq_length_train": false,
+    "increase_seq_length_train": null,
     "multply_factor_seq_len_train": null,
     "max_seq_length_valid": null,
     "batch_size_train": 128,
@@ -34,22 +38,30 @@
     "optimizer": {
       "type": "adam",
       "args": {
-        "lr": 1e-4,
-        "amsgrad": true
+        "lr": 1e-3
       }
     },
     "lr_scheduler": {
-      "patience": 1,
-      "arch_halving_factor": 0.5,
-      "arch_improvement_threshold": 1e-4,
-      "cooldown": 1,
-      "min_lr": 1e-7
+      "name": "MultiStepLR",
+      "args": {
+        "milestones": [4, 6, 8, 10],
+        "gamma": 0.5
+      }
     }
   },
   "arch": {
-    "name": "MLP_mtl",
+    "name": "MLP",
+    "args": {
+      "dnn_lay": [1024, 1024, 1024, 1024, 1024],
+      "dnn_drop": [0.15, 0.15, 0.15, 0.15, 0.15],
+      "dnn_use_laynorm_inp": false,
+      "dnn_use_batchnorm_inp": false,
+      "dnn_use_batchnorm": [true, true, true, true, true],
+      "dnn_use_laynorm": [false, false, false, false, false],
+      "dnn_act": ["relu", "relu", "relu", "relu", "relu"]
+    },
     "loss": {
-      "name": "CE_mtl_mono_cd",
+      "name": "CE",
       "args": {
         "weight_mono": 1.0
       }

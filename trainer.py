@@ -30,7 +30,7 @@ class Trainer(BaseTrainer):
                                       seq_len_scheduler, resume_path, config)
         self.config = config
         self.do_validation = do_validation
-        self.log_step = int(np.sqrt(config['training']['batch_size_train']))
+        self.log_step = int(np.sqrt(config['training']['batching']['batch_size_train']))
         self.overfit_small_batch = overfit_small_batch
         # Necessary for cudnn ctc function
         self.max_label_length = 256 if isinstance(self.loss, CTCPhnLoss) else None
@@ -62,7 +62,7 @@ class Trainer(BaseTrainer):
                               f"{tr_data}_{self.config['exp']['name']}",
                               {feat: _all_feats[feat] for feat in self.config['dataset']['features_use']},
                               {lab: _all_labs[lab] for lab in self.config['dataset']['labels_use']},
-                              self.config['training']['max_seq_length_train'],
+                              self.config['training']['batching']['max_seq_length_train'],
                               self.model.context_left,
                               self.model.context_right,
                               normalize_features=True,
@@ -72,7 +72,7 @@ class Trainer(BaseTrainer):
                               overfit_small_batch=self.overfit_small_batch)
 
         dataloader = KaldiDataLoader(dataset,
-                                     self.config['training']['batch_size_train'],
+                                     self.config['training']['batching']['batch_size_train'],
                                      self.config["exp"]["n_gpu"] > 0,
                                      batch_ordering=self.model.batch_ordering,
                                      shuffle=True)
@@ -81,9 +81,9 @@ class Trainer(BaseTrainer):
             dataloader.sampler.load_state_dict(self.starting_dataset_sampler_state)
             self.starting_dataset_sampler_state = None
 
-        assert len(dataset) >= self.config['training']['batch_size_train'], \
+        assert len(dataset) >= self.config['training']['batching']['batch_size_train'], \
             f"Length of train dataset {len(dataset)} too small " \
-            + f"for batch_size of {self.config['training']['batch_size_train']}"
+            + f"for batch_size of {self.config['training']['batching']['batch_size_train']}"
 
         total_train_loss = 0
         total_train_metrics = {metric: 0 for metric in self.metrics}
@@ -244,6 +244,87 @@ class Trainer(BaseTrainer):
 
     def _valid_epoch(self, epoch):
         """
+       Validate after training an epoch
+       :return: A log that contains information about validation
+       Note:
+           The validation metrics in log must have the key 'val_metrics'.
+       """
+        if 'DEBUG_MODE' in os.environ and bool(int(os.environ['DEBUG_MODE'])):
+            return self._valid_epoch_sync_metrics(epoch)
+        else:
+            return self._valid_epoch_async_metrics(epoch)
+
+    def _valid_epoch_sync_metrics(self, epoch):
+        self.model.eval()
+
+        valid_loss = 0
+        accumulated_valid_metrics = {metric: 0 for metric in self.metrics}
+
+        valid_data = self.config['dataset']['data_use']['valid_with']
+        _all_feats = self.config['dataset']['dataset_definition']['datasets'][valid_data]['features']
+        _all_labs = self.config['dataset']['dataset_definition']['datasets'][valid_data]['labels']
+        dataset = get_dataset(self.config['training']['dataset_type'],
+                              self.config['exp']['data_cache_root'],
+                              f"{valid_data}_{self.config['exp']['name']}",
+                              {feat: _all_feats[feat] for feat in self.config['dataset']['features_use']},
+                              {lab: _all_labs[lab] for lab in self.config['dataset']['labels_use']},
+                              self.config['training']['batching']['max_seq_length_valid'],
+                              self.model.context_left,
+                              self.model.context_right,
+                              normalize_features=True,
+                              phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
+                              max_seq_len=self.config['training']['batching']['max_seq_length_valid'],
+                              max_label_length=self.max_label_length)
+
+        dataloader = KaldiDataLoader(dataset,
+                                     self.config['training']['batching']['batch_size_valid'],
+                                     self.config["exp"]["n_gpu"] > 0,
+                                     batch_ordering=self.model.batch_ordering)
+
+        assert len(dataset) >= self.config['training']['batching']['batch_size_valid'], \
+            f"Length of valid dataset {len(dataset)} too small " \
+            + f"for batch_size of {self.config['training']['batching']['batch_size_valid']}"
+
+        n_steps_this_epoch = 0
+        with tqdm(disable=not logger.isEnabledFor(logging.INFO), total=len(dataloader)) as pbar:
+            pbar.set_description('V e:{} l: {} '.format(epoch, '-'))
+            for batch_idx, (_, inputs, targets) in enumerate(dataloader):
+                n_steps_this_epoch += 1
+
+                inputs = self.to_device(inputs)
+                if "lab_phn" not in targets:
+                    targets = self.to_device(targets)
+
+                output = self.model(inputs)
+                loss = self.loss(output, targets)
+
+                output = self.detach_cpu(output)
+                targets = self.detach_cpu(targets)
+                loss = self.detach_cpu(loss)
+
+                #### Logging ####
+                valid_loss += loss["loss_final"].item()
+                _valid_metrics = eval_metrics((output, targets), self.metrics)
+                for metric, metric_value in _valid_metrics.items():
+                    accumulated_valid_metrics[metric] += metric_value
+
+                pbar.set_description('V e:{} l: {:.4f} '.format(epoch, loss["loss_final"].item()))
+                pbar.update()
+                #### /Logging ####
+        for metric, metric_value in accumulated_valid_metrics.items():
+            accumulated_valid_metrics[metric] += metric_value
+
+        self.tensorboard_logger.set_step(epoch, 'valid')
+        self.tensorboard_logger.add_scalar('valid_loss', valid_loss / n_steps_this_epoch)
+        for metric in accumulated_valid_metrics:
+            self.tensorboard_logger.add_scalar(metric, accumulated_valid_metrics[metric] / n_steps_this_epoch)
+
+        return {'valid_loss': valid_loss / n_steps_this_epoch,
+                'valid_metrics': {metric: accumulated_valid_metrics[metric] / n_steps_this_epoch for metric in
+                                  accumulated_valid_metrics}}
+
+    def _valid_epoch_async_metrics(self, epoch):
+        """
         Validate after training an epoch
         :return: A log that contains information about validation
         Note:
@@ -262,22 +343,22 @@ class Trainer(BaseTrainer):
                               f"{valid_data}_{self.config['exp']['name']}",
                               {feat: _all_feats[feat] for feat in self.config['dataset']['features_use']},
                               {lab: _all_labs[lab] for lab in self.config['dataset']['labels_use']},
-                              self.config['training']['max_seq_length_valid'],
+                              self.config['training']['batching']['max_seq_length_valid'],
                               self.model.context_left,
                               self.model.context_right,
                               normalize_features=True,
                               phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
-                              max_seq_len=self.config['training']['max_seq_length_valid'],
+                              max_seq_len=self.config['training']['batching']['max_seq_length_valid'],
                               max_label_length=self.max_label_length)
 
         dataloader = KaldiDataLoader(dataset,
-                                     self.config['training']['batch_size_valid'],
+                                     self.config['training']['batching']['batch_size_valid'],
                                      self.config["exp"]["n_gpu"] > 0,
                                      batch_ordering=self.model.batch_ordering)
 
-        assert len(dataset) >= self.config['training']['batch_size_valid'], \
+        assert len(dataset) >= self.config['training']['batching']['batch_size_valid'], \
             f"Length of valid dataset {len(dataset)} too small " \
-            + f"for batch_size of {self.config['training']['batch_size_valid']}"
+            + f"for batch_size of {self.config['training']['batching']['batch_size_valid']}"
 
         n_steps_this_epoch = 0
 
@@ -290,8 +371,6 @@ class Trainer(BaseTrainer):
             with tqdm(disable=not logger.isEnabledFor(logging.INFO), total=len(dataloader)) as pbar:
                 pbar.set_description('V e:{} l: {} '.format(epoch, '-'))
                 for batch_idx, (_, inputs, targets) in enumerate(dataloader):
-                    if batch_idx > 10:
-                        break
                     n_steps_this_epoch += 1
 
                     inputs = self.to_device(inputs)

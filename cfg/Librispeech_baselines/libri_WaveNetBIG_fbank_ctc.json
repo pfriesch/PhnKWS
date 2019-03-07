@@ -27,27 +27,28 @@
     //    "dataset_type": "FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT",
     "dataset_type": "SEQUENTIAL",
     //    "dataset_type": "SEQUENTIAL_APPENDED_CONTEXT",
-
-    "max_seq_length_train": 3500,
-    "start_seq_len_train": 1000,
-    "increase_seq_length_train": true,
-    "multply_factor_seq_len_train": 2,
-    "max_seq_length_valid": 3500,
-    "batch_size_train": 8,
-    "batch_size_valid": 8,
+    "batching": {
+      "max_seq_length_train": 3500,
+      "start_seq_len_train": 500,
+      "increase_seq_length_train": true,
+      "multply_factor_seq_len_train": 2,
+      "max_seq_length_valid": 3500,
+      "batch_size_train": 32,
+      "batch_size_valid": 32
+    },
     "clip_grad_norm": -1,
     "optimizer": {
       "type": "adam",
       "args": {
-        "lr": 1e-4
+        "lr": 1e-3
       }
     },
     "lr_scheduler": {
-      "patience": 1,
-      "arch_halving_factor": 0.5,
-      "arch_improvement_threshold": 1e-4,
-      "cooldown": 1,
-      "min_lr": 1e-7
+      "name": "MultiStepLR",
+      "args": {
+        "milestones": [4, 6, 8, 10],
+        "gamma": 0.5
+      }
     }
   },
   "arch": {

@@ -62,7 +62,7 @@ class GCNN(nn.Module):
         for _i, layer in enumerate(self.layers):
             x = layer(x)
 
-        x = x.permute(2, 0, 3, 1)
+        x = x.permute(2, 0, 3, 1)s
         # reorder
         x = gated_linear_unit(self.linear(x), dim=3)
         x = self.dropout(x)

@@ -1,6 +1,4 @@
-from data.datasets import DatasetType
-from nn_.networks.MLPNet import MLPNet
-from nn_.networks.MLP_mtl_Net import MLP_mtl_Net
+from nn_.networks.MLP import MLP
 from nn_.networks.WaveNet import WaveNet
 
 
@@ -22,14 +20,16 @@ def model_init(config):
         _out_name = "out_" + lab_name.split("_", 1)[1]
         # Using labels indexed from 1 so 0 is free for padding etc
         outputs[_out_name] = \
-            config['dataset']['dataset_definition']['data_info']['labels'][lab_name]['num_lab'] + 1
-
+            config['dataset']['dataset_definition']['data_info']['labels'][lab_name]['num_lab']
 
         if config['arch']['loss']['name'] == 'CTC':
             # blank label
             outputs[_out_name] += 1
+            # pass
         elif config['arch']['loss']['name'] == 'CE':
-            pass
+            # TODO +1 for padding with 0 etc
+            outputs[_out_name] += 1
+
         else:
             raise NotImplementedError
 
@@ -50,33 +50,31 @@ def model_init(config):
     #                       input_feat_name=config['arch']['args']['input_feat_name'],
     #                       lab_cd_num=config['arch']['args']['lab_cd_num'],
     #                       lab_mono_num=config['arch']['args']['lab_mono_num'])
+    if arch_name == "MLP":
+        # input_feat_name = config['dataset']['features_use'][0]
+        # input_feat_length = config['dataset']['dataset_definition']['data_info']['features'] \
+        #     [input_feat_name]['input_feat_length']
+        # lab_num = config['dataset']['dataset_definition']['data_info']['labels'] \
+        #               [config['dataset']['labels_use'][0]]['num_lab'] + 1
+        # # if 'CTC' in config['arch']['loss']['name'] or 'ctc' in config['arch']['loss']['name']:
+        # #     lab_num += 1 #TODO
 
-    if arch_name == "MLP_mtl":
-        input_feat_name = config['dataset']['features_use'][0]
-        input_feat_length = config['dataset']['dataset_definition']['data_info']['features'] \
-            [input_feat_name]['input_feat_length']
-        lab_names = config['dataset']['labels_use']
-        assert 'lab_cd' in lab_names and 'lab_mono' in lab_names
-        # lab_nums = [config['dataset']['dataset_definition']['data_info']['labels'] \
-        #                 [lab_name]['num_lab']
-        #             for lab_name in lab_names]
-        if 'CTC' in config['arch']['loss']['name'] or 'ctc' in config['arch']['loss']['name']:
+        if config['arch']['loss']['name'] == 'CTC':
+            # blank label
+            _batch_ordering = "NCL"
+            # pass
+        elif config['arch']['loss']['name'] == 'CE':
+            # TODO +1 for padding with 0 etc
+            _batch_ordering = "NCL"
+
+            if config['training']['dataset_type'] == "FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT" \
+                    or config['training']['dataset_type'] == "SEQUENTIAL_APPENDED_CONTEXT":
+                _batch_ordering = "TNCL"
+
+        else:
             raise NotImplementedError
 
-        net = MLP_mtl_Net(input_feat_length, input_feat_name,
-                          lab_cd_num=config['dataset']['dataset_definition']['data_info']['labels'] \
-                                         ['lab_cd']['num_lab'] + 1,
-                          lab_mono_num=config['dataset']['dataset_definition']['data_info']['labels'] \
-                                           ['lab_mono']['num_lab'] + 1)
-    elif arch_name == "MLP":
-        input_feat_name = config['dataset']['features_use'][0]
-        input_feat_length = config['dataset']['dataset_definition']['data_info']['features'] \
-            [input_feat_name]['input_feat_length']
-        lab_num = config['dataset']['dataset_definition']['data_info']['labels'] \
-                      [config['dataset']['labels_use'][0]]['num_lab'] + 1
-        # if 'CTC' in config['arch']['loss']['name'] or 'ctc' in config['arch']['loss']['name']:
-        #     lab_num += 1 #TODO
-        net = MLPNet(input_feat_length, input_feat_name, lab_num)
+        net = MLP(input_feat_length, input_feat_name, outputs, **config['arch']['args'], batch_ordering=_batch_ordering)
 
 
 
@@ -122,8 +120,7 @@ def model_init(config):
         #                    [lab_name]['num_lab']
         #            for lab_name in lab_names}
 
-        net = WaveNet(input_feat_length, input_feat_name, outputs,
-                      **config['arch']['args'])
+        net = WaveNet(input_feat_length, input_feat_name, outputs, **config['arch']['args'])
 
     else:
         raise ValueError("Can't find the arch {}".format(arch_name))

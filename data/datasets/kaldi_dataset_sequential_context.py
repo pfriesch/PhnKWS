@@ -28,11 +28,9 @@ class KaldiDatasetSequentialContext(BaseKaldiDataset):
         super().__init__(data_cache_root, dataset_name, feature_dict, label_dict, dataset_type, max_sample_len,
                          left_context, right_context, normalize_features,
                          aligned_labels=False, max_seq_len=max_seq_len, max_label_length=max_label_length,
-                         overfit_small_batch=overfit_small_batch
-                         )
-        self.state.aligned_labels = False
-        assert isinstance(phoneme_dict, PhonemeDict)
-        self.state.phoneme_dict = phoneme_dict
+                         phoneme_dict=phoneme_dict)
+        if overfit_small_batch:
+            self.sample_index = self.sample_index[:64]
 
     @property
     def shuffle_frames(self):

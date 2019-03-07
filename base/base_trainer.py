@@ -151,7 +151,7 @@ class BaseTrainer:
 
             # save logged informations into log dict
             log = {'epoch': self.epoch}
-            log.update({'elapsed_time_epoch': f"{t.interval:.2f}s"})
+            log.update({'elapsed_time_epoch': f"{t.interval / 60:.2f} min"})
             log.update(result_log)
 
             # print logged informations to the screen
