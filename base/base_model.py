@@ -46,6 +46,10 @@ class BaseModel(nn.Module):
         logger.info('Trainable parameters: {}'.format(self.trainable_parameters()))
         logger.info(self)
 
+    def info(self):
+        return f" context: {self.context_left}, {self.context_right}" \
+               + f" receptive_field: {self.context_left + self.context_right}"
+
     def __str__(self):
         """
         Model prints with number of trainable parameters

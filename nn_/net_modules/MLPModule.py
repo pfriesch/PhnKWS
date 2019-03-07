@@ -51,7 +51,7 @@ class MLPLayer(nn.Module):
         return x
 
 
-class MLP(nn.Module):
+class MLPModule(nn.Module):
     def __init__(self, input_dim,
                  dnn_lay,
                  dnn_drop,
@@ -60,7 +60,10 @@ class MLP(nn.Module):
                  dnn_use_laynorm_inp,
                  dnn_use_batchnorm_inp,
                  dnn_act):
-        super(MLP, self).__init__()
+        super(MLPModule, self).__init__()
+
+        assert len(dnn_lay) == len(dnn_drop) == len(dnn_use_batchnorm) == len(dnn_use_laynorm) == len(dnn_act), \
+            (len(dnn_lay), len(dnn_drop), len(dnn_use_batchnorm), len(dnn_use_laynorm), len(dnn_act))
         assert isinstance(input_dim, int)
         assert [isinstance(elem, int) for elem in dnn_lay]
         assert [isinstance(elem, float) for elem in dnn_drop]
@@ -122,6 +125,5 @@ class MLP(nn.Module):
             x = self.layers[i](x)
 
         return x
-
 
 # if __name__ == '__main__':

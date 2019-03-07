@@ -18,9 +18,20 @@ def check_cudnn_cond(targets, target_sequence_lengths, input_sequence_lengths):
 
 class CTCPhnLoss(nn.Module):
 
+    def __init__(self, batch_ordering):
+        super().__init__()
+        self.batch_ordering = batch_ordering
+
     def forward(self, output, target):
-        # NCT (NCL) -> TNC required for CuDNN
-        logits = output['out_phn'].permute(2, 0, 1)
+        if self.batch_ordering == 'NCT':
+            # NCT (NCL) -> TNC required for CuDNN
+            logits = output['out_phn'].permute(2, 0, 1)
+        elif self.batch_ordering == 'TNCL':
+            assert len(output['out_phn'].shape) == 3
+            logits = output['out_phn']
+        else:
+            raise NotImplementedError
+
         _targets = target['lab_phn']
         # all input_lengths must be T for CuDNN
         input_sequence_lengths = torch.full_like(

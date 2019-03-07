@@ -8,6 +8,7 @@ from base.base_kaldi_dataset import BaseKaldiDataset
 from data.datasets import DatasetType
 
 from data import PADDING_IGNORE_INDEX
+from utils.logger_config import logger
 
 
 def collate_fn_simple(sample_list):
@@ -15,7 +16,7 @@ def collate_fn_simple(sample_list):
     lab_keys = list(sample_list[0][2].keys())
 
     fea_dict = {k: torch.stack([s[1][k] for s in sample_list]).squeeze(1) for k in fea_keys}
-    lab_dict = {k: torch.stack([s[2][k] for s in sample_list]).squeeze(1).to(dtype=torch.int64) for k in lab_keys}
+    lab_dict = {k: torch.stack([s[2][k] for s in sample_list]).to(dtype=torch.int64) for k in lab_keys}
     sample_names = [s[0] for s in sample_list]
     return sample_names, fea_dict, lab_dict
 
@@ -118,7 +119,7 @@ def collate_fn_pad_batch_first(sample_list, feat_padding='zero', ctc_labels=Fals
     return sample_names, fea_dict, lab_dict
 
 
-def collate_fn_pad(sample_list, feat_padding='repeat'):
+def collate_fn_pad(sample_list, feat_padding='repeat', ctc_labels=True):
     # TODO compare padding methods
     # feat repeat padding see: https://github.com/SeanNaren/deepspeech.pytorch/issues/312
     # mostly used when batchnorm is used in the model
@@ -252,10 +253,12 @@ class StatefulChunkedRandomSampler(Sampler):
                 'samples_per_chunk': self.samples_per_chunk}
 
     def load_state_dict(self, state_dict):
-        self.permutation = state_dict['permutation']
-        self.start_idx = state_dict['start_idx'] + 1
-        assert self.samples_per_chunk == state_dict['samples_per_chunk'], \
-            "The dataset used when this sampler was saved is not the same as the one used now."
+        if self.samples_per_chunk == state_dict['samples_per_chunk']:
+            self.permutation = state_dict['permutation']
+            self.start_idx = state_dict['start_idx'] + 1
+        else:
+            logger.warn("The dataset used when this sampler was saved is not the same as the one used now.\n"
+                        "Ignoring the saved sampler and restarting sampling.")
 
 
 class StatefulSequentialSampler(Sampler):
@@ -283,9 +286,11 @@ class StatefulSequentialSampler(Sampler):
             'data_source_len': len(self.data_source)}
 
     def load_state_dict(self, state_dict):
-        self.start_idx = state_dict['start_idx'] + 1
-        assert len(self.data_source) == state_dict['data_source_len'], \
-            "The dataset used when this sampler was saved is not the same as the one used now."
+        if len(self.data_source) == state_dict['data_source_len']:
+            self.start_idx = state_dict['start_idx'] + 1
+        else:
+            logger.warn("The dataset used when this sampler was saved is not the same as the one used now.\n"
+                        "Ignoring the saved sampler and restarting sampling.")
 
 
 class KaldiDataLoader(DataLoader):
@@ -318,16 +323,23 @@ class KaldiDataLoader(DataLoader):
             _collate_fn = collate_fn_simple
         else:
             if batch_ordering == "TNCL":
-                raise NotImplementedError
+                if dataset.state.dataset_type == DatasetType.SEQUENTIAL_APPENDED_CONTEXT:
+                    _collate_fn = partial(collate_fn_pad, feat_padding='zero', ctc_labels=True)
+                elif dataset.state.dataset_type == DatasetType.FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT:
+                    _collate_fn = partial(collate_fn_pad, feat_padding='zero', ctc_labels=False)
+                else:
+                    raise NotImplementedError
                 # _collate_fn = collate_fn_pad
             elif batch_ordering == "NCL":
-                if dataset.state.dataset_type == DatasetType.FRAMEWISE_SEQUENTIAL or \
-                        dataset.state.dataset_type == DatasetType.FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT:
+                if dataset.state.dataset_type == DatasetType.FRAMEWISE_SEQUENTIAL:
                     _collate_fn = partial(collate_fn_pad_batch_first, feat_padding='zero', ctc_labels=False)
-                elif dataset.state.dataset_type == DatasetType.SEQUENTIAL or \
-                        dataset.state.dataset_type == DatasetType.SEQUENTIAL_APPENDED_CONTEXT:
+                elif dataset.state.dataset_type == DatasetType.SEQUENTIAL:
                     _collate_fn = partial(collate_fn_pad_batch_first, feat_padding='zero', ctc_labels=True)
 
+                elif dataset.state.dataset_type == DatasetType.SEQUENTIAL_APPENDED_CONTEXT:
+                    _collate_fn = partial(collate_fn_pad, feat_padding='zero', ctc_labels=True)
+                elif dataset.state.dataset_type == DatasetType.FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT:
+                    _collate_fn = partial(collate_fn_pad, feat_padding='zero', ctc_labels=False)
                 else:
                     raise ValueError
             else:
