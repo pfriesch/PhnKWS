@@ -17,7 +17,8 @@ class BaseTrainer:
     Base class for all trainers
     """
 
-    def __init__(self, model, loss, metrics, optimizers, lr_schedulers, seq_len_scheduler, resume_path, config):
+    def __init__(self, model, loss, metrics, optimizers, lr_schedulers, seq_len_scheduler, restart_optim,
+                 resume_path, config):
         self.config = config
 
         # setup GPU device if available, move model into configured device
@@ -78,12 +79,17 @@ class BaseTrainer:
             #                                              purge_step=self.global_step)
 
         elif len(os.listdir(self.checkpoint_dir)) > 0:
-            logger.info("Restarting training!")
-            self.start_epoch, self.global_step, self.starting_dataset_sampler_state = \
-                resume_checkpoint(self.checkpoint_dir, model, logger, optimizers, lr_schedulers)
-            for lr_scheduler in self.lr_schedulers:
-                if self.lr_schedulers[lr_scheduler].current_lr() > self.config['training']['optimizer']['args']['lr']:
-                    self.lr_schedulers[lr_scheduler].set_lr(self.config['training']['optimizer']['args']['lr'])
+            if not restart_optim:
+                logger.info("Restarting training!")
+                self.start_epoch, self.global_step, self.starting_dataset_sampler_state = \
+                    resume_checkpoint(self.checkpoint_dir, model, logger, optimizers, lr_schedulers)
+            else:
+                logger.info("Warm starting training with new initialized optimizer!")
+                self.start_epoch, self.global_step, self.starting_dataset_sampler_state = \
+                    resume_checkpoint(self.checkpoint_dir, model, logger)
+            # for lr_scheduler in self.lr_schedulers:
+            #     if self.lr_schedulers[lr_scheduler].current_lr() > self.config['training']['optimizer']['args']['lr']:
+            #         self.lr_schedulers[lr_scheduler].set_lr(self.config['training']['optimizer']['args']['lr'])
 
             self.tensorboard_logger = WriterTensorboardX(os.path.join(self.out_dir, "tensorboard_logs"),
                                                          purge_step=self.global_step)
@@ -147,7 +153,7 @@ class BaseTrainer:
                                                    self.lr_schedulers[lr_scheduler_name].current_lr())
                 self.lr_schedulers[lr_scheduler_name].step(result_log['valid_loss'], epoch=self.epoch)
 
-            self.seq_len_scheduler.step()
+            self.seq_len_scheduler.step(self.epoch)
 
             # save logged informations into log dict
             log = {'epoch': self.epoch}
