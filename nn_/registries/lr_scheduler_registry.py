@@ -1,4 +1,5 @@
 from torch import optim
+from torch.optim.lr_scheduler import MultiStepLR
 
 from utils.logger_config import logger
 
@@ -27,16 +28,28 @@ class ReduceLROnPlateau(optim.lr_scheduler.ReduceLROnPlateau):
 
 def lr_scheduler_init(config, optimizers):
     lr_schedulers = {}
-    for opti_name in optimizers:
-        lr_schedulers[opti_name] = ReduceLROnPlateau(optimizers[opti_name],
-                                                     mode='min',
-                                                     factor=config['training']['lr_scheduler']['arch_halving_factor'],
-                                                     patience=config['training']['lr_scheduler']['patience'],
-                                                     cooldown=config['training']['lr_scheduler']['cooldown'],
-                                                     min_lr=config['training']['lr_scheduler']['min_lr'],
-                                                     verbose=True,
-                                                     threshold=config['training']['lr_scheduler'][
-                                                         'arch_improvement_threshold'],
-                                                     threshold_mode='rel')
+    if config['training']['lr_scheduler']['name'] == 'ReduceLROnPlateau':
+
+        for opti_name in optimizers:
+            lr_schedulers[opti_name] = ReduceLROnPlateau(optimizers[opti_name],
+                                                         mode='min',
+
+                                                         # factor=config['training']['lr_scheduler']['arch_halving_factor'],
+                                                         # patience=config['training']['lr_scheduler']['patience'],
+                                                         # cooldown=config['training']['lr_scheduler']['cooldown'],
+                                                         # min_lr=config['training']['lr_scheduler']['min_lr'],
+                                                         verbose=True,
+                                                         # threshold=config['training']['lr_scheduler'][
+                                                         #     'arch_improvement_threshold'],
+                                                         threshold_mode='rel',
+                                                         **config['training']['lr_scheduler']['args'])
+
+    elif config['training']['lr_scheduler']['name'] == 'MultiStepLR':
+
+        for opti_name in optimizers:
+            lr_schedulers[opti_name] = MultiStepLR(optimizers[opti_name],
+                                                   **config['training']['lr_scheduler']['args'])
+    else:
+        raise ValueError
 
     return lr_schedulers

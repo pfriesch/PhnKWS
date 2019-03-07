@@ -23,9 +23,9 @@ class KaldiDatasetFramewiseContextShuffledFrames(BaseKaldiDataset):
 
         super().__init__(data_cache_root, dataset_name, feature_dict, label_dict, dataset_type, max_sample_len=None,
                          left_context=left_context, right_context=right_context, normalize_features=normalize_features,
-                         aligned_labels=True, max_seq_len=None, max_label_length=None,
-                         overfit_small_batch=overfit_small_batch)
-        self.state.aligned_labels = True
+                         aligned_labels=True, max_seq_len=None, max_label_length=None)
+        if overfit_small_batch:
+            self.sample_index = self.sample_index[:64 * 128]
 
     @property
     def shuffle_frames(self):

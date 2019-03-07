@@ -7,13 +7,14 @@ import ctcdecode
 
 class PhnErrorRate(Module):
 
-    def __init__(self, vocabulary_size):
+    def __init__(self, vocabulary_size, batch_ordering):
         super().__init__()
         # WARINIG dont use chr(0)
         vocabulary_size += 1  # TODO unify blank label stuff
         self.vocabulary = [chr(c) for c in list(range(65, 65 + 58)) + list(range(65 + 58 + 69, 65 + 58 + 69 + 500))][
                           :vocabulary_size]
         self.decoder = ctcdecode.CTCBeamDecoder(self.vocabulary, log_probs_input=True, beam_width=1)
+        self.batch_ordering = batch_ordering
 
     @property
     def cpu_only(self):
@@ -30,17 +31,26 @@ class PhnErrorRate(Module):
         return ''.join([vocab[x] for x in tokens[0:seq_len]])
 
     def forward(self, output, target):
+
+        if self.batch_ordering == 'NCT':
+            # NCT (NCL) -> NTC required for ctcdecode
+            logits = output['out_phn'].permute(0, 2, 1)
+        elif self.batch_ordering == 'TNCL':
+            assert len(output['out_phn'].shape) == 3
+            # TNC -> NTC required for ctcdecode
+            logits = output['out_phn'].permute(1, 0, 2)
+        else:
+            raise NotImplementedError
+
         # decoder expects batch first
-        logits = output['out_phn']
         target_sequence_lengths = target['target_sequence_lengths']
         input_sequence_lengths = target['input_sequence_lengths']
         batch_size = len(input_sequence_lengths)
         # batch x seq x label_size
 
-        _logits = logits.permute(0, 2, 1)
-        assert _logits.shape[0] == batch_size
+        assert logits.shape[0] == batch_size
         # N x L x C expected
-        beam_result, beam_scores, timesteps, out_seq_len = self.decoder.decode(_logits)
+        beam_result, beam_scores, timesteps, out_seq_len = self.decoder.decode(logits)
 
         curr_idx = 0
         all_labels = []

@@ -46,7 +46,6 @@ class BaseKaldiDataset(data.Dataset):
                  aligned_labels=False,
                  max_seq_len=None,
                  max_label_length=None,
-                 overfit_small_batch=False,
                  phoneme_dict=None
                  ):
 
@@ -84,9 +83,6 @@ class BaseKaldiDataset(data.Dataset):
         if not self._check_exists():
             raise RuntimeError('Dataset not found.')
         self._read_info()
-
-        if overfit_small_batch:
-            self.sample_index = self.sample_index[:30]
 
         self.cached_samples = torch.load(
             os.path.join(self.state.dataset_path, "chunk_{:04d}.pyt".format(self.cached_pt)))

@@ -32,10 +32,10 @@ class IncreaseSeqLenAfterEpoch(object):
 
 
 def seq_len_scheduler_init(config):
-    seq_len_scheduler = IncreaseSeqLenAfterEpoch(config['training']['max_seq_length_train'],
-                                                 config['training']['start_seq_len_train'],
-                                                 config['training']['increase_seq_length_train'],
-                                                 config['training']['multply_factor_seq_len_train'],
+    seq_len_scheduler = IncreaseSeqLenAfterEpoch(config['training']['batching']['max_seq_length_train'],
+                                                 config['training']['batching']['start_seq_len_train'],
+                                                 config['training']['batching']['increase_seq_length_train'],
+                                                 config['training']['batching']['multply_factor_seq_len_train'],
                                                  verbose=True)
 
     return seq_len_scheduler

@@ -4,11 +4,12 @@ from torch import nn
 from data import PADDING_IGNORE_INDEX
 
 
-class CELoss_NCL(nn.Module):
+class CELoss(nn.Module):
 
-    def __init__(self, weight_mono=1.0):
+    def __init__(self, batch_ordering, weight_mono=1.0):
         super().__init__()
         self.weight_mono = weight_mono
+        self.batch_ordering = batch_ordering
 
     def forward(self, output, target):
         assert len(target['lab_cd'].shape) == 2

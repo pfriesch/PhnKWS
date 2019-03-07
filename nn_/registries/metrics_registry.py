@@ -3,7 +3,7 @@ from nn_.metrics.metrics import LabCDAccuracy, LabMonoAccuracy, LabCDError, LabM
 from nn_.metrics.ctc_metrics import PhnErrorRate
 
 
-def metrics_init(config):
+def metrics_init(config, model):
     metrics = {}
     for metric in config['arch']['metrics']:
         if metric == 'acc_lab_cd':
@@ -16,7 +16,7 @@ def metrics_init(config):
             metrics[metric] = LabCDError()
         elif metric == 'phone_error_rate':
             metrics[metric] = PhnErrorRate(
-                config['dataset']['dataset_definition']['data_info']['labels']['lab_phn']['num_lab'])
+                config['dataset']['dataset_definition']['data_info']['labels']['lab_phn']['num_lab'],model.batch_ordering)
         else:
             raise ValueError("Can't find the metric {}".format(metric))
     return metrics

@@ -67,7 +67,7 @@ def setup_run(config):
     logger.info("Architecture:")
     logger.info(model)
     logger.info("".join(["="] * 80))
-    metrics = metrics_init(config)
+    metrics = metrics_init(config, model)
 
     loss = loss_init(config, model)
 
@@ -167,6 +167,11 @@ if __name__ == '__main__':
                         help='indices of GPUs to enable (default: all)')
     parser.add_argument('-o', '--overfit', action='store_true',
                         help='overfit_small_batch / debug mode')
+
+    parser.add_argument('--optim', default=None, type=str,
+                        help='override optim config and reinit optim')
+    parser.add_argument('--batching', default=None, type=str,
+                        help='override optim config and reinit optim')
     args = parser.parse_args()
 
     if args.device:
