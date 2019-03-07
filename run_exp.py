@@ -1,3 +1,4 @@
+import json
 import os
 import argparse
 import datetime
@@ -22,7 +23,7 @@ def check_config(config):
     pass
 
 
-def setup_run(config):
+def setup_run(config, optim_overwrite):
     set_seed(config['exp']['seed'])
     torch.backends.cudnn.deterministic = True  # Otherwise I got nans for the CTC gradient
 
@@ -58,9 +59,8 @@ def setup_run(config):
 
     model = model_init(config)
 
-    optimizers = optimizer_init(config, model)
+    optimizers, lr_schedulers = optimizer_init(config, model, optim_overwrite)
 
-    lr_schedulers = lr_scheduler_init(config, optimizers)
     seq_len_scheduler = seq_len_scheduler_init(config)
 
     logger.info("".join(["="] * 80))
@@ -74,9 +74,11 @@ def setup_run(config):
     return model, loss, metrics, optimizers, config, lr_schedulers, seq_len_scheduler
 
 
-def main(config_path, load_path, restart, overfit_small_batch, warm_start):
+def main(config_path, load_path, restart, overfit_small_batch, warm_start, optim_overwrite):
     config = read_json(config_path)
     check_config(config)
+    if optim_overwrite is not None:
+        optim_overwrite = json.loads(optim_overwrite)
 
     if load_path is not None:
         raise NotImplementedError
@@ -137,7 +139,7 @@ def main(config_path, load_path, restart, overfit_small_batch, warm_start):
     logger.info("Experiment name : {}".format(out_folder))
     logger.info("tensorboard : tensorboard --logdir {}".format(os.path.abspath(out_folder)))
 
-    model, loss, metrics, optimizers, config, lr_schedulers, seq_len_scheduler = setup_run(config)
+    model, loss, metrics, optimizers, config, lr_schedulers, seq_len_scheduler = setup_run(config, optim_overwrite)
 
     if warm_start is not None:
         assert hasattr(model, "load_warm_start")
@@ -146,6 +148,7 @@ def main(config_path, load_path, restart, overfit_small_batch, warm_start):
     # TODO instead of resuming and making a new folder, make a backup and continue in the same folder
     trainer = Trainer(model, loss, metrics, optimizers, lr_schedulers, seq_len_scheduler,
                       load_path, config,
+                      restart_optim=optim_overwrite is not None,
                       do_validation=True,
                       overfit_small_batch=overfit_small_batch)
     trainer.train()
@@ -169,12 +172,10 @@ if __name__ == '__main__':
                         help='overfit_small_batch / debug mode')
 
     parser.add_argument('--optim', default=None, type=str,
-                        help='override optim config and reinit optim')
-    parser.add_argument('--batching', default=None, type=str,
-                        help='override optim config and reinit optim')
+                        help='overwrite optim config and reinit optim')
     args = parser.parse_args()
 
     if args.device:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.device
 
-    main(args.config, args.load, args.restart, args.overfit, args.warm_start)
+    main(args.config, args.load, args.restart, args.overfit, args.warm_start, args.optim)
