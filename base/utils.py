@@ -64,7 +64,7 @@ def resume_checkpoint(resume_path, model, logger, optimizers=None, lr_schedulers
 
 
 def save_checkpoint(epoch, global_step, model, optimizers, lr_schedulers, seq_len_scheduler, config,
-                    checkpoint_dir,# monitor_best=None,
+                    checkpoint_dir,  # monitor_best=None,
                     dataset_sampler_state=None, save_best=None):
     """
     Saving checkpoints

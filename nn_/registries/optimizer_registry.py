@@ -1,14 +1,30 @@
 from torch import optim
+from torch.optim.lr_scheduler import _LRScheduler
+
+from nn_.registries.lr_scheduler_registry import lr_scheduler_init
 
 
-def optimizer_init(config, model):
+class StaticLR(_LRScheduler):
+
+    def __init__(self, optimizer):
+        super(StaticLR, self).__init__(optimizer)
+
+    def step(self, epoch=None):
+        pass
+
+
+def optimizer_init(config, model, optim_overwrite):
     optimizers = {}
-    if config['training']['optimizer']['type'] == 'CE_triple_rmsprop_cfg':
+    if optim_overwrite is None:
+        optim_config = config['training']['optimizer']
+    else:
+        optim_config = optim_overwrite
+    if optim_config['type'] == 'CE_triple_rmsprop_cfg':
         trainable_params_MLP = filter(lambda p: p.requires_grad, model.MLP.parameters())
         optimizers['MLP'] = optim.SGD(trainable_params_MLP,
-                                       lr=0.08,
-                                       weight_decay=0.0,
-                                       momentum=0)
+                                      lr=0.08,
+                                      weight_decay=0.0,
+                                      momentum=0)
 
         trainable_params_linear_lab_cd = filter(lambda p: p.requires_grad, model.linear_lab_cd.parameters())
         optimizers['linear_lab_cd'] = optim.RMSprop(trainable_params_linear_lab_cd,
@@ -28,14 +44,20 @@ def optimizer_init(config, model):
                                                       momentum=0,
                                                       centered=False)
 
-    elif config['training']['optimizer']['type'] == 'sgd':
+    elif optim_config['type'] == 'sgd':
         trainable_params = filter(lambda p: p.requires_grad, model.parameters())
-        optimizers['all'] = optim.SGD(trainable_params, **config['training']['optimizer']["args"])
-    elif config['training']['optimizer']['type'] == 'adam':
+        optimizers['all'] = optim.SGD(trainable_params, **optim_config["args"])
+    elif optim_config['type'] == 'adam':
         trainable_params = filter(lambda p: p.requires_grad, model.parameters())
-        optimizers['all'] = optim.Adam(trainable_params, **config['training']['optimizer']["args"])
+        optimizers['all'] = optim.Adam(trainable_params, **optim_config["args"])
 
     else:
-        raise ValueError(f"Can't find the optimizer {config['training']['optimizer']['type']}")
+        raise ValueError(f"Can't find the optimizer {optim_config['type']}")
+    if optim_overwrite is None:
+        lr_schedulers = lr_scheduler_init(config, optimizers)
+    else:
+        lr_schedulers = {}
+        for opti_name in optimizers:
+            lr_schedulers[opti_name] = StaticLR(optimizers[opti_name])
 
-    return optimizers
+    return optimizers, lr_schedulers

@@ -25,9 +25,10 @@ class Trainer(BaseTrainer):
 
     def __init__(self, model, loss, metrics, optimizers, lr_schedulers, seq_len_scheduler,
                  resume_path, config,
+                 restart_optim,
                  do_validation, overfit_small_batch):
         super(Trainer, self).__init__(model, loss, metrics, optimizers, lr_schedulers,
-                                      seq_len_scheduler, resume_path, config)
+                                      seq_len_scheduler, restart_optim, resume_path, config)
         self.config = config
         self.do_validation = do_validation
         self.log_step = int(np.sqrt(config['training']['batching']['batch_size_train']))
@@ -67,7 +68,7 @@ class Trainer(BaseTrainer):
                               self.model.context_right,
                               normalize_features=True,
                               phoneme_dict=self.config['dataset']['dataset_definition']['phoneme_dict'],
-                              max_seq_len=self.seq_len_scheduler.max_seq_length_train_curr,
+                              max_seq_len=self.seq_len_scheduler.get_seq_len(),
                               max_label_length=self.max_label_length,
                               overfit_small_batch=self.overfit_small_batch)
 
