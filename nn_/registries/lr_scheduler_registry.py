@@ -6,6 +6,9 @@ from utils.logger_config import logger
 
 class ReduceLROnPlateau(optim.lr_scheduler.ReduceLROnPlateau):
 
+    def get_lr(self):
+        return self.optimizer.param_groups[0]['lr']
+
     def _reduce_lr(self, epoch):
         for i, param_group in enumerate(self.optimizer.param_groups):
             old_lr = float(param_group['lr'])
@@ -16,11 +19,11 @@ class ReduceLROnPlateau(optim.lr_scheduler.ReduceLROnPlateau):
                     logger.info('Epoch {:d}: reducing learning rate'
                                 ' of group {} to {:.4e}.'.format(epoch, i, new_lr))
 
-    def set_lr(self, new_lr):
-        for i, param_group in enumerate(self.optimizer.param_groups):
-            param_group['lr'] = new_lr
-            if self.verbose:
-                logger.info(f'Setting learning rate of group {i} to {new_lr:.4e}.')
+    # def set_lr(self, new_lr):
+    #     for i, param_group in enumerate(self.optimizer.param_groups):
+    #         param_group['lr'] = new_lr
+    #         if self.verbose:
+    #             logger.info(f'Setting learning rate of group {i} to {new_lr:.4e}.')
 
 
 def lr_scheduler_init(config, optimizers):

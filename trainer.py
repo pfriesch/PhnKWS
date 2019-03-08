@@ -172,8 +172,8 @@ class Trainer(BaseTrainer):
                         accumulated_train_metrics[metric] += metric_value
                         total_train_metrics[metric] += metric_value
 
-                # pbar.set_description('T e:{} l: {:.4f}'.format(epoch,
-                #                                                loss["loss_final"].item()))
+                pbar.set_description('T e:{} l: {:.4f}'.format(epoch,
+                                                               loss["loss_final"].item()))
                 pbar.update()
 
                 # Log training every 30s and smoothe since its the average

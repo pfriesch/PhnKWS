@@ -77,8 +77,8 @@ def setup_run(config, optim_overwrite):
 def main(config_path, load_path, restart, overfit_small_batch, warm_start, optim_overwrite):
     config = read_json(config_path)
     check_config(config)
-    if optim_overwrite is not None:
-        optim_overwrite = json.loads(optim_overwrite)
+    if optim_overwrite:
+        optim_overwrite = read_json('cfg/optim_overwrite.json')
 
     if load_path is not None:
         raise NotImplementedError
@@ -149,7 +149,7 @@ def main(config_path, load_path, restart, overfit_small_batch, warm_start, optim
     # TODO instead of resuming and making a new folder, make a backup and continue in the same folder
     trainer = Trainer(model, loss, metrics, optimizers, lr_schedulers, seq_len_scheduler,
                       load_path, config,
-                      restart_optim=optim_overwrite is not None,
+                      restart_optim=bool(optim_overwrite),
                       do_validation=True,
                       overfit_small_batch=overfit_small_batch)
     trainer.train()
@@ -172,7 +172,7 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--overfit', action='store_true',
                         help='overfit_small_batch / debug mode')
 
-    parser.add_argument('--optim', default=None, type=str,
+    parser.add_argument('--optim', action='store_true',
                         help='overwrite optim config and reinit optim')
     args = parser.parse_args()
 
