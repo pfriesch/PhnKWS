@@ -76,7 +76,7 @@ class Trainer(BaseTrainer):
                                      self.config['training']['batching']['batch_size_train'],
                                      self.config["exp"]["n_gpu"] > 0,
                                      batch_ordering=self.model.batch_ordering,
-                                     shuffle=True)
+                                     shuffle=False)
 
         if self.starting_dataset_sampler_state is not None:
             dataloader.sampler.load_state_dict(self.starting_dataset_sampler_state)
@@ -172,8 +172,8 @@ class Trainer(BaseTrainer):
                         accumulated_train_metrics[metric] += metric_value
                         total_train_metrics[metric] += metric_value
 
-                pbar.set_description('T e:{} l: {:.4f}'.format(epoch,
-                                                               loss["loss_final"].item()))
+                # pbar.set_description('T e:{} l: {:.4f}'.format(epoch,
+                #                                                loss["loss_final"].item()))
                 pbar.update()
 
                 # Log training every 30s and smoothe since its the average

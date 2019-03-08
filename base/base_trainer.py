@@ -6,6 +6,7 @@ import threading
 import torch
 
 from base.utils import resume_checkpoint, save_checkpoint
+from nn_.registries.lr_scheduler_registry import ReduceLROnPlateau
 from utils.logger_config import logger
 from utils.nvidia_smi import nvidia_smi_enabled, get_gpu_usage, get_gpu_memory_consumption
 from utils.tensorboard_logger import WriterTensorboardX
@@ -139,8 +140,8 @@ class BaseTrainer:
         """
         Full training logic
         """
-        logger.info([f"{lr_scheduler_name}: {self.lr_schedulers[lr_scheduler_name].current_lr()}"
-                     for lr_scheduler_name in self.lr_schedulers])
+        logger.info("Current lr: " + " ".join([f"{lr_scheduler_name}: {self.lr_schedulers[lr_scheduler_name].get_lr()}"
+                                               for lr_scheduler_name in self.lr_schedulers]))
         for self.epoch in range(self.start_epoch, self.epochs):
             logger.info('----- Epoch {} / {} -----'.format(format(self.epoch, "03d"), format(self.epochs, "03d")))
 
@@ -150,8 +151,11 @@ class BaseTrainer:
 
             for lr_scheduler_name in self.lr_schedulers:
                 self.tensorboard_logger.add_scalar("lr_{}".format(lr_scheduler_name),
-                                                   self.lr_schedulers[lr_scheduler_name].current_lr())
-                self.lr_schedulers[lr_scheduler_name].step(result_log['valid_loss'], epoch=self.epoch)
+                                                   self.lr_schedulers[lr_scheduler_name].get_lr()[0])
+                if isinstance(self.lr_schedulers[lr_scheduler_name], ReduceLROnPlateau):
+                    self.lr_schedulers[lr_scheduler_name].step(result_log['valid_loss'], epoch=self.epoch)
+                else:
+                    self.lr_schedulers[lr_scheduler_name].step(epoch=self.epoch)
 
             self.seq_len_scheduler.step(self.epoch)
 
