@@ -63,13 +63,14 @@ def model_init(config):
         if config['arch']['loss']['name'] == 'CTC':
             # blank label
             _batch_ordering = "NCL"
+            if config['training']['dataset_type'] == "SEQUENTIAL_APPENDED_CONTEXT":
+                _batch_ordering = "TNCL"
             # pass
         elif config['arch']['loss']['name'] == 'CE':
             # TODO +1 for padding with 0 etc
             _batch_ordering = "NCL"
 
-            if config['training']['dataset_type'] == "FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT" \
-                    or config['training']['dataset_type'] == "SEQUENTIAL_APPENDED_CONTEXT":
+            if config['training']['dataset_type'] == "FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT":
                 _batch_ordering = "TNCL"
 
         else:
