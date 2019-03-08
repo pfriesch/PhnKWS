@@ -6,9 +6,6 @@ from utils.logger_config import logger
 
 class ReduceLROnPlateau(optim.lr_scheduler.ReduceLROnPlateau):
 
-    def current_lr(self):
-        return self.optimizer.param_groups[0]['lr']
-
     def _reduce_lr(self, epoch):
         for i, param_group in enumerate(self.optimizer.param_groups):
             old_lr = float(param_group['lr'])

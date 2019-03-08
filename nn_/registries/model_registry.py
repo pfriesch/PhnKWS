@@ -1,4 +1,5 @@
 from nn_.networks.MLP import MLP
+from nn_.networks.TDNN import TDNN
 from nn_.networks.WaveNet import WaveNet
 
 
@@ -76,6 +77,10 @@ def model_init(config):
 
         net = MLP(input_feat_length, input_feat_name, outputs, **config['arch']['args'], batch_ordering=_batch_ordering)
 
+
+    elif arch_name == "TDNN":
+
+        net = TDNN(input_feat_length, input_feat_name, outputs, **config['arch']['args'])
 
 
     # elif arch_name == "WaveNet_mtl_sequential":
