@@ -142,7 +142,8 @@ def main(config_path, load_path, restart, overfit_small_batch, warm_start, optim
     model, loss, metrics, optimizers, config, lr_schedulers, seq_len_scheduler = setup_run(config, optim_overwrite)
 
     if warm_start is not None:
-        assert hasattr(model, "load_warm_start")
+        load_warm_start_op = getattr(model, "load_warm_start", None)
+        assert callable(load_warm_start_op)
         model.load_warm_start(warm_start)
 
     # TODO instead of resuming and making a new folder, make a backup and continue in the same folder

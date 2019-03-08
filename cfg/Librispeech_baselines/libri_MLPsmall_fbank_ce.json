@@ -27,13 +27,15 @@
     //    "dataset_type": "FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT",
     //    "dataset_type": "SEQUENTIAL",
     //    "dataset_type": "SEQUENTIAL_APPENDED_CONTEXT",
-    "max_seq_length_train": null,
-    "start_seq_len_train": null,
-    "increase_seq_length_train": null,
-    "multply_factor_seq_len_train": null,
-    "max_seq_length_valid": null,
-    "batch_size_train": 512,
-    "batch_size_valid": 512,
+    "batching": {
+      "max_seq_length_train": null,
+      "start_seq_len_train": null,
+      "increase_seq_length_train": null,
+      "multply_factor_seq_len_train": null,
+      "max_seq_length_valid": null,
+      "batch_size_train": 128,
+      "batch_size_valid": 128
+    },
     "clip_grad_norm": -1,
     "optimizer": {
       "type": "adam",
