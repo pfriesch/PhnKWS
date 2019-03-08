@@ -1,5 +1,4 @@
 import os
-import math
 import json
 import threading
 
@@ -140,10 +139,11 @@ class BaseTrainer:
         """
         Full training logic
         """
-        logger.info("Current lr: " + " ".join([f"{lr_scheduler_name}: {self.lr_schedulers[lr_scheduler_name].get_lr()}"
-                                               for lr_scheduler_name in self.lr_schedulers]))
         for self.epoch in range(self.start_epoch, self.epochs):
             logger.info('----- Epoch {} / {} -----'.format(format(self.epoch, "03d"), format(self.epochs, "03d")))
+            logger.info(
+                "Current lr: " + " ".join([f"{lr_scheduler_name}: {self.lr_schedulers[lr_scheduler_name].get_lr()}"
+                                           for lr_scheduler_name in self.lr_schedulers]))
 
             self.tensorboard_logger.set_step(self.global_step, 'epoch_info')
             with Timer("elapsed_time_epoch", [self.tensorboard_logger, logger], self.global_step) as t:

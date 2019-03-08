@@ -15,7 +15,7 @@ class StaticLR(_LRScheduler):
 
 def optimizer_init(config, model, optim_overwrite):
     optimizers = {}
-    if optim_overwrite is None:
+    if not bool(optim_overwrite):
         optim_config = config['training']['optimizer']
     else:
         optim_config = optim_overwrite
@@ -53,11 +53,6 @@ def optimizer_init(config, model, optim_overwrite):
 
     else:
         raise ValueError(f"Can't find the optimizer {optim_config['type']}")
-    if optim_overwrite is None:
-        lr_schedulers = lr_scheduler_init(config, optimizers)
-    else:
-        lr_schedulers = {}
-        for opti_name in optimizers:
-            lr_schedulers[opti_name] = StaticLR(optimizers[opti_name])
+    lr_schedulers = lr_scheduler_init(config, optimizers)
 
     return optimizers, lr_schedulers

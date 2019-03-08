@@ -95,30 +95,41 @@ class MLP(BaseModel):
     #                          k.startswith("output_layers.out_cd.layers.0.")}
     #     self.output_layers['out_cd'].load_wired_state_dict(_wired_state_dict)
 
-    def load_warm_start(self, state_dict):
-        checkpoint = torch.load(state_dict, map_location='cpu')
+    # def load_warm_start(self, state_dict):
+    #     checkpoint = torch.load(state_dict, map_location='cpu')
+    #
+    #     state_dict_orig = checkpoint['state_dict']
+    #     state_dict = {k.replace("tdnn", "MLP").replace("MLP.layers.5.", "output_layers.out_cd.layers.0."): v for k, v in
+    #                   state_dict_orig.items()}
+    #
+    #     _out_mono_layer_state_dict = {k: v for k, v in self.state_dict().items() if "out_mono" in k}
+    #     state_dict.update(_out_mono_layer_state_dict)
+    #
+    #     _out_cd_layer_state_dict = {k: v for k, v in self.state_dict().items() if "out_cd" in k}
+    #
+    #     for k, v in state_dict.items():
+    #         if "output_layers.out_cd.layers.0." in k:
+    #             if len(_out_cd_layer_state_dict[k].shape) > 0:
+    #                 _out_cd_layer_state_dict[k][1:] = state_dict[k]
+    #
+    #     state_dict.update(_out_cd_layer_state_dict)
+    #
+    #     # self.state_dict()
+    #     # for k in checkpoint:
+    #     #     if 'output_layer' in k:
+    #     #         new_t = self.state_dict()[k]
+    #     #         new_t[1:] = checkpoint[k]
+    #     #         checkpoint[k] = new_t
+    #
+    #     self.load_state_dict(state_dict)
 
-        state_dict_orig = checkpoint['state_dict']
-        state_dict = {k.replace("tdnn", "MLP").replace("MLP.layers.5.", "output_layers.out_cd.layers.0."): v for k, v in
-                      state_dict_orig.items()}
-
-        _out_mono_layer_state_dict = {k: v for k, v in self.state_dict().items() if "out_mono" in k}
-        state_dict.update(_out_mono_layer_state_dict)
-
-        _out_cd_layer_state_dict = {k: v for k, v in self.state_dict().items() if "out_cd" in k}
-
-        for k, v in state_dict.items():
-            if "output_layers.out_cd.layers.0." in k:
-                if len(_out_cd_layer_state_dict[k].shape) > 0:
-                    _out_cd_layer_state_dict[k][1:] = state_dict[k]
-
-        state_dict.update(_out_cd_layer_state_dict)
-
-        # self.state_dict()
-        # for k in checkpoint:
-        #     if 'output_layer' in k:
-        #         new_t = self.state_dict()[k]
-        #         new_t[1:] = checkpoint[k]
-        #         checkpoint[k] = new_t
-
-        self.load_state_dict(state_dict)
+    # def load_warm_start(self, state_dict):
+    #
+    #     checkpoint = torch.load(state_dict, map_location='cpu')
+    #
+    #     state_dict_orig = checkpoint['state_dict']
+    #     state_dict = {k.replace("tdnn", "MLP").replace("MLP.layers.5.", "output_layers.out_phn.layers.0."): v for k, v
+    #                   in
+    #                   state_dict_orig.items()}
+    #
+    #     self.load_state_dict(state_dict)
