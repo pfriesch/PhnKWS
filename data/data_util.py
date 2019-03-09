@@ -50,8 +50,10 @@ def filter_by_seqlen(samples_list, max_sequence_length, context_left, context_ri
                 # just for logging purposes
                 min_len = len(sample_dict["features"][feature_name]) - (
                         context_left + context_right)
-            if len(sample_dict["features"][feature_name]) - (
-                    context_left + context_right) <= max_sequence_length and max_sequence_length > 0:
+            if max_sequence_length is None or max_sequence_length <= 0 \
+                    or len(sample_dict["features"][feature_name]) - (
+                    context_left + context_right) <= max_sequence_length:
+                # Filter samples that are too long
                 start_idx = context_left
                 end_idx = len(sample_dict["features"][feature_name]) - context_right
                 filtered_sample_list.append((filename, start_idx, end_idx))

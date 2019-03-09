@@ -2,17 +2,16 @@ import os
 import json
 
 import torch
-import ctcdecode
 import numpy as np
 from tqdm import tqdm
 
+from base.base_trainer import KaldiOutputWriter
 from base.utils import resume_checkpoint
 from data.data_util import apply_context_single_feat
 from data.kaldi_dataset_utils import _load_labels
 from kaldi_decoding_scripts.ctc_decoding.decode_dnn_custom_graph import decode_ctc
 from kws_decoder.eesen_decoder_kw.prepare_decode_graph import make_ctc_decoding_graph
 from nn_.registries.model_registry import model_init
-from trainer import KaldiOutputWriter
 from utils.logger_config import logger
 from utils.util import ensure_dir
 
@@ -153,7 +152,7 @@ class CTCDecoder:
         # input_batch = {'fbank': torch.cat(input_batch, dim=1)}
         output_label = 'out_phn'
         assert output_label in self.model.out_names
-        with KaldiOutputWriter(tmp_out_dir, "keyword", [output_label], self.epoch, self.config) as writer:
+        with KaldiOutputWriter(tmp_out_dir, "keyword", [output_label], self.epoch) as writer:
             post_files.append(writer.post_file[output_label].name)
             for sample_name in tqdm(input_features, desc="computing acoustic features:"):
                 input_feature = {"fbank": self.preprocess_feat(input_features[sample_name])}

@@ -19,7 +19,7 @@
       "test_with": "test_clean_100"
     },
     "features_use": ["fbank"],
-    "labels_use": ["lab_cd", "lab_mono"]
+    "labels_use": ["lab_cd"]
   },
   "training": {
     //    "dataset_type": "FRAMEWISE_SHUFFLED_FRAMES",
@@ -46,7 +46,7 @@
     "lr_scheduler": {
       "name": "MultiStepLR",
       "args": {
-        "milestones": [4, 6, 8, 10],
+        "milestones": [5, 10, 15, 20],
         "gamma": 0.5
       }
     }
@@ -69,9 +69,7 @@
     },
     "metrics": [
       "acc_lab_cd",
-      "err_lab_cd",
-      "acc_lab_mono",
-      "err_lab_mono"
+      "err_lab_cd"
     ]
   }
 }

@@ -1,6 +1,6 @@
 {
-  "type": "sgd",
+  "type": "adam",
   "args": {
-    "lr": 1e-4
+    "lr": 1e-5
   }
 }
