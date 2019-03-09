@@ -1,10 +1,12 @@
 import os
 import json
 import threading
+from multiprocessing import Queue
 
 import torch
 
 from base.utils import resume_checkpoint, save_checkpoint
+from data import kaldi_io
 from nn_.registries.lr_scheduler_registry import ReduceLROnPlateau
 from utils.logger_config import logger
 from utils.nvidia_smi import nvidia_smi_enabled, get_gpu_usage, get_gpu_memory_consumption
@@ -150,8 +152,13 @@ class BaseTrainer:
                 result_log = self._train_epoch(self.epoch)
 
             for lr_scheduler_name in self.lr_schedulers:
+                if isinstance(self.lr_schedulers[lr_scheduler_name].get_lr(), float):
+                    _curr_lr = self.lr_schedulers[lr_scheduler_name].get_lr()
+                else:
+                    _curr_lr = self.lr_schedulers[lr_scheduler_name].get_lr()[0]
+
                 self.tensorboard_logger.add_scalar("lr_{}".format(lr_scheduler_name),
-                                                   self.lr_schedulers[lr_scheduler_name].get_lr()[0])
+                                                   _curr_lr)
                 if isinstance(self.lr_schedulers[lr_scheduler_name], ReduceLROnPlateau):
                     self.lr_schedulers[lr_scheduler_name].step(result_log['valid_loss'], epoch=self.epoch)
                 else:
@@ -210,3 +217,86 @@ class BaseTrainer:
 
     def _eval_epoch(self, epoch):
         raise NotImplementedError
+
+
+def to_device(device, data, non_blocking=True):
+    if isinstance(data, dict):
+        return {k: to_device(device, v) for k, v in data.items()}
+    if isinstance(data, list):
+        return [e.to(device, non_blocking=non_blocking) for e in data]
+    else:
+        return data.to(device, non_blocking=non_blocking)
+
+
+def detach(data):
+    if isinstance(data, dict):
+        return {k: v.detach() for k, v in data.items()}
+    if isinstance(data, list):
+        return [e.detach() for e in data]
+    else:
+        return data.detach()
+
+
+def detach_cpu(data):
+    if isinstance(data, dict):
+        return {k: v.detach().cpu() for k, v in data.items()}
+    if isinstance(data, list):
+        return [e.detach().cpu() for e in data]
+    else:
+        return data.detach().cpu()
+
+
+def eval_metrics(output_target, metrics):
+    output, target = output_target
+    acc_metrics = {}
+    for metric in metrics:
+        acc_metrics[metric] = metrics[metric](output, target)
+    return acc_metrics
+
+
+def detach_metrics(output, targets):
+    detached_output = {}
+    for k in output:
+        detached_output[k] = output[k].detach().cpu()
+    detached_targets = {}
+    for k in targets:
+        detached_targets[k] = targets[k].detach().cpu()
+    return detached_output, detached_targets
+
+
+def metrics_accumulator(q: Queue, metrics):
+    _accumulated_valid_metrics = {metric: 0 for metric in metrics}
+    while True:
+        metrics_input = q.get(True)
+        if metrics_input is None:
+            break
+        _output, _targets = metrics_input
+        _valid_metrics = eval_metrics((_output, _targets), metrics)
+        for metric, metric_value in _valid_metrics.items():
+            _accumulated_valid_metrics[metric] += metric_value
+    return _accumulated_valid_metrics
+
+
+class KaldiOutputWriter:
+
+    def __init__(self, out_folder, data_name, output_names, epoch):
+        super().__init__()
+        self.out_folder = out_folder
+        self.data_name = data_name
+        self.epoch = epoch
+        self.output_names = output_names
+
+    def __enter__(self):
+        base_file_name = '{}/exp_files/logits_{}_ep{:03d}'.format(self.out_folder, self.data_name, self.epoch)
+        self.post_file = {}
+        for out_name in self.output_names:
+            out_file = '{}_{}.ark'.format(base_file_name, out_name)
+            self.post_file[out_name] = kaldi_io.open_or_fd(out_file, 'wb')
+        return self
+
+    def __exit__(self, *args):
+        for out_name in self.output_names:
+            self.post_file[out_name].close()
+
+    def write_mat(self, out_name, out_save, sample_name):
+        kaldi_io.write_mat(self.post_file[out_name], out_save, sample_name)
