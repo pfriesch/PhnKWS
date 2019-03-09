@@ -29,7 +29,7 @@
     "dataset_type": "SEQUENTIAL_APPENDED_CONTEXT",
     "batching": {
       "max_seq_length_train": 3500,
-      "start_seq_len_train": 500,
+      "start_seq_len_train": 3500,
       "increase_seq_length_train": true,
       "multply_factor_seq_len_train": 2,
       "max_seq_length_valid": 3500,
@@ -46,7 +46,7 @@
     "lr_scheduler": {
       "name": "MultiStepLR",
       "args": {
-        "milestones": [4, 6, 8, 10],
+        "milestones": [5, 10, 15, 20],
         "gamma": 0.5
       }
     }

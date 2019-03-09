@@ -11,10 +11,10 @@ from cfg.dataset_definition.get_dataset_definition import get_dataset_definition
 from data.phoneme_dict import get_phoneme_dict
 from nn_ import model_init, optimizer_init, lr_scheduler_init, metrics_init, loss_init
 from nn_.registries.seq_len_scheduler_regestry import seq_len_scheduler_init
+from trainer.trainer import Trainer
 from utils.logger_config import logger
 from utils.nvidia_smi import nvidia_smi_enabled
 from utils.util import code_versioning
-from trainer import Trainer
 from utils.utils import check_environment, read_json
 
 

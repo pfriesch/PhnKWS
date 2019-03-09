@@ -46,7 +46,7 @@
     "lr_scheduler": {
       "name": "MultiStepLR",
       "args": {
-        "milestones": [4, 6, 8, 10],
+        "milestones": [5, 10, 15, 20],
         "gamma": 0.5
       }
     }
