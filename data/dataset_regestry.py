@@ -4,6 +4,7 @@ from data.datasets.kaldi_dataset_framewise_sequential_context import KaldiDatase
 from data.datasets.kaldi_dataset_framewise_shuffled_frames import KaldiDatasetFramewiseContextShuffledFrames
 from data.datasets.kaldi_dataset_sequential import KaldiDatasetSequential
 from data.datasets.kaldi_dataset_sequential_context import KaldiDatasetSequentialContext
+from utils.logger_config import logger
 
 
 def get_dataset(dataset_type,
@@ -37,11 +38,13 @@ def get_dataset(dataset_type,
 
     elif dataset_type == DatasetType.FRAMEWISE_SEQUENTIAL:
         # assert phoneme_dict == None
-        assert 'lab_cd' in label_dict and 'lab_mono' in label_dict
+        assert 'lab_cd' in label_dict and 'lab_mono' in label_dict and 'lab_phnframe' in label_dict
 
-        return KaldiDatasetFramewise(data_cache_root, dataset_name, feature_dict, label_dict, max_sample_len,
+        return KaldiDatasetFramewise(data_cache_root, dataset_name, feature_dict, label_dict, phoneme_dict,
+                                     max_sample_len,
                                      left_context, right_context, normalize_features, max_seq_len, max_label_length,
                                      overfit_small_batch)
+
     elif dataset_type == DatasetType.FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT:
         # assert phoneme_dict == None
         assert 'lab_cd' in label_dict and 'lab_mono' in label_dict
@@ -61,7 +64,8 @@ def get_dataset(dataset_type,
     elif dataset_type == DatasetType.SEQUENTIAL_APPENDED_CONTEXT:
         assert 'lab_phn' in label_dict
 
-        assert left_context > 0 or right_context > 0
+        if not (left_context > 0 or right_context > 0):
+            logger.warn("No context but context given")
 
         return KaldiDatasetSequentialContext(data_cache_root, dataset_name, feature_dict, label_dict, phoneme_dict,
                                              max_sample_len, left_context, right_context, normalize_features,

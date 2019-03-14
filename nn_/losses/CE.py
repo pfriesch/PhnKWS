@@ -25,6 +25,13 @@ class CELoss(nn.Module):
         mono_max = target['lab_mono'].view(-1).max()
         assert mono_max < num_mono, f"got max {mono_max}, expeced {num_mono} (min: {target['lab_mono'].view(-1).min()})"
 
+        if 'lab_phnframe' in target:
+            num_phnframe = output['out_phnframe'].shape[1]
+            phnframe_max = target['lab_phnframe'].view(-1).max()
+            assert phnframe_max < num_phnframe, \
+                f"got max {phnframe_max}," \
+                + f" expeced {num_phnframe} (min: {target['lab_phnframe'].view(-1).min()})"
+
         loss_cd = F.nll_loss(output['out_cd'],
                              target['lab_cd'],
                              ignore_index=PADDING_IGNORE_INDEX)
@@ -32,5 +39,16 @@ class CELoss(nn.Module):
                                target['lab_mono'],
                                ignore_index=PADDING_IGNORE_INDEX)
 
-        loss_final = (self.weight_mono * loss_mono) + loss_cd
-        return {"loss_final": loss_final, "loss_cd": loss_cd, "loss_mono": loss_mono}
+        if 'lab_phnframe' in target:
+            loss_phnframe = F.nll_loss(output['out_phnframe'],
+                                       target['lab_phnframe'],
+                                       ignore_index=PADDING_IGNORE_INDEX)
+
+            loss_final = (self.weight_mono * loss_mono) + loss_cd + loss_phnframe
+            return {"loss_final": loss_final, "loss_cd": loss_cd, "loss_mono": loss_mono,
+                    "loss_phnframe": loss_phnframe}
+
+        else:
+
+            loss_final = (self.weight_mono * loss_mono) + loss_cd
+            return {"loss_final": loss_final, "loss_cd": loss_cd, "loss_mono": loss_mono}

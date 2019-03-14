@@ -5,7 +5,7 @@
     "seed": 2234,
     "n_gpu": 1,
     "prefetch_to_gpu": true,
-    "n_epochs_tr": 20,
+    "n_epochs_tr": 100,
     "save_period": 1,
     "checkpoint_interval_minutes": 10,
     "compute_train_metrics": false,
@@ -29,25 +29,26 @@
     //    "dataset_type": "SEQUENTIAL_APPENDED_CONTEXT",
     "batching": {
       "max_seq_length_train": 3500,
-      "start_seq_len_train": 500,
+      "start_seq_len_train": 150, // use 150 or nan
       "increase_seq_length_train": true,
       "multply_factor_seq_len_train": 2,
       "max_seq_length_valid": 3500,
       "batch_size_train": 32,
       "batch_size_valid": 32
     },
-    "clip_grad_norm": -1,
+    "clip_grad_norm": 10,
     "optimizer": {
       "type": "adam",
       "args": {
-        "lr": 1e-3
+        "lr": 1e-3,
+        "amsgrad": true
       }
     },
     "lr_scheduler": {
       "name": "MultiStepLR",
       "args": {
-        "milestones": [4, 6, 8, 10],
-        "gamma": 0.5
+        "milestones": [5, 10],
+        "gamma": 0.1
       }
     }
   },
@@ -56,6 +57,7 @@
     "args": {
       "lookahead_context": 5,
       "n_layers": 28,
+      "n_channels": 64,
       "max_dilation": 4,
       "n_residual_channels": 32,
       "n_skip_channels": 64,

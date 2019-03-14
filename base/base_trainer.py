@@ -146,9 +146,12 @@ class BaseTrainer:
             logger.info(
                 "Current lr: " + " ".join([f"{lr_scheduler_name}: {self.lr_schedulers[lr_scheduler_name].get_lr()}"
                                            for lr_scheduler_name in self.lr_schedulers]))
+            logger.info(
+                f"Current max seq len: {type(self.seq_len_scheduler).__name__}: {self.seq_len_scheduler.get_seq_len()}")
 
             self.tensorboard_logger.set_step(self.global_step, 'epoch_info')
             with Timer("elapsed_time_epoch", [self.tensorboard_logger, logger], self.global_step) as t:
+
                 result_log = self._train_epoch(self.epoch)
 
             for lr_scheduler_name in self.lr_schedulers:
@@ -164,7 +167,7 @@ class BaseTrainer:
                 else:
                     self.lr_schedulers[lr_scheduler_name].step(epoch=self.epoch)
 
-            self.seq_len_scheduler.step(self.epoch)
+                self.seq_len_scheduler.step(self.epoch)
 
             # save logged informations into log dict
             log = {'epoch': self.epoch}

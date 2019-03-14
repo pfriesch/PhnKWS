@@ -6,15 +6,17 @@ from collections import Counter
 
 import numpy as np
 import torch
+from tqdm import tqdm
 
 from base.base_kaldi_dataset import BaseKaldiDataset, apply_context_full_sequence
 from data.data_util import load_labels
 from data.datasets import DatasetType
+from data.phoneme_dict import PhonemeDict
 
 
 class KaldiDatasetFramewise(BaseKaldiDataset):
 
-    def __init__(self, data_cache_root, dataset_name, feature_dict, label_dict, max_sample_len=1000,
+    def __init__(self, data_cache_root, dataset_name, feature_dict, label_dict, phoneme_dict, max_sample_len=1000,
                  left_context=0, right_context=0, normalize_features=True, max_seq_len=100, max_label_length=None,
                  overfit_small_batch=False):
 
@@ -23,9 +25,11 @@ class KaldiDatasetFramewise(BaseKaldiDataset):
             assert label_dict[label_name]["label_opts"] == "ali-to-phones --per-frame=true" or \
                    label_dict[label_name]["label_opts"] == "ali-to-pdf"
 
+        assert isinstance(phoneme_dict, PhonemeDict)
         super().__init__(data_cache_root, dataset_name, feature_dict, label_dict, dataset_type, max_sample_len,
                          left_context, right_context, normalize_features,
-                         aligned_labels=True, max_seq_len=max_seq_len, max_label_length=max_label_length)
+                         aligned_labels=True, max_seq_len=max_seq_len, max_label_length=max_label_length,
+                         phoneme_dict=phoneme_dict)
         if overfit_small_batch:
             self.sample_index = self.sample_index[:64]
 
@@ -90,7 +94,24 @@ class KaldiDatasetFramewise(BaseKaldiDataset):
                      if len(all_labels_loaded[label_name][l]) < self.state.max_label_length}
 
             assert label_name != "lab_phn" \
-                   and label_name == "lab_cd" or label_name == "lab_mono"
+                   and label_name == "lab_cd" or label_name == "lab_mono" or label_name == "lab_phnframe"
+
+            if label_name == "lab_phnframe":
+                assert self.state.phoneme_dict is not None
+                for sample_id in tqdm(all_labels_loaded[label_name], desc="mapping phnframe"):
+                    assert max(all_labels_loaded[label_name][sample_id]) <= max(
+                        self.state.phoneme_dict.idx2reducedIdx.keys()), \
+                        "Are you sure you have the righ phoneme dict?" + \
+                        " Labels have higher indices than phonemes ( {} <!= {} )".format(
+                            max(all_labels_loaded[label_name][sample_id]),
+                            max(self.state.phoneme_dict.idx2reducedIdx.keys()))
+
+                    # map labels according to phoneme dict
+                    tmp_labels = np.copy(all_labels_loaded[label_name][sample_id])
+                    for k, v in self.state.phoneme_dict.idx2reducedIdx.items():
+                        tmp_labels[all_labels_loaded[label_name][sample_id] == k] = v
+
+                    all_labels_loaded[label_name][sample_id] = tmp_labels
 
             self._check_labels_indexed_from(all_labels_loaded, label_name)
 

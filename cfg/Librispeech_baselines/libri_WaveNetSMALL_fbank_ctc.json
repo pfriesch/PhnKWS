@@ -1,11 +1,11 @@
 {
   "exp": {
     "save_dir": "../exp",
-    "name": "libri_WaveNetSAMLL_fbank_ctc",
+    "name": "libri_WaveNetSMALL_fbank_ctc",
     "seed": 2234,
     "n_gpu": 1,
     "prefetch_to_gpu": true,
-    "n_epochs_tr": 20,
+    "n_epochs_tr": 100,
     "save_period": 1,
     "checkpoint_interval_minutes": 10,
     "compute_train_metrics": false,
@@ -14,7 +14,7 @@
   "dataset": {
     "name": "librispeech",
     "data_use": {
-      "train_with": "train_clean_100",
+      "train_with": "train_clean_460",
       "valid_with": "dev_clean_100",
       "test_with": "test_clean_100"
     },
@@ -29,33 +29,37 @@
     //    "dataset_type": "SEQUENTIAL_APPENDED_CONTEXT",
     "batching": {
       "max_seq_length_train": 3500,
-      "start_seq_len_train": 500,
+      "start_seq_len_train": 3500,
       "increase_seq_length_train": true,
       "multply_factor_seq_len_train": 2,
       "max_seq_length_valid": 3500,
       "batch_size_train": 32,
-      "batch_size_valid": 32
+      "batch_size_valid": 1
     },
-    "clip_grad_norm": -1,
+    "clip_grad_norm": 10,
     "optimizer": {
       "type": "adam",
       "args": {
-        "lr": 1e-3
+        "lr": 1e-3,
+        "amsgrad": true
       }
     },
     "lr_scheduler": {
-      "name": "MultiStepLR",
+      "name": "ReduceLROnPlateau",
       "args": {
-        "milestones": [4, 6, 8, 10],
-        "gamma": 0.5
+        "factor": 0.1,
+        "patience": 3,
+        "cooldown": 3,
+        "min_lr": 1e-6
       }
     }
   },
   "arch": {
     "name": "WaveNet",
     "args": {
-      "lookahead_context": 5,
+      "lookahead_context": 0,
       "n_layers": 28,
+      "n_channels": 32,
       "max_dilation": 4,
       "n_residual_channels": 16,
       "n_skip_channels": 32,
