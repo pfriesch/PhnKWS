@@ -64,9 +64,6 @@ def evaluate(model, metrics, device, out_folder, exp_name, max_label_length, epo
                 for batch_idx, (sample_names, inputs, targets) in enumerate(dataloader):
                     n_steps_this_epoch += 1
 
-                    if batch_idx > 10:
-                        break
-
                     inputs = to_device(device, inputs)
                     if "lab_phn" not in targets:
                         targets = to_device(device, targets)

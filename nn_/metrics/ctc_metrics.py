@@ -32,7 +32,7 @@ class PhnErrorRate(Module):
 
     def forward(self, output, target):
 
-        if self.batch_ordering == 'NCT':
+        if self.batch_ordering == 'NCT' or self.batch_ordering == 'NCL':
             # NCT (NCL) -> NTC required for ctcdecode
             logits = output['out_phn'].permute(0, 2, 1)
         elif self.batch_ordering == 'TNCL':

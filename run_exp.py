@@ -23,6 +23,27 @@ def check_config(config):
     pass
 
 
+def make_phn_dict(config, dataset_definition, label_name):
+    if dataset_definition['data_info']['labels'][label_name]['lab_count'][0] < 1:
+        # TODO counts return 0 indexed but phns are not so wtf
+        dataset_definition['data_info']['labels'][label_name]['lab_count'] = \
+            dataset_definition['data_info']['labels'][label_name]['lab_count'][1:]
+
+    if len(config['dataset']['labels_use']) == 0:
+        raise NotImplementedError("Multiple output labels not implemented for e2e/ctc")
+
+    # e2e ctc
+    phoneme_dict = get_phoneme_dict(config['dataset']['dataset_definition']['phn_mapping_file'],
+                                    stress_marks=False, word_position_dependency=False)
+    dataset_definition['data_info']['labels'][label_name]['num_lab'] = len(phoneme_dict.phoneme2reducedIdx)
+    lab_count_new = [0] * len(phoneme_dict.phoneme2reducedIdx)
+    for lab_idx, count in enumerate(dataset_definition['data_info']['labels'][label_name]['lab_count'], start=1):
+        lab_count_new[phoneme_dict.idx2reducedIdx[lab_idx]] += count
+    dataset_definition['data_info']['labels'][label_name]['lab_count'] = lab_count_new
+
+    return phoneme_dict
+
+
 def setup_run(config, optim_overwrite):
     set_seed(config['exp']['seed'])
     torch.backends.cudnn.deterministic = True  # Otherwise I got nans for the CTC gradient
@@ -31,24 +52,10 @@ def setup_run(config, optim_overwrite):
     dataset_definition = get_dataset_definition(config['dataset']['name'], config['dataset']['data_use']['train_with'])
     config['dataset']['dataset_definition'] = dataset_definition
 
-    if 'lab_phn' in config['dataset']['labels_use'][0]:
-        if dataset_definition['data_info']['labels']['lab_phn']['lab_count'][0] < 1:
-            # TODO counts return 0 indexed but phns are not so wtf
-            dataset_definition['data_info']['labels']['lab_phn']['lab_count'] = \
-                dataset_definition['data_info']['labels']['lab_phn']['lab_count'][1:]
-
-        if len(config['dataset']['labels_use']) == 0:
-            raise NotImplementedError("Multiple output labels not implemented for e2e/ctc")
-
-        # e2e ctc
-        phoneme_dict = get_phoneme_dict(config['dataset']['dataset_definition']['phn_mapping_file'],
-                                        stress_marks=False, word_position_dependency=False)
-        dataset_definition['data_info']['labels']['lab_phn']['num_lab'] = len(phoneme_dict.phoneme2reducedIdx)
-        lab_count_new = [0] * len(phoneme_dict.phoneme2reducedIdx)
-        for lab_idx, count in enumerate(dataset_definition['data_info']['labels']['lab_phn']['lab_count'], start=1):
-            lab_count_new[phoneme_dict.idx2reducedIdx[lab_idx]] += count
-        dataset_definition['data_info']['labels']['lab_phn']['lab_count'] = lab_count_new
-
+    if 'lab_phn' in config['dataset']['labels_use']:
+        phoneme_dict = make_phn_dict(config, dataset_definition, 'lab_phn')
+    elif 'lab_phnframe' in config['dataset']['labels_use']:
+        phoneme_dict = make_phn_dict(config, dataset_definition, 'lab_phnframe')
     else:
         # framewise
         phoneme_dict = get_phoneme_dict(config['dataset']['dataset_definition']['phn_mapping_file'],

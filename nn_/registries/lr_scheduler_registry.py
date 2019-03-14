@@ -1,5 +1,5 @@
 from torch import optim
-from torch.optim.lr_scheduler import MultiStepLR
+from torch.optim.lr_scheduler import MultiStepLR, ExponentialLR
 
 from utils.logger_config import logger
 
@@ -31,20 +31,27 @@ def lr_scheduler_init(config, optimizers):
     if config['training']['lr_scheduler']['name'] == 'ReduceLROnPlateau':
 
         for opti_name in optimizers:
-            lr_schedulers[opti_name] = ReduceLROnPlateau(optimizers[opti_name],
-                                                         mode='min',
-                                                         factor=0.4,
-                                                         patience=2,
-                                                         verbose=True,
-                                                         cooldown=2,
-                                                         threshold_mode='rel',
-                                                         **config['training']['lr_scheduler']['args'])
+            input_dict = {"mode": 'min',
+                          "factor": 0.4,
+                          "patience": 2,
+                          "verbose": True,
+                          "cooldown": 2,
+                          "threshold_mode": 'rel'}
+            input_dict.update(config['training']['lr_scheduler']['args'])
+            lr_schedulers[opti_name] = ReduceLROnPlateau(optimizers[opti_name], **input_dict)
 
     elif config['training']['lr_scheduler']['name'] == 'MultiStepLR':
 
         for opti_name in optimizers:
             lr_schedulers[opti_name] = MultiStepLR(optimizers[opti_name],
                                                    **config['training']['lr_scheduler']['args'])
+
+    elif config['training']['lr_scheduler']['name'] == 'ExponentialLR':
+
+        for opti_name in optimizers:
+            lr_schedulers[opti_name] = ExponentialLR(optimizers[opti_name],
+                                                     **config['training']['lr_scheduler']['args'])
+
     else:
         raise ValueError
 

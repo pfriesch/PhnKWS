@@ -277,6 +277,7 @@ class StatefulSequentialSampler(Sampler):
                 list(enumerate(range(len(self.data_source)), start=self.start_idx))[self.start_idx:]:
             yield index
 
+
     def __len__(self):
         return len(self.data_source)
 

@@ -8,7 +8,7 @@ from tabulate import tabulate
 from torch import nn
 
 from base.base_model import BaseModel
-from nn_.net_modules.WaveNetModules import Conv1d, WaveNetLayer
+from nn_.net_modules.WaveNetModules import Conv1d, WaveNetLayer, Conv2d
 from nn_.utils.CNN_utils import LayerStats
 
 
@@ -19,6 +19,7 @@ class WaveNet(BaseModel):
                  outputs,
                  lookahead_context,
                  n_layers=28,
+                 n_channels=64,
                  max_dilation=4,
                  n_residual_channels=32,
                  n_skip_channels=64,
@@ -33,16 +34,19 @@ class WaveNet(BaseModel):
 
         self.max_dilation = max_dilation
 
+        self.pool_inf_freq_domain = False
+        if self.pool_inf_freq_domain:
+            self.conv_in = Conv2d(input_feat_length, n_residual_channels, kernel_size_freq=7, kernel_size_time=5)
+        else:
+            self.conv_in = Conv1d(input_feat_length, n_residual_channels)
+
         self.layers = nn.ModuleList()
-
-        self.conv_in = Conv1d(input_feat_length, n_residual_channels)
-
         loop_factor = math.floor(math.log2(max_dilation)) + 1
         for i in range(n_layers):
             dilation = 2 ** (i % loop_factor)
 
             self.layers.append(
-                WaveNetLayer(kernel_size, n_residual_channels, n_skip_channels, dilation,
+                WaveNetLayer(kernel_size, n_channels, n_residual_channels, n_skip_channels, dilation,
                              no_output_layer=i == n_layers - 1))
 
         self.output_layers = nn.ModuleDict({})
@@ -69,7 +73,12 @@ class WaveNet(BaseModel):
 
         output_length = x.shape[2] - self.context_left - self.context_right
 
-        x = self.conv_in(x)
+        if self.pool_inf_freq_domain:
+            x = x.unsqueeze(1)
+            x = self.conv_in(x)
+
+        else:
+            x = self.conv_in(x)
         x = torch.tanh(x)
 
         skip_connection = None
@@ -155,6 +164,53 @@ class WaveNet(BaseModel):
             , cfg={"height": 10}))
 
         return layer.output_size()
+
+    # def load_warm_start(self, path):
+    #     # CE mono+cd -> mono+cd+phnframe
+    #     state_dict = torch.load(path, map_location='cpu')['state_dict']
+    #
+    #     state_dict.update({k: v for k, v in self.state_dict().items() if 'out_phnframe' in k})
+    #
+    #     self.load_state_dict(state_dict)
+    #     print("Loaded state dict for warm start")
+
+    # def load_warm_start(self, path):
+    # #same arch
+    #     state_dict = torch.load(path)['state_dict']
+    #     # state_dict = {k: v for k, v in state_dict.items() if not 'out_mono' in k}
+    #
+    #     self.load_state_dict(state_dict)
+    #     print("Loaded state dict for warm start")
+
+    def load_warm_start(self, path):
+        # CE -> CTC
+
+        state_dict = torch.load(path, map_location='cpu')['state_dict']
+        _state_dict_old = {k: v for k, v in state_dict.items() if not 'output_layers' in k}
+
+        _state_dict_init = {k: v for k, v in self.state_dict().items() if 'output_layers' in k}
+        _state_dict_old.update(_state_dict_init)
+
+        self.load_state_dict(_state_dict_old)
+        print("Loaded state dict for warm start")
+        # for param in self.layers.parameters():
+        #     param.requires_grad = False
+        # for param in self.conv_in.parameters():
+        #     param.requires_grad = False
+
+        # print("Froze Layers")
+
+    # def load_warm_start(self, path):
+    #     # CE -> CTC
+    #
+    #     state_dict = torch.load(path)['state_dict']
+    #     _state_dict_old = {k: v for k, v in state_dict.items() if not 'output_layers' in k}
+    #
+    #     _state_dict_init = {k: v for k, v in self.state_dict().items() if 'output_layers' in k}
+    #     _state_dict_old.update(_state_dict_init)
+    #
+    #     self.load_state_dict(_state_dict_old)
+    #     print("Loaded state dict for warm start")
 
 # if __name__ == '__main__':
 #     _x = torch.zeros(5, 40, 16).random_()
