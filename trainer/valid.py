@@ -99,7 +99,7 @@ def valid_epoch_async_metrics(epoch, model, loss_fun, metrics, config, max_label
                               accumulated_valid_metrics}}
 
 
-def valid_epoch_sync_metrics(epoch, model, loss, metrics, config, max_label_length, device, tensorboard_logger):
+def valid_epoch_sync_metrics(epoch, model, loss_fun, metrics, config, max_label_length, device, tensorboard_logger):
     model.eval()
 
     valid_loss = 0
@@ -141,7 +141,7 @@ def valid_epoch_sync_metrics(epoch, model, loss, metrics, config, max_label_leng
                 targets = to_device(device, targets)
 
             output = model(inputs)
-            loss = loss(output, targets)
+            loss = loss_fun(output, targets)
 
             output = detach_cpu(output)
             targets = detach_cpu(targets)

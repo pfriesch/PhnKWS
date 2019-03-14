@@ -25,6 +25,8 @@ def get_dataset_definition(dataset_name, train_with):
         raise NotImplementedError(dataset_name)
 
     dataset_definition = read_json(dataset_config_path)
+    dataset_definition['data_info']['labels'] = {k: v for k, v in dataset_definition['data_info']['labels'].items() if
+                                                 k in dataset_definition['datasets'][train_with]['labels']}
     for label in dataset_definition['data_info']['labels']:
         label_info = dataset_definition['data_info']['labels'][label]
         if label_info['num_lab'] is None:
@@ -41,7 +43,7 @@ def get_dataset_definition(dataset_name, train_with):
                     num_label=label_info["num_lab"],
                     folder_lab_count=folder_lab_count)
 
-            elif label == "lab_mono" or label == "lab_phn":
+            elif label == "lab_mono" or label == "lab_phn" or label == "lab_phnframe":
                 folder_lab_count = dataset_definition['datasets'][train_with] \
                     ['labels'][label]['label_folder']
                 hmm_info = run_shell_info(f"hmm-info {folder_lab_count}/final.mdl")

@@ -1,14 +1,14 @@
 {
   "exp": {
     "save_dir": "../exp",
-    "name": "libri_WaveNetSMALL_fbank_ce",
+    "name": "libri_LSTM_fbank_ctc",
     "seed": 2234,
     "n_gpu": 1,
     "prefetch_to_gpu": true,
-    "n_epochs_tr": 20,
+    "n_epochs_tr": 10,
     "save_period": 1,
     "checkpoint_interval_minutes": 10,
-    "compute_train_metrics": true,
+    "compute_train_metrics": false,
     "data_cache_root": "/mnt/data/pytorch-kaldi/data_cache"
   },
   "dataset": {
@@ -19,58 +19,55 @@
       "test_with": "test_clean_100"
     },
     "features_use": ["fbank"],
-    "labels_use": ["lab_cd", "lab_mono"]
+    "labels_use": ["lab_phn"]
   },
   "training": {
     //    "dataset_type": "FRAMEWISE_SHUFFLED_FRAMES",
-    "dataset_type": "FRAMEWISE_SEQUENTIAL",
+    //    "dataset_type": "FRAMEWISE_SEQUENTIAL",
     //    "dataset_type": "FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT",
     //    "dataset_type": "SEQUENTIAL",
-    //    "dataset_type": "SEQUENTIAL_APPENDED_CONTEXT",
+    "dataset_type": "SEQUENTIAL_APPENDED_CONTEXT",
     "batching": {
       "max_seq_length_train": 3500,
-      "start_seq_len_train": 3500,
-      "increase_seq_length_train": false,
-      "multply_factor_seq_len_train": 1,
+      "start_seq_len_train": 500,
+      "increase_seq_length_train": true,
+      "multply_factor_seq_len_train": 2,
       "max_seq_length_valid": 3500,
-      "batch_size_train": 1,
+      "batch_size_train": 8,
       "batch_size_valid": 1
     },
-    "clip_grad_norm": -1,
+    "clip_grad_norm": 10,
     "optimizer": {
-      "type": "sgd",
+      "type": "adam",
       "args": {
-        "lr": 1e-5
+        "lr": 16e-4,
+        "amsgrad": true
       }
     },
     "lr_scheduler": {
-      "name": "ExponentialLR",
+      "name": "MultiStepLR",
       "args": {
+        "milestones": [10, 15, 20],
         "gamma": 0.5
       }
     }
   },
   "arch": {
-    "name": "WaveNet",
+    "name": "LSTM",
     "args": {
-      "lookahead_context": 5,
-      "n_layers": 28,
-      "max_dilation": 4,
-      "n_residual_channels": 16,
-      "n_skip_channels": 32,
-      "kernel_size": 3
+      "hidden_size": 550,
+      "num_layers": 4,
+      "bias": true,
+      "dropout": 0.2,
+      "bidirectional": true
     },
     "loss": {
-      "name": "CE",
+      "name": "CTC",
       "args": {
-        "weight_mono": 1.0
       }
     },
     "metrics": [
-      "acc_lab_cd",
-      "err_lab_cd",
-      "acc_lab_mono",
-      "err_lab_mono"
+      "phone_error_rate"
     ]
   }
 }

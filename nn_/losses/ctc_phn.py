@@ -23,7 +23,7 @@ class CTCPhnLoss(nn.Module):
         self.batch_ordering = batch_ordering
 
     def forward(self, output, target):
-        if self.batch_ordering == 'NCT':
+        if self.batch_ordering == 'NCT' or self.batch_ordering == 'NCL':
             # NCT (NCL) -> TNC required for CuDNN
             logits = output['out_phn'].permute(2, 0, 1)
         elif self.batch_ordering == 'TNCL':
@@ -33,6 +33,8 @@ class CTCPhnLoss(nn.Module):
             raise NotImplementedError
 
         _targets = target['lab_phn']
+        assert _targets.min() >= 0
+        assert _targets.max() <= logits.shape[2]
         # all input_lengths must be T for CuDNN
         input_sequence_lengths = torch.full_like(
             target['input_sequence_lengths'], dtype=torch.int32, fill_value=logits.shape[0])

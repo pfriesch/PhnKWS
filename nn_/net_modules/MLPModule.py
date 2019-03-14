@@ -126,4 +126,15 @@ class MLPModule(nn.Module):
 
         return x
 
+    def load_cfg(self):
+
+        final_architecture2 = torch.load(
+            "/mnt/data/pytorch-kaldi_cfg/exp/libri_LSTM_fbank/exp_files/final_architecture2.pkl", map_location='cpu')[
+            'model_par']
+
+        _state_Stuff = {k.replace("layers.0.", ""): k for k in self.state_dict()}
+        _final_architecture2 = {_state_Stuff[k.replace(".0.", ".")]: v for k, v in final_architecture2.items()}
+
+        self.load_state_dict(_final_architecture2)
+
 # if __name__ == '__main__':

@@ -6,6 +6,7 @@ import torch
 
 from base.utils import resume_checkpoint
 from kws_decoder.eesen_decoder_lexicon.prepare_decode_graph import make_ctc_decoding_graph
+from nn_.networks.LSTM_cd_Net import LSTM_cd_Net
 from nn_.registries.metrics_registry import metrics_init
 from nn_.registries.model_registry import model_init
 from trainer.eval import evaluate
@@ -16,6 +17,14 @@ from utils.utils import check_environment
 if __name__ == '__main__':
     check_environment()
 
+    # final_architecture1 = torch.load(
+    #     "/mnt/data/pytorch-kaldi_cfg/exp/libri_LSTM_fbank/exp_files/final_architecture1.pkl", map_location='cpu')
+    # final_architecture2 = torch.load(
+    #     "/mnt/data/pytorch-kaldi_cfg/exp/libri_LSTM_fbank/exp_files/final_architecture2.pkl", map_location='cpu')
+
+    mdl = LSTM_cd_Net(input_feat_name='fbank', input_feat_length=40, lab_cd_num=3480)
+    mdl.load_cfg()
+
     tmp_root_dir = '/mnt/data/tmp_kws_eval'
     if not os.path.exists(tmp_root_dir):
         os.makedirs(tmp_root_dir)
@@ -23,15 +32,16 @@ if __name__ == '__main__':
     # _tmp_dir = tmp_dir.name
     _tmp_dir = f"{tmp_root_dir}/ctc_decoing_1gram_lm"
 
-    model_path = "/mnt/data/pytorch-kaldi/exp_finished_runs_backup/libri_MLP_fbank_ctc_20190308_182124/checkpoints/checkpoint_e5.pth"
+    # model_path = "/mnt/data/pytorch-kaldi/exp_finished_runs_backup/libri_MLP_fbank_ctc_20190308_182124/checkpoints/checkpoint_e5.pth"
 
-    assert model_path.endswith(".pth")
-    config = torch.load(model_path, map_location='cpu')['config']
+    # assert model_path.endswith(".pth")
+    # config = torch.load(model_path, map_location='cpu')['config']
 
     # TODO remove
     # config['exp']['save_dir'] = "/mnt/data/pytorch-kaldi/exp_TIMIT_MLP_FBANK"
 
-    model = model_init(config)
+    # model = model_init(config)
+    model = mdl
     metrics = metrics_init(config, model)
     # TODO GPU decoding
 
