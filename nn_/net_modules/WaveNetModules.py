@@ -83,19 +83,20 @@ class WaveNetLayer(nn.Module):
 
     """
 
-    def __init__(self, kernel_size, n_channels, n_residual_channels, n_skip_channels, dilation, no_output_layer=False):
+    def __init__(self, kernel_size, n_channels, n_residual_channels, n_skip_channels, dilation, bias,
+                 no_output_layer=False):
         super().__init__()
         self.n_channels = n_channels
         assert n_channels % 2 == 0
         self.in_layer = Conv1d(n_residual_channels, n_channels,
                                kernel_size=kernel_size, dilation=dilation,
-                               w_init_gain='tanh', is_causal=True)
+                               w_init_gain='tanh', is_causal=True, bias=bias)
 
         self.no_output_layer = no_output_layer
         if not self.no_output_layer:
-            self.res_layer = Conv1d(n_channels // 2, n_residual_channels,
+            self.res_layer = Conv1d(n_channels // 2, n_residual_channels, bias=bias,
                                     w_init_gain='linear')
-        self.skip_layer = Conv1d(n_channels // 2, n_skip_channels,
+        self.skip_layer = Conv1d(n_channels // 2, n_skip_channels, bias=bias,
                                  w_init_gain='relu')
 
     def forward(self, x):

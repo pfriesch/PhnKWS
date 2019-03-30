@@ -17,7 +17,6 @@ def set_seed(seed):
     torch.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
-    # TODO add saving and loading of random state for reproducable research
 
 
 def get_rng_state():
@@ -48,6 +47,13 @@ def resume_checkpoint(resume_path, model, logger, optimizers=None, lr_schedulers
     else:
         start_epoch = checkpoint['epoch']
     global_step = checkpoint['global_step']
+
+    init_model_state_dict = model.state_dict()
+    for k in list(checkpoint['state_dict'].keys()):
+        if k not in init_model_state_dict:
+            logger.info(f"Removed key {k} from loaded state dict")
+            del checkpoint['state_dict'][k]
+
     model.load_state_dict(checkpoint['state_dict'])
 
     assert (optimizers is None and lr_schedulers is None) \

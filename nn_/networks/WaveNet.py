@@ -23,7 +23,8 @@ class WaveNet(BaseModel):
                  max_dilation=4,
                  n_residual_channels=32,
                  n_skip_channels=64,
-                 kernel_size=3):
+                 kernel_size=3,
+                 bias=True):
         super(WaveNet, self).__init__()
         self.input_feat_name = input_feat_name
         self.batch_ordering = "NCL"
@@ -38,7 +39,7 @@ class WaveNet(BaseModel):
         if self.pool_inf_freq_domain:
             self.conv_in = Conv2d(input_feat_length, n_residual_channels, kernel_size_freq=7, kernel_size_time=5)
         else:
-            self.conv_in = Conv1d(input_feat_length, n_residual_channels)
+            self.conv_in = Conv1d(input_feat_length, n_residual_channels, bias=bias)
 
         self.layers = nn.ModuleList()
         loop_factor = math.floor(math.log2(max_dilation)) + 1
@@ -46,7 +47,7 @@ class WaveNet(BaseModel):
             dilation = 2 ** (i % loop_factor)
 
             self.layers.append(
-                WaveNetLayer(kernel_size, n_channels, n_residual_channels, n_skip_channels, dilation,
+                WaveNetLayer(kernel_size, n_channels, n_residual_channels, n_skip_channels, dilation, bias,
                              no_output_layer=i == n_layers - 1))
 
         self.output_layers = nn.ModuleDict({})
@@ -61,7 +62,7 @@ class WaveNet(BaseModel):
                        bias=False, w_init_gain='linear')
             ])
 
-        self.context_left, self.context_right = self.context()
+        self.context_left, self.context_right = self.context
 
     def info(self):
         return f" context: {self.context_left}, {self.context_right}" \
@@ -100,6 +101,7 @@ class WaveNet(BaseModel):
 
         return out_dict
 
+    @property
     def context(self):
         _receptive_field = self._receptive_field()
         _receptive_field_total = _receptive_field[-1]
@@ -165,11 +167,32 @@ class WaveNet(BaseModel):
 
         return layer.output_size()
 
+    def load_warm_start(self, path):
+        # CE mono+cd+phnframe -> CTC phn
+        state_dict = torch.load(path, map_location='cpu')['state_dict']
+
+        state_dict = {k.replace("out_phnframe", "out_phn"): v for k, v in state_dict.items() if
+                      'out_mono' not in k and 'out_cd' not in k}
+
+        self.load_state_dict(state_dict)
+        print("Loaded state dict for warm start")
+
+    # def load_warm_start(self, path):
+    #     # CE mono+cd+phnframe -> CE phnframe
+    #     state_dict = torch.load(path, map_location='cpu')['state_dict']
+    #
+    #     state_dict = {k: v for k, v in state_dict.items() if
+    #                   'out_mono' not in k and 'out_cd' not in k}
+    #
+    #     self.load_state_dict(state_dict)
+    #     print("Loaded state dict for warm start")
+
     # def load_warm_start(self, path):
     #     # CE mono+cd -> mono+cd+phnframe
     #     state_dict = torch.load(path, map_location='cpu')['state_dict']
     #
-    #     state_dict.update({k: v for k, v in self.state_dict().items() if 'out_phnframe' in k})
+    #     state_dict = {k.replace("out_phnframe", "out_phn"): v for k, v in state_dict.items() if
+    #                   'out_mono' not in k and 'out_cd' not in k}
     #
     #     self.load_state_dict(state_dict)
     #     print("Loaded state dict for warm start")
@@ -181,24 +204,24 @@ class WaveNet(BaseModel):
     #
     #     self.load_state_dict(state_dict)
     #     print("Loaded state dict for warm start")
-
-    def load_warm_start(self, path):
-        # CE -> CTC
-
-        state_dict = torch.load(path, map_location='cpu')['state_dict']
-        _state_dict_old = {k: v for k, v in state_dict.items() if not 'output_layers' in k}
-
-        _state_dict_init = {k: v for k, v in self.state_dict().items() if 'output_layers' in k}
-        _state_dict_old.update(_state_dict_init)
-
-        self.load_state_dict(_state_dict_old)
-        print("Loaded state dict for warm start")
-        # for param in self.layers.parameters():
-        #     param.requires_grad = False
-        # for param in self.conv_in.parameters():
-        #     param.requires_grad = False
-
-        # print("Froze Layers")
+    #
+    # def load_warm_start(self, path):
+    #     # CE -> CTC
+    #
+    #     state_dict = torch.load(path, map_location='cpu')['state_dict']
+    #     _state_dict_old = {k: v for k, v in state_dict.items() if not 'output_layers' in k}
+    #
+    #     _state_dict_init = {k: v for k, v in self.state_dict().items() if 'output_layers' in k}
+    #     _state_dict_old.update(_state_dict_init)
+    #
+    #     self.load_state_dict(_state_dict_old)
+    #     print("Loaded state dict for warm start")
+    #     # for param in self.layers.parameters():
+    #     #     param.requires_grad = False
+    #     # for param in self.conv_in.parameters():
+    #     #     param.requires_grad = False
+    #
+    #     # print("Froze Layers")
 
     # def load_warm_start(self, path):
     #     # CE -> CTC

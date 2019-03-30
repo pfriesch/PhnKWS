@@ -1,8 +1,8 @@
 import os
 import shutil
 
+from kws_decoder.build_kw_grammar_fst import build_kw_grammar_fst
 from kws_decoder.const_symbols import SIL_SYM, UNK_SYM, SPN_SYM
-from kws_decoder.build_fst import build_kw_grammar_fst
 from utils.utils import run_shell
 
 KALDI_ROOT = os.environ['KALDI_ROOT']

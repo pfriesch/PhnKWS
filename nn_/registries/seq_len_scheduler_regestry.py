@@ -26,7 +26,7 @@ class IncreaseSeqLenAfterEpoch(_SeqLenScheduler):
     def __init__(self, max_seq_length_train,
                  start_seq_len_train,
                  increase_seq_length_train,
-                 multply_factor_seq_len_train, last_epoch=-1, verbose=True):
+                 multply_factor_seq_len_train, last_epoch=0, verbose=True):
 
         self.max_seq_length_train = max_seq_length_train
         self.start_seq_len_train = start_seq_len_train
@@ -36,12 +36,15 @@ class IncreaseSeqLenAfterEpoch(_SeqLenScheduler):
 
         super(IncreaseSeqLenAfterEpoch, self).__init__(last_epoch)
 
-    def get_seq_len(self):
+    def get_seq_len(self, epoch=None):
+
+        if epoch is None:
+            epoch = self.last_epoch
 
         max_seq_length_train_curr = self.start_seq_len_train
         if self.increase_seq_length_train:
             max_seq_length_train_curr = self.start_seq_len_train * (
-                    self.multply_factor_seq_len_train ** self.last_epoch)
+                    self.multply_factor_seq_len_train ** epoch)
             if max_seq_length_train_curr > self.max_seq_length_train:
                 max_seq_length_train_curr = self.max_seq_length_train
                 if self.verbose:

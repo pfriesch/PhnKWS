@@ -30,7 +30,8 @@ def model_init(config):
             # pass
         elif config['arch']['loss']['name'] == 'CE':
             # TODO +1 for padding with 0 etc
-            outputs[_out_name] += 1
+            if not arch_name == 'LSTM':
+                outputs[_out_name] += 1
 
         else:
             raise NotImplementedError

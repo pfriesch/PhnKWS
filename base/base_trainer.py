@@ -147,7 +147,8 @@ class BaseTrainer:
                 "Current lr: " + " ".join([f"{lr_scheduler_name}: {self.lr_schedulers[lr_scheduler_name].get_lr()}"
                                            for lr_scheduler_name in self.lr_schedulers]))
             logger.info(
-                f"Current max seq len: {type(self.seq_len_scheduler).__name__}: {self.seq_len_scheduler.get_seq_len()}")
+                f"Current max seq len: {type(self.seq_len_scheduler).__name__}:"
+                + f" {self.seq_len_scheduler.get_seq_len(self.epoch)}")
 
             self.tensorboard_logger.set_step(self.global_step, 'epoch_info')
             with Timer("elapsed_time_epoch", [self.tensorboard_logger, logger], self.global_step) as t:
@@ -302,4 +303,11 @@ class KaldiOutputWriter:
             self.post_file[out_name].close()
 
     def write_mat(self, out_name, out_save, sample_name):
+        """
+
+        :param out_name:
+        :param out_save: shape should be [L, C] / [length, channels] for kaldi fst decoder
+        :param sample_name:
+        :return:
+        """
         kaldi_io.write_mat(self.post_file[out_name], out_save, sample_name)
