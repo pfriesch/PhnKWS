@@ -1,10 +1,12 @@
 import os
+import random
 from functools import partial
 
 import torch
 from torch.utils.data import DataLoader, Sampler, SequentialSampler
 
 from base.base_kaldi_dataset import BaseKaldiDataset
+from data.data_util import split_chunks
 from data.datasets import DatasetType
 
 from data import PADDING_IGNORE_INDEX
@@ -21,7 +23,8 @@ def collate_fn_simple(sample_list):
     return sample_names, fea_dict, lab_dict
 
 
-def collate_fn_pad_batch_first(sample_list, feat_padding='zero', ctc_labels=False):
+def collate_fn_pad_batch_first(sample_list, feat_padding='zero', ctc_labels=False, receptive_field=0,
+                               concat_labels=True):
     # TODO compare padding methods
     # feat repeat padding see: https://github.com/SeanNaren/deepspeech.pytorch/issues/312
     # mostly used when batchnorm is used in the model
@@ -37,6 +40,13 @@ def collate_fn_pad_batch_first(sample_list, feat_padding='zero', ctc_labels=Fals
         _len = sample[1][fea_keys[0]].shape[0]
         if _len > max_length_feat:
             max_length_feat = _len
+
+    min_length_feat = 10000000
+    for sample in sample_list:
+        assert sample[1][fea_keys[0]].shape[-1] == 1
+        _len = sample[1][fea_keys[0]].shape[0]
+        if _len < min_length_feat:
+            min_length_feat = _len
 
     if not ctc_labels:
 
@@ -99,15 +109,27 @@ def collate_fn_pad_batch_first(sample_list, feat_padding='zero', ctc_labels=Fals
     sorting = sorted(range(len(input_length)), key=lambda k: input_length[k], reverse=True)
     input_length = input_length[sorting]
     target_length = target_length[sorting]
+    sample_names = [sample_names[i] for i in sorting]
 
     fea_dict = {k: fea_dict[k][sorting] for k in fea_keys}
     if not ctc_labels:
         lab_dict = {k: lab_dict[k][sorting] for k in lab_dict}
 
     else:
-        lab_dict = {k: torch.cat([lab_dict[k][i] for i in sorting], dim=0) for k in lab_keys}
-        for k in lab_dict:
-            assert 0 not in lab_dict[k]
+
+        for k in fea_keys:
+            _zero_padding = receptive_field
+            if _zero_padding > 0:
+                _padding_zerpos = torch.zeros(list(fea_dict[k].shape[:2]) + [_zero_padding])
+                fea_dict[k] = torch.cat((_padding_zerpos, fea_dict[k]), dim=2)
+                input_length = input_length + _zero_padding
+
+        if concat_labels:
+            lab_dict = {k: torch.cat([lab_dict[k][i] for i in sorting], dim=0) for k in lab_keys}
+            for k in lab_dict:
+                assert 0 not in lab_dict[k]
+        else:
+            lab_dict = {k: [lab_dict[k][i] for i in sorting] for k in lab_keys}
 
     # .view(-1).to(dtype=torch.int32)
 
@@ -223,7 +245,7 @@ class StatefulChunkedRandomSampler(Sampler):
 
     # TODO save sate
 
-    def __init__(self, data_source):
+    def __init__(self, data_source, batch_size=None):
         assert hasattr(data_source, "samples_per_chunk")
         self.data_source = data_source
         self.samples_per_chunk = data_source.samples_per_chunk
@@ -237,12 +259,26 @@ class StatefulChunkedRandomSampler(Sampler):
                 self.permutation.append(total_idx + i)
             total_idx += chunk_len
 
+        self.batches = None
+        if batch_size is not None:
+            assert isinstance(batch_size, int)
+            batches = split_chunks(self.permutation, batch_size)
+            last_batch = batches[-1]
+            batches = batches[:-1]
+            random.shuffle(batches)
+            batches.append(last_batch)
+            self.batches = batches
+
         self.start_idx = 0
 
     def __iter__(self):
-        for self.start_idx, index in enumerate(self.permutation[self.start_idx:], start=self.start_idx):
-            # self.start_idx += 1
-            yield index
+        if self.batches is None:
+            for self.start_idx, index in enumerate(self.permutation[self.start_idx:], start=self.start_idx):
+                yield index
+        else:
+            for self.start_idx, batch in enumerate(self.batches[self.start_idx:], start=self.start_idx):
+                for index in batch:
+                    yield index
 
     def __len__(self):
         return len(self.data_source)
@@ -276,7 +312,6 @@ class StatefulSequentialSampler(Sampler):
         for self.start_idx, index in \
                 list(enumerate(range(len(self.data_source)), start=self.start_idx))[self.start_idx:]:
             yield index
-
 
     def __len__(self):
         return len(self.data_source)
@@ -333,9 +368,14 @@ class KaldiDataLoader(DataLoader):
                 # _collate_fn = collate_fn_pad
             elif batch_ordering == "NCL":
                 if dataset.state.dataset_type == DatasetType.FRAMEWISE_SEQUENTIAL:
-                    _collate_fn = partial(collate_fn_pad_batch_first, feat_padding='zero', ctc_labels=False)
+                    _collate_fn = partial(collate_fn_pad_batch_first, feat_padding='zero',
+                                          receptive_field=dataset.state.left_context + dataset.state.right_context,
+                                          ctc_labels=False)
                 elif dataset.state.dataset_type == DatasetType.SEQUENTIAL:
-                    _collate_fn = partial(collate_fn_pad_batch_first, feat_padding='zero', ctc_labels=True)
+                    _collate_fn = partial(collate_fn_pad_batch_first, feat_padding='zero',
+                                          receptive_field=dataset.state.left_context + dataset.state.right_context,
+                                          # 50 since I assume that should leave enough output for the labels
+                                          ctc_labels=True)
 
                 elif dataset.state.dataset_type == DatasetType.SEQUENTIAL_APPENDED_CONTEXT:
                     _collate_fn = partial(collate_fn_pad, feat_padding='zero', ctc_labels=True)
@@ -347,7 +387,7 @@ class KaldiDataLoader(DataLoader):
                 raise ValueError
 
         if shuffle:
-            _sampler = StatefulChunkedRandomSampler(dataset)
+            _sampler = StatefulChunkedRandomSampler(dataset, batch_size)
         else:
             _sampler = StatefulSequentialSampler(dataset)
 

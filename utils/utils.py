@@ -127,7 +127,11 @@ def run_shell(cmd, stdin=None, pipefail=True, cmd_logging_level=logging.DEBUG):
     return output
 
 
-def plot_result_confusion_matrix(keywords, results):
+def plot_result_confusion_matrix(keywords, results, out_path):
+    assert not out_path.endswith("/")
+    if not os.path.exists(out_path):
+        os.makedirs(out_path)
+    keywords = list(keywords.keys())
     #### confusion_matrix
     confusion_matrix = np.zeros((len(keywords) + 1, len(keywords) + 1))
     keywords = ["<UNK>"] + keywords
@@ -156,26 +160,75 @@ def plot_result_confusion_matrix(keywords, results):
     assert keywords[0] == "<UNK>"
     plt.yticks(tick_marks, [" "] + keywords[1:], fontsize=8)
 
+    for (i, j), z in np.ndenumerate(confusion_matrix):
+        if z > 0:
+            ax.text(j, i, '{:d}'.format(int(z)), ha='center', va='center')
+
     plt.xlabel('Predicted')
     plt.ylabel('True')
-    plt.savefig("kw_resilt.png")
+    plt.savefig(f"{out_path}/kw_resilt.png")
+    plt.savefig(f"{out_path}/kw_resilt.pdf")
     plt.clf()
     # TODO plot the results against true/false results
     #### /confusion_matrix
+    #### confusion_matrix no unk label
 
+    fig = plt.figure()
+
+    ax = fig.add_subplot(111)
+
+    ax.matshow(confusion_matrix[1:])
+    # tickmar_font_dict = {'fontsize': 8}
+    # ax.set_xticklabels([''] + keywords, fontdict=tickmar_font_dict)
+    # ax.set_yticklabels([''] + keywords, fontdict=tickmar_font_dict)
+
+    tick_marks = np.arange(len(keywords))
+    plt.xticks(tick_marks, keywords, rotation=90, fontsize=8)
+    assert keywords[0] == "<UNK>"
+    plt.yticks(tick_marks[:-1], keywords[1:], fontsize=8)
+
+    for (i, j), z in np.ndenumerate(confusion_matrix[1:]):
+        ax.text(j, i, '{:d}'.format(int(z)), ha='center', va='center')
+
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
+    plt.savefig(f"{out_path}/kw_resilt_no_unk.png")
+    plt.savefig(f"{out_path}/kw_resilt_no_unk.pdf")
+    plt.clf()
     #### count
     count_gt = confusion_matrix.sum(axis=1)
     count_transcript = confusion_matrix.sum(axis=0)
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    b1 = ax.bar(np.arange(0, len(count_gt), dtype=float) - 0.25, count_gt, width=0.5, align='center')
-    b2 = ax.bar(np.arange(0, len(count_transcript), dtype=float) + 0.25, count_transcript, width=0.5, align='center')
-    ax.legend((b1, b2), ('count_gt', 'count_transcript'))
-    plt.savefig("count_gt.png")
+    b1 = ax.bar(np.arange(0, len(count_gt), dtype=float) - 0.125, count_gt, width=0.25, align='center')
+    b2 = ax.bar(np.arange(0, len(count_transcript), dtype=float) + 0.125, count_transcript, width=0.25, align='center')
+    plt.xticks(tick_marks, keywords, rotation=90, fontsize=8)
+
+    ax.legend((b1, b2), ('# Ground Truth', '# Predicted'))
+    plt.savefig(f"{out_path}/count_gt.png")
+    plt.savefig(f"{out_path}/count_gt.pdf")
     plt.clf()
 
     #### count
+
+    corret_prediction = (confusion_matrix * np.eye(confusion_matrix.shape[0])).sum(axis=1)
+    total = confusion_matrix.sum(axis=1)
+    accuracy = (corret_prediction / total)[1:]
+
+    sorting = [_i for _i, acc in sorted(enumerate(accuracy), key=lambda x: x[1], reverse=True)]
+    accuracy = [accuracy[_i] for _i in sorting]
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    # b1 = ax.bar(np.arange(0, len(count_gt), dtype=float) - 0.125, count_gt, width=0.25, align='center')
+    b2 = ax.bar(np.arange(0, len(accuracy), dtype=float), accuracy, align='center')
+    plt.xticks(tick_marks, [keywords[1:][_i] for _i in sorting], rotation=90, fontsize=8)
+
+    # ax.legend((b1, b2), ('# Ground Truth', '# Predicted'))
+    plt.savefig(f"{out_path}/accuracy.png")
+    plt.savefig(f"{out_path}/accuracy.pdf")
+    plt.clf()
 
     # print(json.dumps(results, indent=1))
     # plot_output_phonemes(model_logits)
@@ -193,7 +246,50 @@ def feat_without_context(input_feat):
     return out_feat
 
 
-def plot_alignment_spectrogram(sample_name, input_feat, output, phn_dict, _labels=None, result_decoded=None):
+def plot_alignment_spectrogram_ctc(sample_name, input_feat, output, phn_dict, _labels=None, text=None,
+                                   result_decoded=None):
+    min_height = 0.10
+
+    height = 500
+
+    fig = plt.figure()
+    ax = fig.subplots()
+    ax.imshow(input_feat, origin='lower',
+              # extent=[-(in_feat.shape[0] - output.shape[0] + 1) // 2, in_feat.shape[0], 0, 100],
+              extent=[-(input_feat.shape[1] - output.shape[1]), output.shape[1], 0, height], alpha=0.5)
+    for i in range(output.shape[0]):
+        # ax.plot(output[:, i] * height, linewidth=0.5)
+        if i != 0:
+            # x = (output[:, i] * height).argmax()
+            # y = (output[:, i] * height)[x]
+
+            peaks, _ = find_peaks(output[i] * height, height=min_height * height, distance=10)
+            plt.plot((output[i] * height), linewidth=0.5)
+
+            for peak in peaks:
+                # plt.axvline(x=peak, ymax=(output[:, i] * height)[peak] / height, linewidth=0.5, color='r',
+                #             linestyle='-')
+                if (output[i] * height)[peak] > 500 * 0.3:
+                    ax.annotate(phn_dict.reducedIdx2phoneme[i - 1], xy=(peak, (output[i] * height)[peak]), fontsize=4)
+    # ax.
+    # if _labels is not None:
+    #     ax.set_xticklabels(_l_out, rotation='vertical')
+    #     ax.set_xticks(_l_out_i)
+    # ax.legend()
+    # ax.xaxis.set_major_locator(ticker.FixedLocator(_l_out_i))
+    # ax.xaxis.set_(ticker.FixedLocator(_l_out_i))
+    plt.tick_params(labelsize=4)
+    ax.set_aspect(aspect=0.2)
+    # if result_decoded is None:
+    ax.set_title("RES: " + result_decoded + "\n" + "LAB: " + _labels + "\n" + "TXT: " + text, loc='left')
+    fig.savefig(f"output_{sample_name}.png")
+    fig.savefig(f"output_{sample_name}.pdf")
+    fig.clf()
+    # plt.close(fig)
+
+
+def plot_alignment_spectrogram(sample_name, input_feat, output, phn_dict, decoded=None, _labels=None, text=None,
+                               result_decoded=None):
     min_height = 0.10
     top_phns = [x[0] for x in list(sorted(enumerate(output.max(axis=0)), key=lambda x: x[1], reverse=True))
                 if output[:, x[0]].max() > min_height]
@@ -264,6 +360,79 @@ def plot_alignment_spectrogram(sample_name, input_feat, output, phn_dict, _label
     # plt.close(fig)
 
 
+def plot_alignment_spectrogram(sample_name, input_feat, output, phn_dict, decoded=None, _labels=None, text=None,
+                               result_decoded=None):
+    min_height = 0.10
+    # top_phns = [x[0] for x in list(sorted(enumerate(output.max(axis=0)), key=lambda x: x[1], reverse=True))
+    #             if output[:, x[0]].max() > min_height]
+
+    # if _labels is not None:
+    #     _labels = _labels['lab_mono'][sample_name]
+    #     _labels = [phn_dict.idx2phoneme[l] for l in _labels]
+    #     prev_phn = None
+    #     _l_out = []
+    #     _l_out_i = []
+    #
+    #     for _i, l in enumerate(_labels):
+    #         if prev_phn is None:
+    #             prev_phn = l
+    #             # _l_out.append("")
+    #         else:
+    #             if prev_phn == l:
+    #                 pass
+    #             # _l_out.append("")
+    #             else:
+    #                 _l_out.append(prev_phn)
+    #                 _l_out_i.append(_i)
+    #                 prev_phn = l
+
+    # if 0 in top_phns:
+    #     top_phns.remove(0)  # TODO removed blank maybe add later
+
+    # phn_dict = {k + 1: v for k, v in phn_dict.items()}
+    # phn_dict[0] = "<blk>"
+    # assert len(phn_dict) == output.shape[1]
+
+    height = 500
+
+    fig = plt.figure()
+    ax = fig.subplots()
+    in_feat = feat_without_context(input_feat)
+    ax.imshow(in_feat.T, origin='lower',
+              # extent=[-(in_feat.shape[0] - output.shape[0] + 1) // 2, in_feat.shape[0], 0, 100],
+              extent=[-(in_feat.shape[0] - output.shape[0]), output.shape[0], 0, height],
+              alpha=0.5)
+    for i in range(output.shape[1]):
+        # ax.plot(output[:, i] * height, linewidth=0.5)
+        if i != 0:
+            # x = (output[:, i] * height).argmax()
+            # y = (output[:, i] * height)[x]
+
+            peaks, _ = find_peaks(output[:, i] * height, height=min_height * height, distance=10)
+            # plt.plot(peaks, (output[:, i] * height)[peaks], "x", markersize=1)
+            plt.plot(output[:, i] * height, linewidth=0.5)
+
+            for peak in peaks:
+                # plt.axvline(x=peak, ymax=(output[:, i] * height)[peak] / height, linewidth=0.5, color='r',
+                #             linestyle='-')
+                ax.annotate(phn_dict.reducedIdx2phoneme[i - 1], xy=(peak, (output[:, i] * height)[peak]), fontsize=4)
+    # ax.
+    # if _labels is not None:
+    #     ax.set_xticklabels(_l_out, rotation='vertical')
+    #     ax.set_xticks(_l_out_i)
+    # ax.legend()
+    # ax.xaxis.set_major_locator(ticker.FixedLocator(_l_out_i))
+    # ax.xaxis.set_(ticker.FixedLocator(_l_out_i))
+    plt.tick_params(labelsize=4)
+    ax.set_aspect(aspect=0.2)
+    if result_decoded is None:
+        ax.set_title(result_decoded)
+    fig.savefig(f"output_{sample_name}.png")
+    fig.savefig(f"output_{sample_name}.pdf")
+    fig.clf()
+    # plt.close(fig)
+
+
 def get_open_fds():
     '''
     return the number of open file descriptors for current process
@@ -283,3 +452,13 @@ def get_open_fds():
             procs.split('\n')))
     )
     return nprocs
+
+
+def sample_id_to_transcript(sample_id, dataset_path):
+    spkr_id, file_sample_id, split_id = sample_id.split("-")
+    # os.listdir("/mnt/data/datasets/LibriSpeech/dev-clean")
+    with open(os.path.join(dataset_path, spkr_id, file_sample_id, f"{spkr_id}-{file_sample_id}.trans.txt"), "r") as f:
+        for l in f:
+            if sample_id in l:
+                return l
+    raise RuntimeError(sample_id, dataset_path)

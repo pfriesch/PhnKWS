@@ -94,8 +94,8 @@ def _filter_samples_by_length(file_names, feature_dict, features_loaded, label_d
                 break
             if type(min_sample_len) == int and \
                     min_sample_len > len(features_loaded[feature_name][file]):
-                logger.info("Skipping {}, feature of size {} too small ( {} expected) ".format(
-                    file, len(features_loaded[feature_name][file]), min_sample_len))
+                logger.info(f"Skipping {file}, feature of size "
+                            + f"{len(features_loaded[feature_name][file])} too small ( {min_sample_len} expected) ")
                 _continue = True
                 break
 

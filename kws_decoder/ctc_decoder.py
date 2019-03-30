@@ -1,19 +1,20 @@
 import os
 import json
 
+import ctcdecode
 import torch
 import numpy as np
 from tqdm import tqdm
 
 from base.base_trainer import KaldiOutputWriter
 from base.utils import resume_checkpoint
-from data.data_util import apply_context_single_feat
 from data.kaldi_dataset_utils import _load_labels
 from kaldi_decoding_scripts.ctc_decoding.decode_dnn_custom_graph import decode_ctc
 from kws_decoder.eesen_decoder_kw.prepare_decode_graph import make_ctc_decoding_graph
 from nn_.registries.model_registry import model_init
 from utils.logger_config import logger
 from utils.util import ensure_dir
+from utils.utils import plot_alignment_spectrogram
 
 
 class CTCDecoder:
@@ -51,22 +52,22 @@ class CTCDecoder:
         # self.alignment_model_path = os.path.join(graph_dir, "final.mdl")
         # assert os.path.exists(self.alignment_model_path)
 
-    def test_decoder(self, phns="SIL S EH V AH N SIL"):
-        _phn_idx = [self.phoneme_dict.phoneme2reducedIdx[p] + 1 for p in phns.split(" ")]
-        test_output = np.ones((88, 42))
-        _p = 0
-        for i in range(88):
-            if i % len(_phn_idx) == 6 and _p < len(_phn_idx):
-                test_output[i][_phn_idx[_p]] = 1000000
-                _p += 1
-            else:
-                test_output[i][0] = 1000000
-
-        test_output = (test_output.T / np.sum(test_output, axis=1)).T
-
-        test_output = np.log(test_output)
-
-        return test_output
+    # def test_decoder(self, phns="SIL S EH V AH N SIL"):
+    #     _phn_idx = [self.phoneme_dict.phoneme2reducedIdx[p] + 1 for p in phns.split(" ")]
+    #     test_output = np.ones((88, 42))
+    #     _p = 0
+    #     for i in range(88):
+    #         if i % len(_phn_idx) == 6 and _p < len(_phn_idx):
+    #             test_output[i][_phn_idx[_p]] = 1000000
+    #             _p += 1
+    #         else:
+    #             test_output[i][0] = 1000000
+    #
+    #     test_output = (test_output.T / np.sum(test_output, axis=1)).T
+    #
+    #     test_output = np.log(test_output)
+    #
+    #     return test_output
 
     def is_keyword_batch(self, input_features, sensitivity, tmp_out_dir=None):
         if tmp_out_dir is None:
@@ -95,26 +96,32 @@ class CTCDecoder:
 
         # test_output = self.test_decoder()
 
+        # plot_phns = metadata_dict is None
         plot_phns = False
-        if plot_phns:
-            lab_dict = {"lab_mono": {
-                "label_folder": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b_ali_dev_clean_100/",
-                "label_opts": "ali-to-phones --per-frame=true",
-                "lab_data_folder": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/dev_clean/",
-                "lab_graph": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/graph_tgsmall/"
-            }}
-            label_index_from = 1
-            _labels = _load_labels(lab_dict, label_index_from, max_label_length=None, phoneme_dict=self.phoneme_dict)
+        # if plot_phns:
+        #     lab_dict = {"lab_mono": {
+        #         "label_folder": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b_ali_dev_clean_100/",
+        #         "label_opts": "ali-to-phones --per-frame=true",
+        #         "lab_data_folder": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/dev_clean/",
+        #         "lab_graph": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/graph_tgsmall/"
+        #     }}
+        #     label_index_from = 1
+        #     _labels = _load_labels(lab_dict, label_index_from, max_label_length=None, phoneme_dict=self.phoneme_dict)
+        #
+        #     lab_dict = {"lab_mono": {
+        #         "label_folder": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b_ali_dev_clean_100/",
+        #         "label_opts": "ali-to-phones",
+        #         "lab_data_folder": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/dev_clean/",
+        #         "lab_graph": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/graph_tgsmall/"
+        #     }}
+        #     label_index_from = 1
+        #     _labels_no_ali = _load_labels(lab_dict, label_index_from, max_label_length=None,
+        #                                   phoneme_dict=self.phoneme_dict)
 
-            lab_dict = {"lab_mono": {
-                "label_folder": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b_ali_dev_clean_100/",
-                "label_opts": "ali-to-phones",
-                "lab_data_folder": "/mnt/data/libs/kaldi/egs/librispeech/s5/data/dev_clean/",
-                "lab_graph": "/mnt/data/libs/kaldi/egs/librispeech/s5/exp/tri4b/graph_tgsmall/"
-            }}
-            label_index_from = 1
-            _labels_no_ali = _load_labels(lab_dict, label_index_from, max_label_length=None,
-                                          phoneme_dict=self.phoneme_dict)
+        vocabulary_size = 42
+        vocabulary = [chr(c) for c in list(range(65, 65 + 58)) + list(range(65 + 58 + 69, 65 + 58 + 69 + 500))][
+                     :vocabulary_size]
+        decoder = ctcdecode.CTCBeamDecoder(vocabulary, log_probs_input=True, beam_width=1)
 
         all_samples_concat = None
         for sample_name, feat in tqdm(input_features.items()):
@@ -128,11 +135,6 @@ class CTCDecoder:
         post_files = []
 
         plot_num = 0
-
-        # vocabulary_size = 42
-        # self.vocabulary = [chr(c) for c in list(range(65, 65 + 58)) + list(range(65 + 58 + 69, 65 + 58 + 69 + 500))][
-        #                   :vocabulary_size]
-        # self.decoder = ctcdecode.CTCBeamDecoder(self.vocabulary, log_probs_input=True, beam_width=1)
 
         # len = 88
 
@@ -150,21 +152,33 @@ class CTCDecoder:
         #     sample_names.append(sample_name)
 
         # input_batch = {'fbank': torch.cat(input_batch, dim=1)}
+
+        beam_results = {}
         output_label = 'out_phn'
         assert output_label in self.model.out_names
         with KaldiOutputWriter(tmp_out_dir, "keyword", [output_label], self.epoch) as writer:
             post_files.append(writer.post_file[output_label].name)
-            for sample_name in tqdm(input_features, desc="computing acoustic features:"):
-                input_feature = {"fbank": self.preprocess_feat(input_features[sample_name])}
+            for sample_name in tqdm(input_features, desc="computing acoustic features:", position=1):
+                # input_feature = {"fbank": self.preprocess_feat(input_features[sample_name])}
+                input_feature = {"fbank": torch.from_numpy(input_features[sample_name].T).unsqueeze(0)}
                 # Normalize over whole chunk instead of only over a single file, which is done by applying the kaldi cmvn
-                input_feature["fbank"] = ((input_feature["fbank"] - mean) / std).unsqueeze(1)
+                input_feature["fbank"] = ((input_feature["fbank"] - mean) / std)
+
+                # assert input_feature["fbank"].shape[2] > self.model.context_left + self.model.context_right + 50
+                if input_feature["fbank"].shape[2] < self.model.context_left + self.model.context_right + 100:
+                    padd = torch.zeros((input_feature["fbank"].shape[0], input_feature["fbank"].shape[1],
+                                        self.model.context_left + self.model.context_right),
+                                       device=input_feature["fbank"].device,
+                                       dtype=input_feature["fbank"].dtype)
+                    input_feature["fbank"] = torch.cat((padd, input_feature["fbank"]), dim=2)
+
                 output = self.model(input_feature)
                 assert output_label in output
                 output = output[output_label]
 
-                _logits = output.detach().permute(1, 0, 2)
+                _logits = output.detach().permute(0, 2, 1)
 
-                output = output.detach().squeeze(1).numpy()
+                output = output.detach().squeeze(0).numpy().T
                 # output = test_output
 
                 # if self.config['test'][output_label]['normalize_posteriors']:
@@ -185,30 +199,48 @@ class CTCDecoder:
                 # assert _logits.shape[0] == batch_size
                 # output = np.exp(output)
 
-                # beam_result, beam_scores, timesteps, out_seq_len = self.decoder.decode(_logits)
-                # beam_result = beam_result[0, 0, :out_seq_len[0, 0]]
+                beam_result, beam_scores, timesteps, out_seq_len = decoder.decode(_logits)
+                beam_result = beam_result[0, 0, :out_seq_len[0, 0]]
+                result_decoded = [self.phoneme_dict.reducedIdx2phoneme[l.item() - 1] for l in beam_result]
+                result_decoded = " ".join(result_decoded)
 
-                # if plot_num < 20:
+                beam_results[sample_name] = result_decoded
+
+                if plot_num < 20 and plot_phns:
+                    # logger.debug(sample_name)
+
+                    # logger.debug(result_decoded)
+                    # if plot_phns:
+                    #     label_decoded = " ".join(
+                    #         [self.phoneme_dict.idx2phoneme[l.item()] for l in _labels_no_ali['lab_mono'][sample_name]])
+                    #     logger.debug(label_decoded)
+
+                    # if plot_phns:
+                    #     plot_alignment_spectrogram(sample_name, input_feature["fbank"],
+                    #                                (np.exp(output).T / np.exp(output).sum(axis=1)).T,
+                    #                                self.phoneme_dict, _labels, result_decoded=result_decoded)
+                    # else:
+                    plot_alignment_spectrogram(sample_name, input_feature["fbank"],
+                                               (np.exp(output).T / np.exp(output).sum(axis=1)).T,
+                                               self.phoneme_dict, result_decoded=result_decoded)
+
+                    plot_num += 1
+                # else:
+                #     beam_result, beam_scores, timesteps, out_seq_len = decoder.decode(_logits)
+                #     beam_result = beam_result[0, 0, :out_seq_len[0, 0]]
                 #     # logger.debug(sample_name)
                 #     result_decoded = [self.phoneme_dict.reducedIdx2phoneme[l.item() - 1] for l in beam_result]
                 #     result_decoded = " ".join(result_decoded)
                 #     # logger.debug(result_decoded)
-                #     if plot_phns:
-                #         label_decoded = " ".join(
-                #             [self.phoneme_dict.idx2phoneme[l.item()] for l in _labels_no_ali['lab_mono'][sample_name]])
-                #         logger.debug(label_decoded)
-                #
-                #     if plot_phns:
-                #         plot(sample_name, input_feature["fbank"], (np.exp(output).T / np.exp(output).sum(axis=1)).T,
-                #              self.phoneme_dict, _labels, result_decoded=result_decoded)
-                #     else:
-                #         plot(sample_name, input_feature["fbank"], (np.exp(output).T / np.exp(output).sum(axis=1)).T,
-                #              self.phoneme_dict, result_decoded=result_decoded)
+                #     plot_alignment_spectrogram(sample_name, input_feature["fbank"],
+                #                                (np.exp(output).T / np.exp(output).sum(axis=1)).T,
+                #                                self.phoneme_dict, metadata_dict[sample_name], result_decoded=result_decoded)
                 #
                 #     plot_num += 1
 
                 assert len(output.shape) == 2
                 assert np.sum(np.isnan(output)) == 0, "NaN in output"
+                assert output.shape[1] == len(self.phoneme_dict.reducedIdx2phoneme) + 1
                 writer.write_mat(output_label, output.squeeze(), sample_name)
 
         # self.config['decoding']['scoring_type'] = 'just_transcript'
@@ -224,11 +256,12 @@ class CTCDecoder:
 
         return result
 
-    def preprocess_feat(self, feat):
-        assert len(feat.shape) == 2
-        # length, num_feats = feat.shape
-        feat_context = apply_context_single_feat(feat, self.model.context_left, self.model.context_right,
-                                                 start_idx=self.model.context_left,
-                                                 end_idx=len(feat) - self.model.context_right)
-
-        return torch.from_numpy(feat_context).to(dtype=torch.float32)
+    # def preprocess_feat(self, feat):
+    #     assert len(feat.shape) == 2
+    #     length, num_feats = feat.shape
+    #     assert length > self.model.context_left + self.model.context_right
+    #     feat_context = apply_context_single_feat(feat, self.model.context_left, self.model.context_right,
+    #                                              start_idx=self.model.context_left,
+    #                                              end_idx=len(feat) - self.model.context_right)
+    #
+    #     return torch.from_numpy(feat_context).to(dtype=torch.float32)

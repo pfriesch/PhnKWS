@@ -44,8 +44,8 @@ class PhnErrorRate(Module):
 
         # decoder expects batch first
         target_sequence_lengths = target['target_sequence_lengths']
-        input_sequence_lengths = target['input_sequence_lengths']
-        batch_size = len(input_sequence_lengths)
+        # input_sequence_lengths = target['input_sequence_lengths']
+        batch_size = len(target_sequence_lengths)
         # batch x seq x label_size
 
         assert logits.shape[0] == batch_size

@@ -84,8 +84,10 @@ class LabCDAccuracy(Module):
         return False
 
     def forward(self, output, target):
+        if len(output['out_cd'].shape) == 3 and output['out_cd'].shape[1] == 1:
+            output['out_cd'] = output['out_cd'].squeeze(1)
         pred = output['out_cd'].max(dim=1)[1].view(-1)
-        lab = target['lab_cd'].view(-1)
+        lab = target['lab_cd'].view(-1).to(dtype=torch.long)
 
         accuracy = torch.mean((pred == lab).to(dtype=torch.float32))
 
@@ -102,8 +104,10 @@ class LabCDError(Module):
         return False
 
     def forward(self, output, target):
+        if len(output['out_cd'].shape) == 3 and output['out_cd'].shape[1] == 1:
+            output['out_cd'] = output['out_cd'].squeeze(1)
         pred = output['out_cd'].max(dim=1)[1].view(-1)
-        lab = target['lab_cd'].view(-1)
+        lab = target['lab_cd'].view(-1).to(dtype=torch.long)
 
         error = torch.mean((pred != lab).to(dtype=torch.float32))
 

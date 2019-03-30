@@ -3,7 +3,6 @@ from __future__ import print_function
 import json
 import os
 import os.path
-import random
 import errno
 import sys
 from functools import partial
@@ -17,7 +16,7 @@ from tqdm import tqdm
 
 from data.data_util import split_chunks, apply_context_single_feat
 from data.kaldi_dataset_utils import convert_chunk_from_kaldi_format
-from data.phoneme_dict import load_phoneme_dict, PhonemeDict
+from data.phoneme_dict import load_phoneme_dict
 from utils.logger_config import logger
 from data.datasets import DatasetType
 
@@ -40,13 +39,15 @@ class BaseKaldiDataset(data.Dataset):
                  label_dict,
                  dataset_type,
                  max_sample_len=None,
+                 min_sample_len=None,
                  left_context=None,
                  right_context=None,
                  normalize_features=None,
                  aligned_labels=False,
                  max_seq_len=None,
                  max_label_length=None,
-                 phoneme_dict=None
+                 phoneme_dict=None,
+                 label_index_from=1
                  ):
 
         self.state = SimpleNamespace()
@@ -58,17 +59,21 @@ class BaseKaldiDataset(data.Dataset):
         if max_sample_len is None or max_sample_len < 0:
             max_sample_len = float("inf")
 
+        if min_sample_len is None or min_sample_len < 0:
+            min_sample_len = 0
+
         self.state.data_cache_root = os.path.expanduser(data_cache_root)
         self.state.chunk_size = 100
         self.state.max_len_per_chunk = None
         self.state.min_len_per_chunk = None
         self.state.max_seq_len = max_seq_len
         self.state.max_sample_len = max_sample_len
-        self.state.min_sample_len = left_context + right_context + 1  # TODO ?
+        self.state.min_sample_len = min_sample_len
         self.state.max_label_length = max_label_length
         self.state.left_context = left_context
         self.state.right_context = right_context
-        self.state.label_index_from = 1  # TODO ?
+        self.state.label_index_from = label_index_from
+        self.state.sorted_by_lengh = True
 
         self.cached_pt = 0
         self.sample_index = []
@@ -150,24 +155,8 @@ class BaseKaldiDataset(data.Dataset):
                                                  all_labels_loaded[label_name][filename] + self.state.label_index_from
                                              for filename in all_labels_loaded[label_name]}
 
-    def _convert_from_kaldi_format(self, feature_dict, label_dict):
-        logger.info("Converting features from kaldi features!")
-        main_feat = next(iter(feature_dict))
+    def make_feat_chunks(self, feat_list, feature_dict, label_dict, all_labels_loaded, main_feat, write_info=True):
 
-        try:
-            os.makedirs(self.state.dataset_path)
-        except OSError as e:
-            if e.errno == errno.EEXIST:
-                pass
-            else:
-                raise
-
-        all_labels_loaded = self._load_labels(label_dict)
-
-        with open(feature_dict[main_feat]["feature_lst_path"], "r") as f:
-            lines = f.readlines()
-        feat_list = lines
-        random.shuffle(feat_list)
         file_chunks = list(split_chunks(feat_list, self.state.chunk_size))
 
         self.state.max_len_per_chunk = [0] * len(file_chunks)
@@ -209,7 +198,46 @@ class BaseKaldiDataset(data.Dataset):
         assert len(_sample_index) > 0, \
             f"No sample with a max seq length of {self.state.max_seq_len} in the dataset! " \
             + f"Try to choose a higher max seq length to start with"
-        self._write_info(_sample_index)
+        if write_info:
+            self._write_info(_sample_index)
+        return _sample_index
+
+    def _convert_from_kaldi_format(self, feature_dict, label_dict):
+        logger.info("Converting features from kaldi features!")
+        main_feat = next(iter(feature_dict))
+
+        try:
+            os.makedirs(self.state.dataset_path)
+        except OSError as e:
+            if e.errno == errno.EEXIST:
+                pass
+            else:
+                raise
+
+        all_labels_loaded = self._load_labels(label_dict)
+
+        with open(feature_dict[main_feat]["feature_lst_path"], "r") as f:
+            lines = f.readlines()
+        feat_list = lines
+
+        _sample_index = self.make_feat_chunks(feat_list, feature_dict, label_dict, all_labels_loaded, main_feat,
+                                              write_info=not self.state.sorted_by_lengh)
+
+        if self.state.sorted_by_lengh:
+            logger.info('Redoing extracting kaldi features, but sorted!')
+
+            # for chunk_idx, file_name, stad_idx, end_idx in
+            _sample_index_dict = sorted(_sample_index, key=lambda x: x[3] - x[2])
+
+            _files_dict = dict([s.split(" ") for s in feat_list])
+
+            sorted_feat_list = []
+            for chunk_idx, file_name, stad_idx, end_idx in _sample_index_dict:
+                sorted_feat_list.append(f"{file_name} {_files_dict[file_name]}")
+
+            self.make_feat_chunks(sorted_feat_list, feature_dict, label_dict, all_labels_loaded,
+                                  main_feat)
+
         logger.info('Done extracting kaldi features!')
 
     def _check_exists(self):

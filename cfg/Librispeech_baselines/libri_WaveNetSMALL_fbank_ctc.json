@@ -14,7 +14,7 @@
   "dataset": {
     "name": "librispeech",
     "data_use": {
-      "train_with": "train_clean_460",
+      "train_with": "train_clean_100",
       "valid_with": "dev_clean_100",
       "test_with": "test_clean_100"
     },
@@ -29,28 +29,23 @@
     //    "dataset_type": "SEQUENTIAL_APPENDED_CONTEXT",
     "batching": {
       "max_seq_length_train": 3500,
-      "start_seq_len_train": 3500,
+      "start_seq_len_train": 100, // use 150 or nan
       "increase_seq_length_train": true,
       "multply_factor_seq_len_train": 2,
       "max_seq_length_valid": 3500,
       "batch_size_train": 32,
-      "batch_size_valid": 1
+      "batch_size_valid": 32
     },
     "clip_grad_norm": 10,
     "optimizer": {
       "type": "adam",
       "args": {
-        "lr": 1e-3,
-        "amsgrad": true
+        "lr": 5e-4
       }
     },
     "lr_scheduler": {
-      "name": "ReduceLROnPlateau",
+      "name": "StaticLR",
       "args": {
-        "factor": 0.1,
-        "patience": 3,
-        "cooldown": 3,
-        "min_lr": 1e-6
       }
     }
   },
@@ -58,9 +53,9 @@
     "name": "WaveNet",
     "args": {
       "lookahead_context": 0,
-      "n_layers": 28,
-      "n_channels": 32,
-      "max_dilation": 4,
+      "n_layers": 24,
+      "n_channels": 64,
+      "max_dilation": 8,
       "n_residual_channels": 16,
       "n_skip_channels": 32,
       "kernel_size": 3

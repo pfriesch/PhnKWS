@@ -5,7 +5,7 @@
     "seed": 2234,
     "n_gpu": 1,
     "prefetch_to_gpu": true,
-    "n_epochs_tr": 20,
+    "n_epochs_tr": 100,
     "save_period": 1,
     "checkpoint_interval_minutes": 10,
     "compute_train_metrics": true,
@@ -19,7 +19,7 @@
       "test_with": "test_clean_100"
     },
     "features_use": ["fbank"],
-    "labels_use": ["lab_cd", "lab_mono", "lab_phnframe"]
+    "labels_use": ["lab_cd"]
   },
   "training": {
     //    "dataset_type": "FRAMEWISE_SHUFFLED_FRAMES",
@@ -33,30 +33,29 @@
       "increase_seq_length_train": false,
       "multply_factor_seq_len_train": 1,
       "max_seq_length_valid": 3500,
-      "batch_size_train": 1,
+      "batch_size_train": 8,
       "batch_size_valid": 1
     },
     "clip_grad_norm": -1,
     "optimizer": {
       "type": "adam",
       "args": {
-        "lr": 1e-3
+        "lr": 5e-4
       }
     },
     "lr_scheduler": {
-      "name": "MultiStepLR",
+      "name": "StaticLR",
       "args": {
-        "milestones": [5, 10, 13, 15, 16, 17, 18, 19, 20],
-        "gamma": 0.5
       }
     }
   },
   "arch": {
     "name": "WaveNet",
     "args": {
-      "lookahead_context": 5,
+      "lookahead_context": 0,
       "n_layers": 28,
-      "max_dilation": 4,
+      "n_channels": 64,
+      "max_dilation": 8,
       "n_residual_channels": 32,
       "n_skip_channels": 64,
       "kernel_size": 3
@@ -64,16 +63,11 @@
     "loss": {
       "name": "CE",
       "args": {
-        "weight_mono": 1.0
       }
     },
     "metrics": [
       "acc_lab_cd",
-      "err_lab_cd",
-      "acc_lab_mono",
-      "err_lab_mono",
-      "acc_lab_phnframe",
-      "err_lab_phnframe"
+      "err_lab_cd"
     ]
   }
 }

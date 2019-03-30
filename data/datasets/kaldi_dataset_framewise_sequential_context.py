@@ -16,7 +16,7 @@ class KaldiDatasetFramewiseContext(BaseKaldiDataset):
 
     def __init__(self, data_cache_root, dataset_name, feature_dict, label_dict, max_sample_len=1000,
                  left_context=0, right_context=0, normalize_features=True, max_seq_len=100, max_label_length=None,
-                 overfit_small_batch=False):
+                 overfit_small_batch=False, label_index_from=1):
 
         dataset_type = DatasetType.FRAMEWISE_SEQUENTIAL_APPENDED_CONTEXT
         for label_name in label_dict:
@@ -24,8 +24,10 @@ class KaldiDatasetFramewiseContext(BaseKaldiDataset):
                    label_dict[label_name]["label_opts"] == "ali-to-pdf"
 
         super().__init__(data_cache_root, dataset_name, feature_dict, label_dict, dataset_type, max_sample_len,
-                         left_context, right_context, normalize_features,
-                         aligned_labels=True, max_seq_len=max_seq_len, max_label_length=max_label_length)
+                         min_sample_len=0, left_context=left_context, right_context=right_context,
+                         normalize_features=normalize_features,
+                         aligned_labels=True, max_seq_len=max_seq_len, max_label_length=max_label_length,
+                         label_index_from=label_index_from)
         if overfit_small_batch:
             self.sample_index = self.sample_index[:64]
 
