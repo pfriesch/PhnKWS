@@ -1,5 +1,5 @@
 from torch import optim
-from torch.optim.lr_scheduler import MultiStepLR, ExponentialLR
+from torch.optim.lr_scheduler import MultiStepLR, ExponentialLR, _LRScheduler
 
 from utils.logger_config import logger
 
@@ -24,6 +24,14 @@ class ReduceLROnPlateau(optim.lr_scheduler.ReduceLROnPlateau):
     #         param_group['lr'] = new_lr
     #         if self.verbose:
     #             logger.info(f'Setting learning rate of group {i} to {new_lr:.4e}.')
+
+
+class StaticLR(_LRScheduler):
+    def __init__(self, optimizer, last_epoch=-1):
+        super(StaticLR, self).__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        return self.base_lrs
 
 
 def lr_scheduler_init(config, optimizers):
@@ -51,6 +59,11 @@ def lr_scheduler_init(config, optimizers):
         for opti_name in optimizers:
             lr_schedulers[opti_name] = ExponentialLR(optimizers[opti_name],
                                                      **config['training']['lr_scheduler']['args'])
+
+    elif config['training']['lr_scheduler']['name'] == 'StaticLR':
+        for opti_name in optimizers:
+            lr_schedulers[opti_name] = StaticLR(optimizers[opti_name],
+                                                **config['training']['lr_scheduler']['args'])
 
     else:
         raise ValueError

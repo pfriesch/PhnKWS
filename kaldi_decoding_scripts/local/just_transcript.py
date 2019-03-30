@@ -37,6 +37,13 @@ def get_transcripts(words_path, workdir):
     lm_posterior_out_file = f"{workdir}/scoring/keywords.lm_post"
     acoustic_posterior_out_file = f"{workdir}/scoring/keywords.ac_post"
 
+    # plt =True
+    # if plt:
+    # only for word sequences, not useful for KWS
+    #     run_shell(f"gunzip -c {workdir}/lat.*.gz | lattice-to-fst ark:- \"scp,p:echo $utterance_id $tmp_dir/$utterance_id.fst|\"")
+        # run_shell(f"gunzip -c {workdir}/lat.*.gz | lattice-to-fst ark:- ")
+
+
     run_shell(f"gunzip -c {workdir}/lat.*.gz | "
               + f"lattice-to-nbest ark:- ark,t:- | "
               + f"nbest-to-linear ark:- ark:{ali_out_file} ark,t:{transcript_out_file} "

@@ -45,7 +45,7 @@ def train_epoch(epoch, global_step, model, loss_fun, metrics, config, max_label_
                           model.context_right,
                           normalize_features=True,
                           phoneme_dict=config['dataset']['dataset_definition']['phoneme_dict'],
-                          max_seq_len=seq_len_scheduler.get_seq_len(),
+                          max_seq_len=seq_len_scheduler.get_seq_len(epoch),
                           max_label_length=max_label_length,
                           overfit_small_batch=overfit_small_batch)
 

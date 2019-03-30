@@ -24,7 +24,8 @@ class Logger(object):
                 },
                 'handlers': {
                     'console': {
-                        'level': 'INFO',
+                        'level': 'DEBUG' if 'DEBUG_MODE' in os.environ and bool(int(os.environ['DEBUG_MODE']))
+                        else 'INFO',
                         'class': 'utils.logger_format.TqdmLoggingHandler',
                         'formatter': 'brief'
                     },

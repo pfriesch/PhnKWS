@@ -17,6 +17,7 @@ from ww_benchmark.engine import Engine
 
 # run asr and plot the log likelyhood of the individual phonemes over time
 
+
 def get_kaldi_feats(scp_file, out_dir, spk2utt, utt2spk):
     # Compute features
     fbank_config = "kaldi_decoding_scripts/conf/fbank.conf"
@@ -44,65 +45,69 @@ def get_kaldi_feats(scp_file, out_dir, spk2utt, utt2spk):
 
 class KWSEngine(Engine):
 
-    def __init__(self, keywords, sensitivity, model_path, n_parallel) -> None:
+    def __init__(self, keywords, sensitivity, model_path) -> None:
         super().__init__()
         self.tmp_root_dir = '/mnt/data/tmp_kws_eval'
         if not os.path.exists(self.tmp_root_dir):
             os.makedirs(self.tmp_root_dir)
         self.tmp_dir = tempfile.TemporaryDirectory(dir=self.tmp_root_dir)
-        self.tmp_run_dirs = [tempfile.TemporaryDirectory(dir=self.tmp_root_dir) for _ in range(n_parallel)]
-        for tmp_run_dir in self.tmp_run_dirs:
-            if not os.path.exists(os.path.join(tmp_run_dir.name, "exp_files")):
-                os.makedirs(os.path.join(tmp_run_dir.name, "exp_files"))
+
         # TODO debug mode
 
         logger.configure_logger(self.tmp_dir.name)
         check_environment()
 
-        assert isinstance(keywords, dict)
+        assert isinstance(keywords, dict), keywords
         self.keywords = keywords
         self.sensitivity = sensitivity
 
         self.model_checkpoint_path = model_path
-        self.decoder = get_decoder(model_path, list(keywords.keys()), self.tmp_dir.name)
+        self.decoder = get_decoder(model_path, keywords, self.tmp_dir.name)
 
     def process_batch(self, _input):
+        with tempfile.TemporaryDirectory(dir=self.tmp_root_dir) as tmp_run_dir:
+            if not os.path.exists(os.path.join(tmp_run_dir, "exp_files")):
+                os.makedirs(os.path.join(tmp_run_dir, "exp_files"))
 
-        chunk_id, wav_files = _input
-        _wav_files = set()
-        for file in wav_files:
-            assert os.path.abspath(file)
-            if file in _wav_files:
-                logger.warn(f"Duplicate file {file}, ignoring...")
+            if isinstance(_input, tuple):
+                assert isinstance(_input[0], list), isinstance(_input[1], list)
+                assert len(_input[0]) == len(_input[1])
+                wav_files, metadata_dict = _input
             else:
-                _wav_files.add(file)
-        wav_files = list(_wav_files)
+                wav_files = _input
+                metadata_dict = None
+            if isinstance(wav_files[0], list):
+                wav_files, metadata = wav_files
+                metadata_dict = {}
+                for w_file, _mdata in zip(wav_files, metadata):
+                    metadata_dict[os.path.basename(w_file)[:-5]] = _mdata
+            _wav_files = set()
+            for file in wav_files:
+                assert os.path.abspath(file)
+                if file in _wav_files:
+                    logger.warn(f"Duplicate file {file}, ignoring...")
+                else:
+                    _wav_files.add(file)
+            # wav_files = list(_wav_files)
 
-        # self.add_noise_padding()
+            # self.add_noise_padding()
 
-        tmp_scp, spk2utt_path, utt2spk_path = self.preppare_tmp_files(wav_files, self.tmp_run_dirs[chunk_id].name)
+            tmp_scp, spk2utt_path, utt2spk_path = self.preppare_tmp_files(wav_files, tmp_run_dir)
 
-        feats = get_kaldi_feats(tmp_scp, self.tmp_run_dirs[chunk_id].name, spk2utt_path, utt2spk_path)
+            feats = get_kaldi_feats(tmp_scp, tmp_run_dir, spk2utt_path, utt2spk_path)
 
-        # TODO apply mean std norm, same as in dataloader
+            # TODO apply mean std norm, same as in dataloader
 
-        result = self.decoder.is_keyword_batch(input_features=feats,
-                                               sensitivity=self.sensitivity,
-                                               tmp_out_dir=self.tmp_run_dirs[chunk_id].name)
-        n_parallel = len(self.tmp_run_dirs)
-        for _dir in self.tmp_run_dirs:
-            _dir.cleanup()
-        self.tmp_run_dirs = [tempfile.TemporaryDirectory(dir=self.tmp_root_dir) for _ in range(n_parallel)]
-        for tmp_run_dir in self.tmp_run_dirs:
-            if not os.path.exists(os.path.join(tmp_run_dir.name, "exp_files")):
-                os.makedirs(os.path.join(tmp_run_dir.name, "exp_files"))
-
-        return result
+            result = self.decoder.is_keyword_batch(input_features=feats,
+                                                   sensitivity=self.sensitivity,
+                                                   tmp_out_dir=tmp_run_dir)
+            if metadata_dict is not None:
+                return list(zip(metadata_dict, result.values()))
+            else:
+                return result
 
     def release(self):
         self.tmp_dir.cleanup()
-        for _dir in self.tmp_run_dirs:
-            _dir.cleanup()
 
     def __str__(self):
         pass
@@ -110,8 +115,8 @@ class KWSEngine(Engine):
     @property
     def frame_length(self, sample_rate=16000):
 
-        assert self.decoder.model.context_right + self.decoder.model.context_left <= 150, \
-            "The context size of the model is larger than 150."
+        # assert self.decoder.model.context_right + self.decoder.model.context_left <= 150, \
+        #     "The context size of the model is larger than 150."
         return 2 * sample_rate  # 2 seconds
 
     @staticmethod

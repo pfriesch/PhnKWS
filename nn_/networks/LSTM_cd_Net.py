@@ -1,7 +1,5 @@
 import torch
 
-from torch.nn.utils.rnn import pad_packed_sequence, PackedSequence
-
 from base.base_model import BaseModel
 from nn_.net_modules.LSTM_cudnn import LSTM
 from nn_.net_modules.MLPModule import MLPModule
@@ -32,6 +30,7 @@ class LSTM_cd_Net(BaseModel):
         self.context_right = 0
         self.input_feat_name = input_feat_name
         self.batch_ordering = "TNCL"
+        # self.load_cfg()
 
     def forward(self, x):
         x = x[self.input_feat_name]
@@ -58,10 +57,6 @@ class LSTM_cd_Net(BaseModel):
             "/mnt/data/pytorch-kaldi_cfg/exp/libri_LSTM_fbank/exp_files/final_architecture1.pkl", map_location='cpu')[
             'model_par']
         final_architecture1 = {k.replace('lstm.0.', 'lstm.'): v for k, v in final_architecture1.items()}
-
-        # final_architecture2 = torch.load(
-        #     "/mnt/data/pytorch-kaldi_cfg/exp/libri_LSTM_fbank/exp_files/final_architecture2.pkl", map_location='cpu')[
-        #     'model_par']
 
         self.lstm.load_state_dict(final_architecture1)
         self.mlp_lab_cd.load_cfg()

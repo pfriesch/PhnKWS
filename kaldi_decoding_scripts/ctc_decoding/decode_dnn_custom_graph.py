@@ -7,7 +7,6 @@ from utils.logger_config import logger
 from utils.utils import run_shell
 
 
-
 def decode_ctc(words_path,
                graph_path,
                out_folder,
@@ -35,7 +34,6 @@ def decode_ctc(words_path,
     for ck_data in tqdm(featstrings, desc="lattice generation chunk:"):
         finalfeats = f"ark,s,cs: "
 
-
         # Decode for each of the acoustic scales
         run_shell(f"{latgen_faster_bin} "
                   + f"--max-active={max_active} "
@@ -48,11 +46,12 @@ def decode_ctc(words_path,
                   + f"{graph_path} "
                   + f"ark:{ck_data} \"ark:|gzip -c > {out_folder}/lat.{chnk_id}.gz\"")
 
-
     transcripts_best, transcripts, lattice_confidence, lm_posterior, acoustic_posterior = get_transcripts(words_path,
                                                                                                           out_folder)
 
     for t in transcripts_best:
+        # if transcripts_best[t] != ['THREE'] and transcripts[t] != [
+        #     'THREE']:  # might give a different path for e.g. THREE and TREE
         assert transcripts_best[t] == transcripts[t], f"{t}: {transcripts_best[t]} =!= {transcripts[t]}"
 
     assert len(transcripts) == len(lattice_confidence)
