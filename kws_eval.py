@@ -45,19 +45,22 @@ def test_kws(checkpoint_path, decode_experiment_name):
     data_folder = "/mnt/data/pytorch-kaldi/bench_data/speech_commands_v0.02"
 
     files, keywords = get_files_speech_commands(data_folder, "validation_list.txt")
+    files = [f for f in files if 'seven' in f]
     # _files, _ = get_files_speech_commands(data_folder, "testing_list.txt")
     # random.shuffle(files)
     # files = [f for f in files if "seven" in f]
     # files = files[:200]
     # files += _files
     if 'reduced' in decode_experiment_name:
-        reduced_keywords = ['MARVIN',
+        reduced_keywords = ['RIGHT',
+                            'LEFT',
+                            'HAPPY',
                             'SHEILA',
+                            'MARVIN',
                             'SEVEN',
-                            'VISUAL',
-                            'HAPPY',  # TODO remove bad performing keywords
-                            'FOLLOW',
-                            'LEARN']
+                            'NINE',
+                            'BED',
+                            'HOUSE']
         keywords = reduced_keywords
 
     keywords = {kw.upper(): _i for _i, kw in enumerate(keywords)}
@@ -128,17 +131,21 @@ def test_kws(checkpoint_path, decode_experiment_name):
 
 
 if __name__ == '__main__':
-    # checkpoint_path = "/mnt/data/pytorch-kaldi/trained_models/libri_WaveNetBig_ce/libri_WaveNetBIG_fbank_ce/checkpoints/checkpoint_e19.pth"
-    # checkpoint_path = "/mnt/data/pytorch-kaldi/trained_models/libri_WaveNetBig_ctc/libri_WaveNetBIG_fbank_ctc_PER_21percent/checkpoints/checkpoint_e37.pth"
+    checkpoint_path = "/mnt/data/pytorch-kaldi/trained_models/libri_WaveNetBig_ctc/libri_WaveNetBIG_fbank_ctc_PER_21percent/checkpoints/checkpoint_e37.pth"
     # checkpoint_path = "/mnt/data/pytorch-kaldi/trained_models/libri_WaveNetBig_ctc/libri_WaveNetBIG_fbank_ctc_PER26_from_scratch/checkpoints/checkpoint_e36_bias.pth"
-    checkpoint_path = "/mnt/data/pytorch-kaldi/trained_models/libri_LSTM_fbank_ce/checkpoints/checkpoint_e0_gs316.pth"
+
+    # checkpoint_path = "/mnt/data/pytorch-kaldi/exp/libri_WaveNetBIG_fbank_ctc/checkpoints/checkpoint_e10.pth"
+    # checkpoint_path = "/mnt/data/pytorch-kaldi/trained_models/libri_WaveNetBig_ce/libri_WaveNetBIG_fbank_ce/checkpoints/checkpoint_e19.pth"
+    # checkpoint_path = "/mnt/data/pytorch-kaldi/trained_models/libri_WaveNetBIG_fbank_ctc/checkpoints/checkpoint_e8.pth"
+    # checkpoint_path = "/mnt/data/pytorch-kaldi/trained_models/libri_LSTM_fbank_ce/checkpoints/checkpoint_e0_gs316.pth"
 
     # test_kws(checkpoint_path, 'kws_reduced')
-    # test_kws(checkpoint_path, 'kws_all')
+    test_kws(checkpoint_path, 'kws_all')
     # test_asr()
-    base_dir = os.path.dirname(os.path.dirname(checkpoint_path))
-    result_path = os.path.join(base_dir, "alexa_results/")
-    snr_db = 994
-    run_benchmark_alexa(result_path, checkpoint_path, snr_db)
+
+    # base_dir = os.path.dirname(os.path.dirname(checkpoint_path))
+    # result_path = os.path.join(base_dir, "alexa_results/")
+    # snr_db = 994
+    # run_benchmark_alexa(result_path, checkpoint_path, snr_db)
 
     # run_benchmark_speech_commands(checkpoint_path, os.path.abspath("bench_output"))

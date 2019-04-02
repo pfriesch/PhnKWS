@@ -27,6 +27,7 @@ class KaldiDatasetSequential(BaseKaldiDataset):
 
         assert isinstance(phoneme_dict, PhonemeDict)
         super().__init__(data_cache_root, dataset_name, feature_dict, label_dict, dataset_type, max_sample_len,
+                         left_context + right_context + 50,
                          left_context, right_context, normalize_features,
                          aligned_labels=False, max_seq_len=max_seq_len, max_label_length=max_label_length,
                          phoneme_dict=phoneme_dict)

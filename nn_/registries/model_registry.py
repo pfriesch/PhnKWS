@@ -1,4 +1,5 @@
 from nn_.networks.LSTMNet import LSTMNet
+from nn_.networks.LSTM_cfg import LSTM_cfg
 from nn_.networks.MLP import MLP
 from nn_.networks.TDNN import TDNN
 from nn_.networks.WaveNet import WaveNet
@@ -128,10 +129,20 @@ def model_init(config):
         #                    [lab_name]['num_lab']
         #            for lab_name in lab_names}
 
-        net = WaveNet(input_feat_length, input_feat_name, outputs, **config['arch']['args'])
+        net =   WaveNet(input_feat_length, input_feat_name, outputs, **config['arch']['args'])
 
     elif arch_name == "LSTM":
         net = LSTMNet(input_feat_length, input_feat_name, outputs, **config['arch']['args'])
+        # net = LSTM_cfg(
+        #     lstm_lay=[550, 550, 550, 550],
+        #     lstm_drop=[0.2, 0.2, 0.2, 0.2],
+        #     lstm_use_laynorm_inp=False,
+        #     lstm_use_batchnorm_inp=False,
+        #     lstm_use_laynorm=[False, False, False, False],
+        #     lstm_use_batchnorm=[True, True, True, True],
+        #     lstm_bidir=True,
+        #     lstm_act=['tanh', 'tanh', 'tanh', 'tanh'],
+        #     lstm_orthinit=True)
 
 
     else:

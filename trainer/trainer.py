@@ -45,12 +45,12 @@ class Trainer(BaseTrainer):
        Note:
            The validation metrics in log must have the key 'val_metrics'.
        """
-        if 'DEBUG_MODE' in os.environ and bool(int(os.environ['DEBUG_MODE'])):
-            return valid_epoch_sync_metrics(epoch, self.model, self.loss, self.metrics, self.config,
-                                            self.max_label_length, self.device, self.tensorboard_logger)
-        else:
-            return valid_epoch_async_metrics(epoch, self.model, self.loss, self.metrics, self.config,
-                                             self.max_label_length, self.device, self.tensorboard_logger)
+        # if 'DEBUG_MODE' in os.environ and bool(int(os.environ['DEBUG_MODE'])):
+        #     return valid_epoch_sync_metrics(epoch, self.model, self.loss, self.metrics, self.config,
+        #                                     self.max_label_length, self.device, self.tensorboard_logger)
+        # else:
+        return valid_epoch_async_metrics(epoch, self.model, self.loss, self.metrics, self.config,
+                                         self.max_label_length, self.device, self.tensorboard_logger)
 
     def _eval_epoch(self, epoch):
         test_data = self.config['dataset']['data_use']['test_with']

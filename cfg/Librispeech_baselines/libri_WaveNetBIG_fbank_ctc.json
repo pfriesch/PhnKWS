@@ -29,18 +29,18 @@
     //    "dataset_type": "SEQUENTIAL_APPENDED_CONTEXT",
     "batching": {
       "max_seq_length_train": 3500,
-      "start_seq_len_train": 100, // use 150 or nan
+      "start_seq_len_train": 3500, // use 150 or nan
       "increase_seq_length_train": true,
       "multply_factor_seq_len_train": 2,
       "max_seq_length_valid": 3500,
-      "batch_size_train": 32,
-      "batch_size_valid": 32
+      "batch_size_train": 64,
+      "batch_size_valid": 1
     },
-    "clip_grad_norm": 10,
+    "clip_grad_norm": -1,
     "optimizer": {
       "type": "adam",
       "args": {
-        "lr": 5e-4
+        "lr": 1e-3
       }
     },
     "lr_scheduler": {
@@ -55,7 +55,7 @@
       "lookahead_context": 0,
       "n_layers": 28,
       "n_channels": 64,
-      "max_dilation": 8,
+      "max_dilation": 4,
       "n_residual_channels": 32,
       "n_skip_channels": 64,
       "kernel_size": 3

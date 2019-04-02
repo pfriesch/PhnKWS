@@ -94,8 +94,10 @@ def valid_epoch_async_metrics(epoch, model, loss_fun, metrics, config, max_label
 
     tensorboard_logger.set_step(epoch, 'valid')
     tensorboard_logger.add_scalar('valid_loss', valid_loss / n_steps_this_epoch)
+    logger.info(f'valid_loss: {valid_loss / n_steps_this_epoch}')
     for metric in accumulated_valid_metrics:
         tensorboard_logger.add_scalar(metric, accumulated_valid_metrics[metric] / n_steps_this_epoch)
+        logger.info(f'{metric}: {accumulated_valid_metrics[metric] / n_steps_this_epoch}')
 
     return {'valid_loss': valid_loss / n_steps_this_epoch,
             'valid_metrics': {metric: accumulated_valid_metrics[metric] / n_steps_this_epoch for metric in

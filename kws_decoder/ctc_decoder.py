@@ -25,6 +25,7 @@ class CTCDecoder:
         # self.config['exp']['save_dir'] = "/mnt/data/pytorch-kaldi/exp_TIMIT_MLP_FBANK"
 
         self.model = model_init(self.config)
+        logger.info(self.model)
         # TODO GPU decoding
 
         self.max_seq_length_train_curr = -1
