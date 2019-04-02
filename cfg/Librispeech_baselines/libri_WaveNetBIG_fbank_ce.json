@@ -19,7 +19,7 @@
       "test_with": "test_clean_100"
     },
     "features_use": ["fbank"],
-    "labels_use": ["lab_cd"]
+    "labels_use": ["lab_cd", "lab_phnframe"]
   },
   "training": {
     //    "dataset_type": "FRAMEWISE_SHUFFLED_FRAMES",
@@ -52,10 +52,10 @@
   "arch": {
     "name": "WaveNet",
     "args": {
-      "lookahead_context": 0,
+      "lookahead_context": 5,
       "n_layers": 28,
       "n_channels": 64,
-      "max_dilation": 8,
+      "max_dilation": 4,
       "n_residual_channels": 32,
       "n_skip_channels": 64,
       "kernel_size": 3
@@ -67,7 +67,9 @@
     },
     "metrics": [
       "acc_lab_cd",
-      "err_lab_cd"
+      "err_lab_cd",
+      "acc_lab_phnframe",
+      "err_lab_phnframe"
     ]
   }
 }

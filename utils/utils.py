@@ -162,7 +162,7 @@ def plot_result_confusion_matrix(keywords, results, out_path):
 
     for (i, j), z in np.ndenumerate(confusion_matrix):
         if z > 0:
-            ax.text(j, i, '{:d}'.format(int(z)), ha='center', va='center')
+            ax.text(j, i, '{:d}'.format(int(z)), ha='center', va='center', fontsize=3)
 
     plt.xlabel('Predicted')
     plt.ylabel('True')
@@ -188,7 +188,8 @@ def plot_result_confusion_matrix(keywords, results, out_path):
     plt.yticks(tick_marks[:-1], keywords[1:], fontsize=8)
 
     for (i, j), z in np.ndenumerate(confusion_matrix[1:]):
-        ax.text(j, i, '{:d}'.format(int(z)), ha='center', va='center')
+        if z > 0:
+            ax.text(j, i, '{:d}'.format(int(z)), ha='center', va='center', fontsize=3)
 
     plt.xlabel('Predicted')
     plt.ylabel('True')
@@ -398,9 +399,12 @@ def plot_alignment_spectrogram(sample_name, input_feat, output, phn_dict, decode
     fig = plt.figure()
     ax = fig.subplots()
     in_feat = feat_without_context(input_feat)
+
+    in_feat = in_feat[(in_feat.shape[0] - output.shape[0]):]
     ax.imshow(in_feat.T, origin='lower',
               # extent=[-(in_feat.shape[0] - output.shape[0] + 1) // 2, in_feat.shape[0], 0, 100],
-              extent=[-(in_feat.shape[0] - output.shape[0]), output.shape[0], 0, height],
+              # extent=[-(in_feat.shape[0] - output.shape[0]), output.shape[0], 0, height],
+              extent=[0, output.shape[0], 0, height],
               alpha=0.5)
     for i in range(output.shape[1]):
         # ax.plot(output[:, i] * height, linewidth=0.5)
@@ -423,6 +427,7 @@ def plot_alignment_spectrogram(sample_name, input_feat, output, phn_dict, decode
     # ax.legend()
     # ax.xaxis.set_major_locator(ticker.FixedLocator(_l_out_i))
     # ax.xaxis.set_(ticker.FixedLocator(_l_out_i))
+    plt.yticks([])
     plt.tick_params(labelsize=4)
     ax.set_aspect(aspect=0.2)
     if result_decoded is None:

@@ -160,6 +160,7 @@ def main(config_path, load_path, restart, overfit_small_batch, warm_start, optim
                       do_validation=True,
                       overfit_small_batch=overfit_small_batch)
     trainer.train()
+    # trainer._valid_epoch(-1)
 
 
 if __name__ == '__main__':

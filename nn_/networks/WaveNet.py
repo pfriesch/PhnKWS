@@ -5,7 +5,7 @@ import torch
 import asciichartpy
 import torch.nn.functional as F
 from tabulate import tabulate
-from torch import nn
+from torch import nn, Tensor
 
 from base.base_model import BaseModel
 from nn_.net_modules.WaveNetModules import Conv1d, WaveNetLayer, Conv2d
@@ -69,7 +69,12 @@ class WaveNet(BaseModel):
                + f" receptive_field: {self.context_left + self.context_right}"
 
     def forward(self, _input):
-        x = _input[self.input_feat_name]
+        if isinstance(_input, dict):
+            x = _input[self.input_feat_name]
+        elif isinstance(_input, Tensor):
+            x = _input
+        else:
+            raise NotImplementedError
         # [N , C_in, L]
 
         output_length = x.shape[2] - self.context_left - self.context_right
@@ -167,15 +172,44 @@ class WaveNet(BaseModel):
 
         return layer.output_size()
 
-    def load_warm_start(self, path):
-        # CE mono+cd+phnframe -> CTC phn
-        state_dict = torch.load(path, map_location='cpu')['state_dict']
+    # def load_warm_start(self, path):
+    #     # CE mono+cd+phnframe -> CTC phn
+    #     state_dict = torch.load(path, map_location='cpu')['state_dict']
+    #
+    #     state_dict = {k.replace("out_phnframe", "out_phn"): v for k, v in state_dict.items() if
+    #                   'out_mono' not in k and 'out_cd' not in k}
+    #
+    #     self.load_state_dict(state_dict)
+    #     print("Loaded state dict for warm start")
 
-        state_dict = {k.replace("out_phnframe", "out_phn"): v for k, v in state_dict.items() if
-                      'out_mono' not in k and 'out_cd' not in k}
+    def get_custom_ops_for_counting(self):
 
-        self.load_state_dict(state_dict)
-        print("Loaded state dict for warm start")
+        def count_conv1d(m, x, y):
+            x = x[0]
+
+            cin = m.in_channels
+            cout = m.out_channels
+            kh, kw = m.kernel_size
+            batch_size = x.size()[0]
+
+            out_h = y.size(2)
+            out_w = y.size(3)
+
+            # ops per output element
+            # kernel_mul = kh * kw * cin
+            # kernel_add = kh * kw * cin - 1
+            kernel_ops = kh * kw * cin // m.groups
+            bias_ops = 1 if m.bias is not None else 0
+            ops_per_element = kernel_ops + bias_ops
+
+            # total ops
+            # num_out_elements = y.numel()
+            output_elements = batch_size * out_w * out_h * cout
+            total_ops = output_elements * ops_per_element
+
+            m.total_ops = torch.Tensor([int(total_ops)])
+
+        return {Conv1d: count_conv1d}
 
     # def load_warm_start(self, path):
     #     # CE mono+cd+phnframe -> CE phnframe
@@ -188,14 +222,24 @@ class WaveNet(BaseModel):
     #     print("Loaded state dict for warm start")
 
     # def load_warm_start(self, path):
-    #     # CE mono+cd -> mono+cd+phnframe
+    #     # CE cd -> cd+phnframe
     #     state_dict = torch.load(path, map_location='cpu')['state_dict']
     #
-    #     state_dict = {k.replace("out_phnframe", "out_phn"): v for k, v in state_dict.items() if
-    #                   'out_mono' not in k and 'out_cd' not in k}
+    #     state_dict = {k: v for k, v in state_dict.items() if 'out_mono' not in k}
+    #     # state_dict.update({k: v for k, v in self.state_dict().items() if 'out_phnframe' in k})
     #
     #     self.load_state_dict(state_dict)
     #     print("Loaded state dict for warm start")
+
+    def load_warm_start(self, path):
+        # CE mono+cd -> mono+cd+phnframe
+        state_dict = torch.load(path, map_location='cpu')['state_dict']
+
+        state_dict = {k.replace("out_phnframe", "out_phn"): v for k, v in state_dict.items() if
+                      'out_mono' not in k and 'out_cd' not in k}
+
+        self.load_state_dict(state_dict)
+        print("Loaded state dict for warm start")
 
     # def load_warm_start(self, path):
     # #same arch
