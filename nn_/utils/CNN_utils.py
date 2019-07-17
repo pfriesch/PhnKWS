@@ -1,8 +1,8 @@
 import itertools
 from math import ceil
 
-import asciichartpy
-from tabulate import tabulate
+# import asciichartpy
+# from tabulate import tabulate
 
 
 class LayerStats:

@@ -1,7 +1,7 @@
 import os
 import json
 
-import ctcdecode
+# import ctcdecode
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -122,7 +122,8 @@ class CTCDecoder:
         vocabulary_size = 42
         vocabulary = [chr(c) for c in list(range(65, 65 + 58)) + list(range(65 + 58 + 69, 65 + 58 + 69 + 500))][
                      :vocabulary_size]
-        decoder = ctcdecode.CTCBeamDecoder(vocabulary, log_probs_input=True, beam_width=1)
+        raise NotImplementedError
+        # decoder = ctcdecode.CTCBeamDecoder(vocabulary, log_probs_input=True, beam_width=1)
 
         all_samples_concat = None
         for sample_name, feat in tqdm(input_features.items()):
