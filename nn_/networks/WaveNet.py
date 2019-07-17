@@ -2,9 +2,9 @@ import itertools
 import math
 import torch
 
-import asciichartpy
+# import asciichartpy
 import torch.nn.functional as F
-from tabulate import tabulate
+# from tabulate import tabulate
 from torch import nn, Tensor
 
 from base.base_model import BaseModel
@@ -142,35 +142,35 @@ class WaveNet(BaseModel):
             _receptive_field.append(layer.receptive_field())
         return _receptive_field
 
-    def _cnn_stats(self, input_size):
-        layers = self._get_layer_stats()
-
-        _print_tabular = []
-        _receptive_field = []
-        for i in range(len(layers)):
-            layer = layers[i]
-
-            if i > 0:
-                prev_layer = layers[i - 1]
-                layer.prev_layer = prev_layer
-                layer.input_size = prev_layer.output_size()
-            else:
-                layer.prev_layer = None
-                layer.input_size = input_size
-
-            _print_tabular.append([i, type(layer).__name__, layer.kernel_size, layer.stride, layer.dilation,
-                                   layer.padding, layer.input_size,
-                                   layer.output_size(), layer.receptive_field()])
-            _receptive_field.append(layer.receptive_field())
-        print(tabulate(_print_tabular, headers=(
-            "Layer #", "Name", "Kernel Size", "Stride", "Dilation", "Padding", "Input Size", "Output Size",
-            "Receptive Field")))
-
-        print(asciichartpy.plot(
-            list(itertools.chain.from_iterable(itertools.repeat(x, 5) for x in _receptive_field))
-            , cfg={"height": 10}))
-
-        return layer.output_size()
+    # def _cnn_stats(self, input_size):
+    #     layers = self._get_layer_stats()
+    #
+    #     _print_tabular = []
+    #     _receptive_field = []
+    #     for i in range(len(layers)):
+    #         layer = layers[i]
+    #
+    #         if i > 0:
+    #             prev_layer = layers[i - 1]
+    #             layer.prev_layer = prev_layer
+    #             layer.input_size = prev_layer.output_size()
+    #         else:
+    #             layer.prev_layer = None
+    #             layer.input_size = input_size
+    #
+    #         _print_tabular.append([i, type(layer).__name__, layer.kernel_size, layer.stride, layer.dilation,
+    #                                layer.padding, layer.input_size,
+    #                                layer.output_size(), layer.receptive_field()])
+    #         _receptive_field.append(layer.receptive_field())
+    #     print(tabulate(_print_tabular, headers=(
+    #         "Layer #", "Name", "Kernel Size", "Stride", "Dilation", "Padding", "Input Size", "Output Size",
+    #         "Receptive Field")))
+    #
+    #     print(asciichartpy.plot(
+    #         list(itertools.chain.from_iterable(itertools.repeat(x, 5) for x in _receptive_field))
+    #         , cfg={"height": 10}))
+    #
+    #     return layer.output_size()
 
     # def load_warm_start(self, path):
     #     # CE mono+cd+phnframe -> CTC phn

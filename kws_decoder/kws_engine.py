@@ -47,7 +47,7 @@ class KWSEngine(Engine):
 
     def __init__(self, keywords, sensitivity, model_path) -> None:
         super().__init__()
-        self.tmp_root_dir = '/mnt/data/tmp_kws_eval'
+        self.tmp_root_dir = '/Volumes/SD/projects2/KTH/IndividualCourse/phn_keywordspotting/pytorch-kaldi/tmp'
         if not os.path.exists(self.tmp_root_dir):
             os.makedirs(self.tmp_root_dir)
         self.tmp_dir = tempfile.TemporaryDirectory(dir=self.tmp_root_dir)
@@ -55,7 +55,7 @@ class KWSEngine(Engine):
         # TODO debug mode
 
         logger.configure_logger(self.tmp_dir.name)
-        check_environment()
+        # check_environment()
 
         assert isinstance(keywords, dict), keywords
         self.keywords = keywords

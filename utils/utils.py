@@ -8,11 +8,11 @@ import matplotlib
 
 from utils.logger_config import logger
 
-matplotlib.use('agg')
+# matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from jsmin import jsmin
 from scipy.signal import find_peaks
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
 
@@ -64,9 +64,9 @@ def check_environment():
     run_shell("which lattice-to-ctm-conf")
 
     # Build FST
-    run_shell("which fstcompile")
+    # run_shell("which fstcompile")
     run_shell("which fstaddselfloops")
-    run_shell("which fstarcsort")
+    # run_shell("which fstarcsort")
 
     run_shell("which fsttablecompose")
     run_shell("which fstdeterminizestar")

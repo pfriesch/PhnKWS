@@ -1,0 +1,61 @@
+{
+  "exp": {
+    "save_dir": "../exp",
+    "name": "libri_MLP_fbank",
+    "seed": 2234,
+    "n_gpu": 1,
+    "prefetch_to_gpu": true,
+    "n_epochs_tr": 34,
+    "save_period": 1,
+    "checkpoint_interval_seconds": 10000000000000,
+    "compute_train_metrics": false,
+    "data_cache_root": "/mnt/data/pytorch-kaldi/data_cache"
+  },
+  "dataset": {
+    "name": "librispeech",
+    "data_use": {
+      "train_with": "train_clean_460",
+      "valid_with": "dev_clean",
+      "test_with": "test_clean"
+    },
+    "features_use": ["fbank"],
+    "labels_use": ["lab_phn"]
+  },
+  "training": {
+    "dataset_type": "SEQUENTIAL_APPENDED_CONTEXT",
+    "max_seq_length_train": 3500,
+    "start_seq_len_train": 3500,
+    "increase_seq_length_train": true,
+    "multply_factor_seq_len_train": 2,
+    "max_seq_length_valid": 3500,
+    "batch_size_train": 1,
+    "batch_size_valid": 1,
+    "clip_grad_norm": -1,
+    "optimizer": {
+      "type": "adam",
+      "args": {
+        "lr": 1e-4,
+        "amsgrad": true
+      }
+    },
+    "lr_scheduler": {
+      "patience": 1,
+      "arch_halving_factor": 0.5,
+      "arch_improvement_threshold": 1e-4,
+      "cooldown": 1,
+      "min_lr": 1e-7
+    }
+  },
+  "arch": {
+    "name": "MLP",
+    "loss": {
+      "name": "CTC",
+      "args": {
+        "weight_mono": 1.0
+      }
+    },
+    "metrics": [
+      "phone_error_rate"
+    ]
+  }
+}

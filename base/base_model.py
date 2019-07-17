@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 
 from utils.logger_config import logger
-from thop import profile
+# from thop import profile
 
 # @see https://stackoverflow.com/questions/3154460/python-human-readable-large-numbers/3155023
 import math
@@ -44,7 +44,7 @@ class BaseModel(nn.Module):
         """
         Model summary
         """
-
+        raise NotImplementedError
         if self.batch_ordering == "NCL":
             flops, params = profile(self, input={'fbank': torch.zeros(((8, 40, sum(self.context) + 50)))},
                                     custom_ops=self.get_custom_ops_for_counting())

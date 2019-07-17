@@ -2,7 +2,7 @@ from torch.nn import Module
 import numpy as np
 from nn_.metrics.ctc_utils.error_rate.error_rate import cer
 from utils.logger_config import logger
-import ctcdecode
+# import ctcdecode
 
 
 class PhnErrorRate(Module):
@@ -13,7 +13,7 @@ class PhnErrorRate(Module):
         vocabulary_size += 1  # TODO unify blank label stuff
         self.vocabulary = [chr(c) for c in list(range(65, 65 + 58)) + list(range(65 + 58 + 69, 65 + 58 + 69 + 500))][
                           :vocabulary_size]
-        self.decoder = ctcdecode.CTCBeamDecoder(self.vocabulary, log_probs_input=True, beam_width=1)
+        # self.decoder = ctcdecode.CTCBeamDecoder(self.vocabulary, log_probs_input=True, beam_width=1)
         self.batch_ordering = batch_ordering
 
     @property
@@ -50,6 +50,7 @@ class PhnErrorRate(Module):
 
         assert logits.shape[0] == batch_size
         # N x L x C expected
+        raise NotImplementedError
         beam_result, beam_scores, timesteps, out_seq_len = self.decoder.decode(logits)
 
         curr_idx = 0
